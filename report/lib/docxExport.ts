@@ -85,8 +85,13 @@ async function buildCommonData(report: GenReport, store: Map<string, Uint8Array>
   return {
     제목: report.subject || report.docTitle || "",
     "작성 일자": dotDate(report.date),
-    sections: report.sections.map((s) => ({ heading: s.heading, body: s.body || " " })),
-    photosLabel: `${report.sections.length + 1}. 첨부사진`,
+    // 본문은 줄마다 ○ 항목으로 반복(엔터 줄바꿈 = 항목 분리). 빈 줄은 제외.
+    sections: report.sections.map((s) => ({
+      heading: s.heading,
+      내용: (s.body || "").split(/\r?\n/).map((l) => l.trim()).filter(Boolean),
+    })),
+    // 첨부사진은 제목과 같은 자동번호 목록 → Word가 다음 번호를 자동 부여(형식 일치)
+    photosLabel: "첨부사진",
     photoRows,
   };
 }
