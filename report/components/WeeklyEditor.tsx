@@ -102,7 +102,7 @@ export default function WeeklyEditor({ initial }: { initial: WeeklyDraft }) {
       const phraseMap: Record<string, WorkPhrase> = {};
       if (phrases) for (const [id, ph] of Object.entries(phrases)) phraseMap[id] = { 본문: ph.본문 };
       const blob = await generateWeeklyPptx(draft, phraseMap);
-      const name = `[주간업무자료] 바이오 이노베이션 허브_${draft.period.replace(/[.\s~]+/g, "_").replace(/_+/g, "_")}.pptx`;
+      const name = `[주간업무자료] 바이오 이노베이션 허브_${draft.period}.pptx`;
       await shareOrDownloadFile(blob, name, "application/vnd.openxmlformats-officedocument.presentationml.presentation", "주간 업무보고");
     } catch {
       alert("PPT 생성에 실패했습니다. 다시 시도해 주세요.");
