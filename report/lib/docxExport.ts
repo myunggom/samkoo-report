@@ -12,11 +12,13 @@ import type { PungReport } from "@/lib/pungsuhae";
 import { dotDate as pungDotDate } from "@/lib/pungsuhae";
 import { proxied } from "@/lib/client";
 
-const IMG_W = 300;
-const IMG_H = 225;
+// 사진 박스(px). 양식의 사진 셀 크기에 맞춰 넣어야 표 크기가 변하지 않음.
+type Box = { w: number; h: number };
+const COMMON_BOX: Box = { w: 300, h: 225 }; // 일반 보고서 2열 표(셀 3.25in, 높이 자동)
+const PUNG_BOX: Box = { w: 198, h: 138 }; // 풍수해 사진 셀(2.25×1.50in 고정) 안에 맞춤
 
-// 사진을 흰 배경 고정 박스(4:3)에 여백 없이 cover-crop → 셀에 꽉 차게
-async function normalizePhoto(url: string): Promise<Uint8Array | null> {
+// 사진을 흰 배경 고정 박스에 여백 없이 cover-crop → 셀 크기에 딱 맞게(표가 커지지 않음)
+async function normalizePhoto(url: string, box: Box = COMMON_BOX): Promise<Uint8Array | null> {
   try {
     const res = await fetch(proxied(url));
     if (!res.ok) return null;
@@ -24,16 +26,16 @@ async function normalizePhoto(url: string): Promise<Uint8Array | null> {
     const bitmap = await createImageBitmap(blob).catch(() => null);
     if (!bitmap) return null;
     const canvas = document.createElement("canvas");
-    canvas.width = IMG_W;
-    canvas.height = IMG_H;
+    canvas.width = box.w;
+    canvas.height = box.h;
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
     ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, IMG_W, IMG_H);
-    const ratio = Math.max(IMG_W / bitmap.width, IMG_H / bitmap.height);
+    ctx.fillRect(0, 0, box.w, box.h);
+    const ratio = Math.max(box.w / bitmap.width, box.h / bitmap.height);
     const w = bitmap.width * ratio;
     const h = bitmap.height * ratio;
-    ctx.drawImage(bitmap, (IMG_W - w) / 2, (IMG_H - h) / 2, w, h);
+    ctx.drawImage(bitmap, (box.w - w) / 2, (box.h - h) / 2, w, h);
     const outBlob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/jpeg", 0.82));
     if (!outBlob) return null;
     return new Uint8Array(await outBlob.arrayBuffer());
@@ -46,10 +48,11 @@ async function normalizePhoto(url: string): Promise<Uint8Array | null> {
 type PhotoRow = { c1img: string; c1cap: string; c2img: string; c2cap: string };
 async function buildPhotoRows(
   photos: { url?: string; caption?: string }[],
-  store: Map<string, Uint8Array>
+  store: Map<string, Uint8Array>,
+  box: Box = COMMON_BOX
 ): Promise<PhotoRow[]> {
   const filled = photos.filter((p) => p.url);
-  const imgs = await Promise.all(filled.map((p) => normalizePhoto(p.url!)));
+  const imgs = await Promise.all(filled.map((p) => normalizePhoto(p.url!, box)));
   const items = filled
     .map((p, i) => ({ img: imgs[i], cap: p.caption || "" }))
     .filter((x): x is { img: Uint8Array; cap: string } => x.img != null);
@@ -115,7 +118,7 @@ async function buildAccidentData(report: GenReport, store: Map<string, Uint8Arra
   return data;
 }
 
-async function renderDocx(templateFile: string, data: unknown, store: Map<string, Uint8Array>): Promise<Blob> {
+async function renderDocx(templateFile: string, data: unknown, store: Map<string, Uint8Array>, box: Box = COMMON_BOX): Promise<Blob> {
   const { default: PizZip } = await import("pizzip");
   const { default: Docxtemplater } = await import("docxtemplater");
   const ImageModule = (await import("docxtemplater-image-module-free")).default;
@@ -126,7 +129,7 @@ async function renderDocx(templateFile: string, data: unknown, store: Map<string
 
   const imageModule = new ImageModule({
     getImage: (key: string) => store.get(key) ?? new Uint8Array(),
-    getSize: () => [IMG_W, IMG_H],
+    getSize: () => [box.w, box.h],
   });
   const doc = new Docxtemplater(new PizZip(content), {
     modules: [imageModule],
@@ -162,7 +165,7 @@ export async function generatePungReportDocx(report: PungReport): Promise<Blob> 
   // 사진 5구간×3 = 최대 15칸 (구간 순서대로 평탄화)
   const slots: { url?: string; caption?: string }[] = [];
   report.sections.forEach((sec) => sec.slots.forEach((s) => slots.push(s)));
-  const imgs = await Promise.all(slots.map((s) => (s.url ? normalizePhoto(s.url) : Promise.resolve(null))));
+  const imgs = await Promise.all(slots.map((s) => (s.url ? normalizePhoto(s.url, PUNG_BOX) : Promise.resolve(null))));
   for (let n = 1; n <= 15; n++) {
     const bytes = imgs[n - 1];
     if (bytes) {
@@ -172,5 +175,5 @@ export async function generatePungReportDocx(report: PungReport): Promise<Blob> 
       data[`사진${n}`] = "";
     }
   }
-  return renderDocx("pungsuhae.docx", data, store);
+  return renderDocx("pungsuhae.docx", data, store, PUNG_BOX);
 }
