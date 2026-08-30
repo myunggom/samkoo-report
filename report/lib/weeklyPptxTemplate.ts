@@ -44,8 +44,9 @@ async function normalizePhoto(url: string): Promise<Uint8Array | null> {
 }
 
 // 작업 슬라이드 태그에 _i 접미사 + 루프 마커 제거
+// ({글}/{볼드}는 {#본문} 루프 내부 스코프라 접미사 대상 아님)
 function suffixWorkTags(xml: string, i: number): string {
-  const toks = ["{번호}", "{주제}", "{본문}", "{사진1설명}", "{사진2설명}", "{%사진1}", "{%사진2}"];
+  const toks = ["{번호}", "{주제}", "{#본문}", "{/본문}", "{사진1설명}", "{사진2설명}", "{%사진1}", "{%사진2}"];
   let out = xml;
   for (const t of toks) {
     const inner = t.replace(/^\{[#/%]?/, "").replace(/\}$/, "");
@@ -112,10 +113,21 @@ function expandWorkSlides(zip: ZipLike, n: number): void {
   zip.file("ppt/presentation.xml", pres);
 }
 
-// 본문: Claude 정리 문구가 있으면 그것, 없으면 메모를 그대로(줄바꿈·띄어쓰기 보존)
-function workBody(work: WeeklyWork, phrase?: WorkPhrase): string {
-  if (phrase && phrase.본문 && phrase.본문.trim()) return phrase.본문;
-  return work.memo || "";
+// 본문 텍스트 → 줄 배열. "# "로 시작하는 줄은 볼드 제목, 나머지는 일반.
+type BodyLine = { 글: string; 볼드: boolean };
+function parseBody(text: string): BodyLine[] {
+  const lines = (text || "").split(/\r?\n/);
+  while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
+  return lines.map((ln) => {
+    const m = /^#\s+(.*)$/.exec(ln.trim());
+    return m ? { 글: m[1], 볼드: true } : { 글: ln, 볼드: false };
+  });
+}
+
+// 본문: Claude 정리 문구가 있으면 그것, 없으면 메모를 그대로
+function workBody(work: WeeklyWork, phrase?: WorkPhrase): BodyLine[] {
+  const text = phrase && phrase.본문 && phrase.본문.trim() ? phrase.본문 : work.memo || "";
+  return parseBody(text);
 }
 
 export async function generateWeeklyPptx(

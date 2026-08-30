@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import type { WeeklyDraft, WeeklyWork, 공종 } from "@/lib/weekly";
-import { 공종목록, emptyWork, defectDisplay, defectTotals, normalizeDraft, foldWeek } from "@/lib/weekly";
+import { 공종목록, emptyWork, defectDisplay, defectTotals, normalizeDraft, foldWeek, todayBaseDate } from "@/lib/weekly";
 import { uploadPhoto } from "@/lib/client";
 import { generateWeeklyPptx, type WorkPhrase } from "@/lib/weeklyPptxTemplate";
 import { shareOrDownloadFile } from "@/lib/pdf";
@@ -14,7 +14,8 @@ type Phrase = { 본문: string };
 
 export default function WeeklyEditor({ initial }: { initial: WeeklyDraft }) {
   const router = useRouter();
-  const [draft, setDraft] = useState<WeeklyDraft>(() => normalizeDraft(initial));
+  // 기준일은 항상 오늘(작성일)로 시작 — yyyy.mm.dd (요일) 기준
+  const [draft, setDraft] = useState<WeeklyDraft>(() => ({ ...normalizeDraft(initial), baseDate: todayBaseDate() }));
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [phrases, setPhrases] = useState<Record<string, Phrase> | null>(null);
@@ -212,7 +213,7 @@ export default function WeeklyEditor({ initial }: { initial: WeeklyDraft }) {
 
         {phrases && (
           <div className="mt-4 space-y-3">
-            <p className="text-xs text-slate-500">문구를 자유롭게 수정할 수 있어요. 줄바꿈이 슬라이드에 그대로 반영됩니다.</p>
+            <p className="text-xs text-slate-500">자유롭게 수정하세요. <b># 로 시작하는 줄</b>은 볼드 제목, <b>- 로 시작하는 줄</b>은 항목으로 들어갑니다.</p>
             {draft.works.map((w, idx) => (
               <div key={w.id} className="rounded-xl border border-slate-200 bg-white p-3">
                 <div className="mb-2 text-sm font-semibold text-slate-700">{idx + 1}. {w.title || "(제목 없음)"}</div>
