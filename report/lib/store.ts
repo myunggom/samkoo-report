@@ -15,6 +15,7 @@ import type { MediaItem, DayNote } from "./archive";
 import type { GenReport } from "./reports";
 import type { CalEvent } from "./events";
 import type { Issue } from "./issues";
+import type { WeeklyDraft } from "./weekly";
 
 const BLOB_TOKEN = process.env.BLOB_READ_WRITE_TOKEN || "";
 const USE_BLOB = !!BLOB_TOKEN;
@@ -25,6 +26,7 @@ const DAYNOTE_PREFIX = "db/daynotes/";
 const GENREPORT_PREFIX = "db/genreports/";
 const EVENT_PREFIX = "db/events/";
 const ISSUE_PREFIX = "db/issues/";
+const WEEKLY_PREFIX = "db/weekly/";
 
 const DATA_DIR = path.join(process.cwd(), ".data");
 const PUNG_FILE = path.join(DATA_DIR, "pungsuhae.json");
@@ -33,6 +35,7 @@ const DAYNOTE_FILE = path.join(DATA_DIR, "daynotes.json");
 const GENREPORT_FILE = path.join(DATA_DIR, "genreports.json");
 const EVENT_FILE = path.join(DATA_DIR, "events.json");
 const ISSUE_FILE = path.join(DATA_DIR, "issues.json");
+const WEEKLY_FILE = path.join(DATA_DIR, "weekly.json");
 const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads");
 
 async function readLocal<T>(file: string, fallback: T): Promise<T> {
@@ -300,6 +303,18 @@ export async function updateIssue(id: string, patch: Partial<Issue>): Promise<Is
 export async function deleteIssue(id: string): Promise<void> {
   const all = await allIssues();
   await putIssues(all.filter((x) => x.id !== id));
+}
+
+// ── 주간 업무보고 초안 (사장 전용 · 단일 문서) ────────────────────
+export async function getWeeklyDraft(): Promise<WeeklyDraft | null> {
+  if (USE_BLOB) return readBlobJson<WeeklyDraft | null>(WEEKLY_PREFIX, null);
+  return readLocal<WeeklyDraft | null>(WEEKLY_FILE, null);
+}
+export async function saveWeeklyDraft(draft: WeeklyDraft): Promise<WeeklyDraft> {
+  const next: WeeklyDraft = { ...draft, updatedAt: new Date().toISOString() };
+  if (USE_BLOB) await writeBlobJson(WEEKLY_PREFIX, next);
+  else await writeLocal(WEEKLY_FILE, next);
+  return next;
 }
 
 // ── 사진 업로드 (고유 파일명 — 불변이라 덮어쓰기 문제 없음) ────────
