@@ -2,9 +2,9 @@
 
 import { useRef, useState } from "react";
 import { uploadToArchive, registerMedia } from "@/lib/client";
-import { MEDIA_CATEGORIES, DEFAULT_CATEGORY, todayYmd, mediaTypeOf } from "@/lib/archive";
+import { MEDIA_CATEGORIES, DEFAULT_CATEGORY, todayYmd, mediaTypeOf, extOf, fileIcon } from "@/lib/archive";
 
-type Staged = { file: File; type: "image" | "video"; pct: number; done: boolean };
+type Staged = { file: File; type: "image" | "video" | "file"; pct: number; done: boolean };
 
 export default function MediaUploader({
   defaultTakenAt,
@@ -25,6 +25,7 @@ export default function MediaUploader({
 
   const cameraRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const docRef = useRef<HTMLInputElement>(null);
 
   function addFiles(files: FileList | null) {
     if (!files) return;
@@ -43,10 +44,10 @@ export default function MediaUploader({
       for (let i = 0; i < staged.length; i++) {
         const s = staged[i];
         if (s.done) continue;
-        const { url, type } = await uploadToArchive(s.file, (pct) =>
+        const { url, type, fileName, ext } = await uploadToArchive(s.file, (pct) =>
           setStaged((prev) => prev.map((x, idx) => (idx === i ? { ...x, pct } : x)))
         );
-        await registerMedia({ url, type, category, takenAt, area, uploader, note });
+        await registerMedia({ url, type, category, takenAt, area, uploader, note, fileName, ext });
         setStaged((prev) => prev.map((x, idx) => (idx === i ? { ...x, pct: 100, done: true } : x)));
       }
       setStaged([]);
@@ -62,7 +63,7 @@ export default function MediaUploader({
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-bold text-slate-800">사진·동영상 올리기</h2>
+        <h2 className="text-sm font-bold text-slate-800">사진·동영상·문서 올리기</h2>
         <span className="text-xs text-slate-400">여러 개 한 번에 가능</span>
       </div>
 
@@ -95,23 +96,27 @@ export default function MediaUploader({
       </label>
 
       {/* 파일 선택 */}
-      <div className="mt-3 grid grid-cols-2 gap-2">
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
         <button onClick={() => cameraRef.current?.click()} disabled={busy} className="rounded-lg bg-slate-900 py-2.5 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50">
           📷 카메라 촬영
         </button>
         <button onClick={() => fileRef.current?.click()} disabled={busy} className="rounded-lg border border-slate-300 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50">
-          🖼 사진·동영상 선택
+          🖼 사진·동영상
+        </button>
+        <button onClick={() => docRef.current?.click()} disabled={busy} className="col-span-2 rounded-lg border border-slate-300 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50 sm:col-span-1">
+          📄 문서(PPT·워드·엑셀·PDF)
         </button>
       </div>
       <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { addFiles(e.target.files); if (cameraRef.current) cameraRef.current.value = ""; }} />
       <input ref={fileRef} type="file" accept="image/*,video/*" multiple className="hidden" onChange={(e) => { addFiles(e.target.files); if (fileRef.current) fileRef.current.value = ""; }} />
+      <input ref={docRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.hwp,.hwpx,.csv,.txt,.zip,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation" multiple className="hidden" onChange={(e) => { addFiles(e.target.files); if (docRef.current) docRef.current.value = ""; }} />
 
       {/* 대기 목록 */}
       {staged.length > 0 && (
         <div className="mt-3 space-y-1.5">
           {staged.map((s, i) => (
             <div key={i} className="flex items-center gap-2 rounded-lg border border-slate-200 px-2 py-1.5 text-xs">
-              <span className="shrink-0">{s.type === "video" ? "🎬" : "🖼"}</span>
+              <span className="shrink-0">{s.type === "video" ? "🎬" : s.type === "file" ? fileIcon(extOf(s.file.name)) : "🖼"}</span>
               <span className="min-w-0 flex-1 truncate text-slate-600">{s.file.name}</span>
               {busy ? (
                 <span className="shrink-0 tabular-nums text-slate-400">{s.done ? "완료" : `${s.pct}%`}</span>

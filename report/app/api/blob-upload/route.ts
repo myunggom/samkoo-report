@@ -12,7 +12,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       body,
       request: req,
       onBeforeGenerateToken: async () => ({
-        allowedContentTypes: ["image/*", "video/*"],
+        // 사진·동영상 + 문서(PPT·워드·엑셀·PDF·한글 등). 일부 문서는 octet-stream으로 올라옴.
+        allowedContentTypes: ["image/*", "video/*", "application/*", "text/*"],
         addRandomSuffix: true,
         maximumSizeInBytes: 1024 * 1024 * 1024, // 1GB
       }),

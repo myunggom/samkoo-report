@@ -40,15 +40,19 @@ export function proxied(url: string): string {
   return url;
 }
 
-// 아카이브용: 사진은 축소, 동영상은 원본을 Blob으로 "직접" 업로드(서버 함수 크기 제한 우회).
-// 반환: { url, type }
+// 아카이브용: 사진은 축소, 동영상·문서는 원본을 Blob으로 "직접" 업로드(서버 함수 크기 제한 우회).
+// 반환: { url, type, fileName, ext }
 export async function uploadToArchive(
   file: File,
   onProgress?: (pct: number) => void
-): Promise<{ url: string; type: "image" | "video" }> {
-  const isVideo = file.type.startsWith("video");
-  const payload: Blob = isVideo ? file : await compressImage(file);
-  const ext = isVideo ? file.name.split(".").pop() || "mp4" : "jpg";
+): Promise<{ url: string; type: "image" | "video" | "file"; fileName?: string; ext?: string }> {
+  const { mediaTypeOf, extOf } = await import("@/lib/archive");
+  const kind = mediaTypeOf(file);
+  const isImage = kind === "image";
+
+  const payload: Blob = isImage ? await compressImage(file) : file;
+  const origExt = extOf(file.name);
+  const ext = isImage ? "jpg" : origExt || file.type.split("/").pop() || "bin";
   const base = file.name.replace(/\.[^.]+$/, "") || "media";
   const pathname = `archive/${Date.now()}-${base}.${ext}`;
 
@@ -56,23 +60,26 @@ export async function uploadToArchive(
   const blob = await upload(pathname, payload, {
     access: "public",
     handleUploadUrl: "/api/blob-upload",
-    contentType: isVideo ? file.type : "image/jpeg",
-    multipart: isVideo, // 큰 동영상은 분할 업로드로 안정성 확보
+    contentType: isImage ? "image/jpeg" : file.type || "application/octet-stream",
+    multipart: kind !== "image", // 큰 동영상·문서는 분할 업로드로 안정성 확보
     onUploadProgress: onProgress ? (p) => onProgress(Math.round(p.percentage)) : undefined,
   });
-  return { url: blob.url, type: isVideo ? "video" : "image" };
+  if (kind === "file") return { url: blob.url, type: "file", fileName: file.name, ext: origExt };
+  return { url: blob.url, type: kind };
 }
 
 // 업로드 후 메타데이터 등록
 export async function registerMedia(meta: {
   url: string;
-  type: "image" | "video";
+  type: "image" | "video" | "file";
   category?: string;
   title?: string;
   note?: string;
   area?: string;
   takenAt?: string;
   uploader?: string;
+  fileName?: string;
+  ext?: string;
 }): Promise<void> {
   const res = await fetch("/api/media", {
     method: "POST",

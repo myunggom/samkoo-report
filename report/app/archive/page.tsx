@@ -11,7 +11,7 @@ export default function ArchivePage() {
   const [items, setItems] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [cat, setCat] = useState<string>("전체");
-  const [typeFilter, setTypeFilter] = useState<"all" | "image" | "video">("all");
+  const [typeFilter, setTypeFilter] = useState<"all" | "image" | "video" | "file">("all");
   const [q, setQ] = useState("");
   const [editing, setEditing] = useState<MediaItem | null>(null);
 
@@ -37,7 +37,7 @@ export default function ArchivePage() {
       if (cat !== "전체" && m.category !== cat) return false;
       if (typeFilter !== "all" && m.type !== typeFilter) return false;
       if (kw) {
-        const hay = `${m.title ?? ""} ${m.note ?? ""} ${m.area ?? ""} ${m.uploader ?? ""}`.toLowerCase();
+        const hay = `${m.title ?? ""} ${m.note ?? ""} ${m.area ?? ""} ${m.uploader ?? ""} ${m.fileName ?? ""}`.toLowerCase();
         if (!hay.includes(kw)) return false;
       }
       return true;
@@ -48,7 +48,7 @@ export default function ArchivePage() {
     <div className="space-y-5">
       <div>
         <h1 className="text-xl font-bold text-slate-900">아카이브</h1>
-        <p className="mt-1 text-sm text-slate-500">건물 사진·동영상 보관함 — 여기서 올리면 보고서에서 바로 불러 쓸 수 있어요.</p>
+        <p className="mt-1 text-sm text-slate-500">건물 사진·동영상·문서(PPT·워드·엑셀·PDF) 보관함 — 사진은 보고서에서 바로 불러 쓸 수 있고, 완료·발송 자료도 올려 보관하세요.</p>
       </div>
 
       <MediaUploader onUploaded={load} />
@@ -66,12 +66,13 @@ export default function ArchivePage() {
             </button>
           ))}
         </div>
-        <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as "all" | "image" | "video")} className="rounded-lg border border-slate-300 px-2 py-1 text-xs">
-          <option value="all">사진+동영상</option>
+        <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as "all" | "image" | "video" | "file")} className="rounded-lg border border-slate-300 px-2 py-1 text-xs">
+          <option value="all">전체 종류</option>
           <option value="image">사진만</option>
           <option value="video">동영상만</option>
+          <option value="file">문서만</option>
         </select>
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="검색(설명·위치·이름)" className="ml-auto w-40 rounded-lg border border-slate-300 px-2 py-1 text-xs" />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="검색(설명·위치·파일명)" className="ml-auto w-40 rounded-lg border border-slate-300 px-2 py-1 text-xs" />
       </div>
 
       {/* 그리드 */}

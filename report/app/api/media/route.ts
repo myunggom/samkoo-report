@@ -16,16 +16,20 @@ export async function POST(req: NextRequest) {
   if (!b.url || typeof b.url !== "string") {
     return NextResponse.json({ error: "url이 필요합니다." }, { status: 400 });
   }
+  const type = b.type === "video" ? "video" : b.type === "file" ? "file" : "image";
   const item: MediaItem = {
     id: randomUUID(),
     url: String(b.url),
-    type: b.type === "video" ? "video" : "image",
+    type,
     category: typeof b.category === "string" && b.category ? b.category : DEFAULT_CATEGORY,
     title: b.title ? String(b.title) : "",
     note: b.note ? String(b.note) : "",
     area: b.area ? String(b.area) : "",
     takenAt: typeof b.takenAt === "string" && b.takenAt ? b.takenAt : todayYmd(),
     uploader: b.uploader ? String(b.uploader) : "",
+    ...(type === "file"
+      ? { fileName: b.fileName ? String(b.fileName) : "", ext: b.ext ? String(b.ext).toLowerCase() : "" }
+      : {}),
     createdAt: new Date().toISOString(),
   };
   return NextResponse.json(await addMedia(item), { status: 201 });

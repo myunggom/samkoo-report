@@ -4,11 +4,11 @@
 //   일일 기록은 같은 미디어를 "날짜"로 묶어 보여주고, 날짜별 메모(DayNote)를 곁들임.
 //   → 데이터 중복 없음. 아카이브에서 지우면 일지에서도 사라짐.
 
-export type MediaType = "image" | "video";
+export type MediaType = "image" | "video" | "file";
 
 export type MediaItem = {
   id: string;
-  url: string; // Blob 원본 URL (사진 또는 동영상)
+  url: string; // Blob 원본 URL (사진·동영상·문서)
   type: MediaType;
   category: string; // MEDIA_CATEGORIES 중 하나
   title?: string; // 짧은 설명/제목
@@ -16,6 +16,8 @@ export type MediaItem = {
   area?: string; // 위치(구역) — 예: 지하3층 기계실
   takenAt: string; // YYYY-MM-DD (촬영/기록 날짜, 기본 오늘)
   uploader?: string; // 올린 사람 (자유 입력)
+  fileName?: string; // 문서 원본 파일명 (type === "file")
+  ext?: string; // 문서 확장자 소문자 (예: pptx, docx, xlsx, pdf, hwp)
   createdAt: string;
 };
 
@@ -64,7 +66,40 @@ export function prettyDay(ymd: string): string {
   return `${y}. ${p(m)}. ${p(d)} (${WEEK[dt.getDay()]})`;
 }
 
-// 파일 → 이미지/동영상 판별
-export function mediaTypeOf(file: { type: string }): MediaType {
-  return file.type.startsWith("video") ? "video" : "image";
+// 문서로 취급할 확장자
+export const DOC_EXTS = ["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "hwp", "hwpx", "csv", "txt", "zip"] as const;
+
+export function extOf(name: string): string {
+  const m = /\.([^.]+)$/.exec(name || "");
+  return m ? m[1].toLowerCase() : "";
+}
+
+// 파일 → 이미지/동영상/문서 판별 (mime 우선, 없으면 확장자)
+export function mediaTypeOf(file: { type: string; name?: string }): MediaType {
+  if (file.type.startsWith("video")) return "video";
+  if (file.type.startsWith("image")) return "image";
+  const ext = extOf(file.name || "");
+  if (DOC_EXTS.includes(ext as (typeof DOC_EXTS)[number])) return "file";
+  // mime이 문서 계열이면 문서
+  if (/^application\/(pdf|msword|vnd\.|x-hwp|haansoft|zip)/.test(file.type) || file.type === "text/plain" || file.type === "text/csv") return "file";
+  // 알 수 없으면 이미지로(기존 동작 유지)
+  return file.type ? "image" : (ext ? "file" : "image");
+}
+
+// 문서 아이콘(확장자별)
+export function fileIcon(ext?: string): string {
+  switch ((ext || "").toLowerCase()) {
+    case "pdf": return "📕";
+    case "doc":
+    case "docx":
+    case "hwp":
+    case "hwpx": return "📘";
+    case "xls":
+    case "xlsx":
+    case "csv": return "📗";
+    case "ppt":
+    case "pptx": return "📙";
+    case "zip": return "🗜";
+    default: return "📄";
+  }
 }
