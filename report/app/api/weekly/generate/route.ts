@@ -84,11 +84,23 @@ ${listText}`;
   }
 
   let text = "";
+  let diag = "";
   try {
     const data = await res.json();
-    text = (data?.content?.[0]?.text ?? "").trim();
+    const blocks: unknown[] = Array.isArray(data?.content) ? data.content : [];
+    // text 타입 블록만 모아서 사용 (thinking 등 다른 블록이 앞에 와도 안전)
+    text = blocks
+      .map((b) => (b && typeof b === "object" && (b as Record<string, unknown>).type === "text" ? String((b as Record<string, unknown>).text ?? "") : ""))
+      .join("")
+      .trim();
+    const types = blocks.map((b) => (b && typeof b === "object" ? (b as Record<string, unknown>).type : typeof b)).join(",");
+    diag = `stop=${data?.stop_reason ?? "?"}; blocks=[${types}]`;
   } catch (e) {
     return NextResponse.json({ error: `Claude 응답을 읽지 못했습니다: ${(e as Error).message}` }, { status: 502 });
+  }
+
+  if (!text) {
+    return NextResponse.json({ error: `AI가 빈 응답을 보냈습니다. (${diag}) 다시 시도해 주세요.` }, { status: 502 });
   }
 
   // 코드펜스/앞뒤 텍스트 제거 후 JSON 파싱 (실패해도 원문 일부를 안내)
@@ -100,7 +112,7 @@ ${listText}`;
     const parsed = JSON.parse(start >= 0 ? jsonStr.slice(start, end + 1) : jsonStr);
     outItems = Array.isArray(parsed?.items) ? parsed.items : [];
   } catch {
-    return NextResponse.json({ error: `AI 응답 형식을 해석하지 못했습니다. 응답 일부: ${text.slice(0, 120)}` }, { status: 502 });
+    return NextResponse.json({ error: `AI 응답 형식을 해석하지 못했습니다. 응답 일부: ${text.slice(0, 150)}` }, { status: 502 });
   }
 
   const result = usable.map((it, i) => {
