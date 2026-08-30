@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@vercel/blob": "^2.8.0",
+    "docx-preview": "^0.4.0",
     "docxtemplater": "^3.69.3",
     "docxtemplater-image-module-free": "^1.1.1",
     "html2canvas-pro": "^2.4.0",

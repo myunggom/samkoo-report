@@ -6,8 +6,9 @@ import { useRouter } from "next/navigation";
 import type { PungReport, PungSection, PungSlot } from "@/lib/pungsuhae";
 import { dotDate, pungFileName } from "@/lib/pungsuhae";
 import { uploadPhoto } from "@/lib/client";
-import { elementToPdfBlob, shareOrDownloadPdf } from "@/lib/pdf";
-import PungsuhaeDocument from "@/components/PungsuhaeDocument";
+import { shareOrDownloadPdf, shareOrDownloadFile } from "@/lib/pdf";
+import { generatePungReportDocx } from "@/lib/docxExport";
+import { docxBlobToPdfBlob } from "@/lib/docxToPdf";
 import ArchivePicker from "@/components/ArchivePicker";
 
 export default function PungsuhaeEditor({ initial }: { initial: PungReport }) {
@@ -18,6 +19,7 @@ export default function PungsuhaeEditor({ initial }: { initial: PungReport }) {
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [exportingWord, setExportingWord] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [picking, setPicking] = useState<{ si: number; i: number } | null>(null);
 
@@ -26,7 +28,6 @@ export default function PungsuhaeEditor({ initial }: { initial: PungReport }) {
   const albumMultiRef = useRef<HTMLInputElement>(null);
   const target = useRef<{ si: number; i: number } | null>(null);
   const fillTarget = useRef<number | null>(null); // 여러 장 채우기 대상 구간
-  const docRef = useRef<HTMLDivElement>(null);
 
   const sections = report.sections;
   const section = sections[Math.min(active, sections.length - 1)] as PungSection | undefined;
@@ -154,15 +155,28 @@ export default function PungsuhaeEditor({ initial }: { initial: PungReport }) {
     }
   }
 
-  // ── PDF 출력 (저장 후 캡처) ──────────────────────────
+  // ── 워드 출력 (원본 양식 채우기) ──────────────────────
+  async function exportWord() {
+    setExportingWord(true);
+    try {
+      await save();
+      const blob = await generatePungReportDocx(report);
+      const name = pungFileName(report).replace(/\.pdf$/, ".docx");
+      await shareOrDownloadFile(blob, name, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", `풍수해 예방 점검 보고서 (${dotDate(report.date)})`);
+    } catch {
+      alert("워드 출력에 실패했습니다. 다시 시도해 주세요.");
+    } finally {
+      setExportingWord(false);
+    }
+  }
+  // ── PDF 출력 (워드 파일을 만든 뒤 PDF로 변환) ──────────
   async function exportPdf() {
     setExporting(true);
     try {
       await save();
-      await new Promise((r) => setTimeout(r, 50));
-      if (!docRef.current) throw new Error("문서를 찾을 수 없습니다.");
-      const blob = await elementToPdfBlob(docRef.current, { orientation: "portrait", pageSelector: ".pung-page" });
-      await shareOrDownloadPdf(blob, pungFileName(report), `풍수해 예방 점검 보고서 (${dotDate(report.date)})`);
+      const docxBlob = await generatePungReportDocx(report);
+      const pdfBlob = await docxBlobToPdfBlob(docxBlob);
+      await shareOrDownloadPdf(pdfBlob, pungFileName(report), `풍수해 예방 점검 보고서 (${dotDate(report.date)})`);
     } catch {
       alert("PDF 출력에 실패했습니다. 다시 시도해 주세요.");
     } finally {
@@ -387,11 +401,18 @@ export default function PungsuhaeEditor({ initial }: { initial: PungReport }) {
               {saving ? "저장 중…" : "저장"}
             </button>
             <button
+              onClick={exportWord}
+              disabled={exportingWord}
+              className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-600 disabled:opacity-50"
+            >
+              {exportingWord ? "만드는 중…" : "워드로 출력"}
+            </button>
+            <button
               onClick={exportPdf}
               disabled={exporting}
               className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50"
             >
-              {exporting ? "만드는 중…" : "PDF 출력 · 공유"}
+              {exporting ? "만드는 중…" : "PDF로 출력"}
             </button>
           </div>
         </div>
@@ -433,12 +454,6 @@ export default function PungsuhaeEditor({ initial }: { initial: PungReport }) {
         />
       )}
 
-      {/* PDF 캡처용 오프스크린 문서 */}
-      <div style={{ position: "fixed", left: -99999, top: 0, pointerEvents: "none" }} aria-hidden>
-        <div ref={docRef}>
-          <PungsuhaeDocument report={report} />
-        </div>
-      </div>
     </div>
   );
 }

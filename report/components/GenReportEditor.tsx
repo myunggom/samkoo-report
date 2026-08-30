@@ -1,14 +1,13 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { GenReport, ReportTextSection, AccidentFields } from "@/lib/reports";
 import { KIND_LABEL, layoutOf, reportFileName } from "@/lib/reports";
-import { elementToPdfBlobFlow, shareOrDownloadPdf, shareOrDownloadFile } from "@/lib/pdf";
+import { shareOrDownloadPdf, shareOrDownloadFile } from "@/lib/pdf";
 import { generateReportDocx } from "@/lib/docxExport";
-import { generateReportPptx } from "@/lib/pptxExport";
+import { docxBlobToPdfBlob } from "@/lib/docxToPdf";
 import ReportPhotoField from "@/components/ReportPhotoField";
-import GenReportDocument from "@/components/GenReportDocument";
 
 export default function GenReportEditor({ initial }: { initial: GenReport }) {
   const router = useRouter();
@@ -17,8 +16,6 @@ export default function GenReportEditor({ initial }: { initial: GenReport }) {
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportingWord, setExportingWord] = useState(false);
-  const [exportingPpt, setExportingPpt] = useState(false);
-  const docRef = useRef<HTMLDivElement>(null);
   const layout = layoutOf(r.kind);
 
   function patch(p: Partial<GenReport>) {
@@ -63,14 +60,14 @@ export default function GenReportEditor({ initial }: { initial: GenReport }) {
       alert("삭제에 실패했습니다.");
     }
   }
+  // PDF = 워드 파일을 먼저 만든 뒤 그 문서를 그대로 PDF로 변환
   async function exportPdf() {
     setExporting(true);
     try {
       await save();
-      await new Promise((res) => setTimeout(res, 50));
-      if (!docRef.current) throw new Error();
-      const blob = await elementToPdfBlobFlow(docRef.current, { orientation: "portrait" });
-      await shareOrDownloadPdf(blob, reportFileName(r), reportFileName(r).replace(/\.pdf$/, ""));
+      const docxBlob = await generateReportDocx(r);
+      const pdfBlob = await docxBlobToPdfBlob(docxBlob);
+      await shareOrDownloadPdf(pdfBlob, reportFileName(r), reportFileName(r).replace(/\.pdf$/, ""));
     } catch {
       alert("PDF 출력에 실패했습니다. 다시 시도해 주세요.");
     } finally {
@@ -88,19 +85,6 @@ export default function GenReportEditor({ initial }: { initial: GenReport }) {
       alert("워드 출력에 실패했습니다. 다시 시도해 주세요.");
     } finally {
       setExportingWord(false);
-    }
-  }
-  async function exportPpt() {
-    setExportingPpt(true);
-    try {
-      await save();
-      const blob = await generateReportPptx(r);
-      const name = reportFileName(r).replace(/\.pdf$/, ".pptx");
-      await shareOrDownloadFile(blob, name, "application/vnd.openxmlformats-officedocument.presentationml.presentation", name.replace(/\.pptx$/, ""));
-    } catch {
-      alert("PPT 출력에 실패했습니다. 다시 시도해 주세요.");
-    } finally {
-      setExportingPpt(false);
     }
   }
 
@@ -179,25 +163,16 @@ export default function GenReportEditor({ initial }: { initial: GenReport }) {
             <button onClick={save} disabled={saving} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50">
               {saving ? "저장 중…" : "저장"}
             </button>
-            <button onClick={exportPdf} disabled={exporting} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50">
-              {exporting ? "만드는 중…" : "PDF로 출력"}
-            </button>
             <button onClick={exportWord} disabled={exportingWord} className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-600 disabled:opacity-50">
               {exportingWord ? "만드는 중…" : "워드로 출력"}
             </button>
-            <button onClick={exportPpt} disabled={exportingPpt} className="rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-500 disabled:opacity-50">
-              {exportingPpt ? "만드는 중…" : "PPT로 출력"}
+            <button onClick={exportPdf} disabled={exporting} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50">
+              {exporting ? "만드는 중…" : "PDF로 출력"}
             </button>
           </div>
         </div>
       </div>
 
-      {/* PDF 캡처용 오프스크린 문서 */}
-      <div style={{ position: "fixed", left: -99999, top: 0, pointerEvents: "none" }} aria-hidden>
-        <div ref={docRef}>
-          <GenReportDocument report={r} />
-        </div>
-      </div>
     </div>
   );
 }

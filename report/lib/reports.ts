@@ -139,7 +139,7 @@ export function emptyGenReport(id: string, kind: ReportKind): GenReport {
     date: todayYmd(),
     sections: defaultSections(kind),
     accident: emptyAccident(),
-    photos: [{ caption: "" }, { caption: "" }],
+    photos: [],
     createdAt: now,
     updatedAt: now,
   };

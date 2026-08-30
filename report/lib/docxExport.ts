@@ -1,18 +1,21 @@
 "use client";
 
-// 보고서(GenReport)를 원본 양식형 워드(.docx)로 생성 — 클라이언트 전용.
-//  · 사고보고서: 사장 원본 양식(public/templates/accident.docx)을 그대로 채움(텍스트 태그 + 사진 이미지 태그)
-//  · 완료/점검/보수요청: 섹션이 가변이라 공통 생성템플릿(gen-common.docx)에 반복 채움
-// 사진은 개수에 맞춰 채우고, 셀에 꽉 차게(여백 없이) 넣습니다. 글꼴은 템플릿에서 맑은 고딕으로 통일.
+// 보고서를 사장 원본 양식(.docx) 그대로 채워 생성 — 클라이언트 전용.
+//  · 사고: accident.docx (필드표 그대로 + 사진 반복표)
+//  · 점검/완료/보수요청: inspection/completion/repair.docx (반복 섹션 + 사진 반복표)
+//  · 풍수해: pungsuhae.docx (점검표 결과 + 사진 5구간×3)
+// 사진은 개수에 맞춰 표가 늘어나고, 셀에 꽉 차게(cover) 들어갑니다. 글꼴은 양식에서 맑은 고딕.
 
-import type { GenReport } from "@/lib/reports";
+import type { GenReport, ReportKind } from "@/lib/reports";
 import { dotDate, layoutOf } from "@/lib/reports";
+import type { PungReport } from "@/lib/pungsuhae";
+import { dotDate as pungDotDate } from "@/lib/pungsuhae";
 import { proxied } from "@/lib/client";
 
-// 사진을 셀에 꽉 차게 채우기 위한 고정 박스(4:3), 여백 없이 cover-crop
 const IMG_W = 300;
 const IMG_H = 225;
 
+// 사진을 흰 배경 고정 박스(4:3)에 여백 없이 cover-crop → 셀에 꽉 차게
 async function normalizePhoto(url: string): Promise<Uint8Array | null> {
   try {
     const res = await fetch(proxied(url));
@@ -27,7 +30,6 @@ async function normalizePhoto(url: string): Promise<Uint8Array | null> {
     if (!ctx) return null;
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, IMG_W, IMG_H);
-    // cover: 박스를 꽉 채우도록 확대 후 가운데 crop (여백 없음)
     const ratio = Math.max(IMG_W / bitmap.width, IMG_H / bitmap.height);
     const w = bitmap.width * ratio;
     const h = bitmap.height * ratio;
@@ -40,20 +42,33 @@ async function normalizePhoto(url: string): Promise<Uint8Array | null> {
   }
 }
 
-async function blankImage(): Promise<Uint8Array> {
-  const canvas = document.createElement("canvas");
-  canvas.width = IMG_W;
-  canvas.height = IMG_H;
-  const ctx = canvas.getContext("2d");
-  if (ctx) {
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, IMG_W, IMG_H);
+// 사진들 → 2열 반복표 데이터 (개수에 맞춰 행 생성, 홀수 마지막은 빈 셀)
+type PhotoRow = { c1img: string; c1cap: string; c2img: string; c2cap: string };
+async function buildPhotoRows(
+  photos: { url?: string; caption?: string }[],
+  store: Map<string, Uint8Array>
+): Promise<PhotoRow[]> {
+  const filled = photos.filter((p) => p.url);
+  const imgs = await Promise.all(filled.map((p) => normalizePhoto(p.url!)));
+  const items = filled
+    .map((p, i) => ({ img: imgs[i], cap: p.caption || "" }))
+    .filter((x): x is { img: Uint8Array; cap: string } => x.img != null);
+  items.forEach((it, i) => store.set(`p${i}`, it.img));
+  const rows: PhotoRow[] = [];
+  for (let i = 0; i < items.length; i += 2) {
+    const hasB = i + 1 < items.length;
+    rows.push({ c1img: `p${i}`, c1cap: items[i].cap, c2img: hasB ? `p${i + 1}` : "", c2cap: hasB ? items[i + 1].cap : "" });
   }
-  const b = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/jpeg", 0.6));
-  return b ? new Uint8Array(await b.arrayBuffer()) : new Uint8Array();
+  return rows;
 }
 
-// 여러 줄 텍스트를 n개 슬롯으로 분배 (부족하면 빈칸, 넘치면 마지막에 몰아넣음)
+const TEMPLATE_BY_KIND: Record<ReportKind, string> = {
+  accident: "accident.docx",
+  completion: "completion.docx",
+  inspection: "inspection.docx",
+  repair: "repair.docx",
+};
+
 function splitLines(text: string, n: number): string[] {
   const lines = (text || "").split("\n").map((s) => s.trim());
   const out: string[] = [];
@@ -62,39 +77,20 @@ function splitLines(text: string, n: number): string[] {
   return out;
 }
 
-// ── 공통 양식(완료/점검/보수요청): 사진 2열 반복 ──
-type PhotoRow = { c1img: string; c1cap: string; c2img: string; c2cap: string };
-
 async function buildCommonData(report: GenReport, store: Map<string, Uint8Array>) {
-  const filled = report.photos.filter((p) => p.url);
-  const imgs = await Promise.all(filled.map((p) => normalizePhoto(p.url!)));
-  const items = filled
-    .map((p, i) => ({ img: imgs[i], cap: p.caption || "" }))
-    .filter((x): x is { img: Uint8Array; cap: string } => x.img != null);
-
-  const rows: PhotoRow[] = [];
-  if (items.length > 0) {
-    const blankKey = "__blank__";
-    store.set(blankKey, await blankImage());
-    items.forEach((it, i) => store.set(`p${i}`, it.img));
-    for (let i = 0; i < items.length; i += 2) {
-      const hasB = i + 1 < items.length;
-      rows.push({ c1img: `p${i}`, c1cap: items[i].cap, c2img: hasB ? `p${i + 1}` : blankKey, c2cap: hasB ? items[i + 1].cap : "" });
-    }
-  }
+  const photoRows = await buildPhotoRows(report.photos, store);
   return {
-    docTitle: report.docTitle || report.subject || "보고서",
-    dateLine: `${dotDate(report.date)} · 삼구INC`,
-    sections: report.sections.map((s, i) => ({ heading: `${i + 1}. ${s.heading}`, body: s.body || " " })),
+    제목: report.subject || report.docTitle || "",
+    "작성 일자": dotDate(report.date),
+    sections: report.sections.map((s) => ({ heading: s.heading, body: s.body || " " })),
     photosLabel: `${report.sections.length + 1}. 첨부사진`,
-    photoRows: rows,
+    photoRows,
   };
 }
 
-// ── 사고보고서: 원본 양식의 태그를 그대로 채움 ──
 async function buildAccidentData(report: GenReport, store: Map<string, Uint8Array>) {
   const a = report.accident;
-  const data: Record<string, string> = {
+  const data: Record<string, unknown> = {
     "보고자 직책": a.reporter,
     이름: "",
     "보고 일자": dotDate(report.date),
@@ -108,65 +104,73 @@ async function buildAccidentData(report: GenReport, store: Map<string, Uint8Arra
     "피해 금액": a.damageCost,
     "사고 발생일": a.occurredAt,
   };
-  // 조치 사항 및 경과: 줄 단위로 5개 슬롯의 '내용'에 채움 (시간칸은 비움)
-  const acts = splitLines(a.actions, 5);
-  acts.forEach((line, i) => {
+  splitLines(a.actions, 5).forEach((line, i) => {
     data[`사고 시간${i + 1}`] = "";
     data[`사고 시간${i + 1} 내용`] = line;
   });
-  // 대응 적합성 및 향후 방안: 2개 슬롯
   const fol = splitLines(a.followup, 2);
   data["대응 적합성 및 향후 방안1"] = fol[0];
   data["대응 적합성 및 향후 방안2"] = fol[1];
-
-  // 사진 8칸: 있는 만큼 채우고 나머지는 빈칸
-  const filled = report.photos.filter((p) => p.url).slice(0, 8);
-  const imgs = await Promise.all(filled.map((p) => normalizePhoto(p.url!)));
-  for (let n = 1; n <= 8; n++) {
-    const idx = n - 1;
-    const bytes = imgs[idx];
-    if (bytes) {
-      store.set(`사진${n}`, bytes);
-      data[`사진${n}`] = `사진${n}`; // 이미지 태그 값 = 저장소 키
-      data[`사진${n} 내용`] = filled[idx].caption || "";
-    } else {
-      data[`사진${n}`] = ""; // 빈 슬롯 → 이미지 렌더 안 됨
-      data[`사진${n} 내용`] = "";
-    }
-  }
+  data.photoRows = await buildPhotoRows(report.photos, store);
   return data;
 }
 
-export async function generateReportDocx(report: GenReport): Promise<Blob> {
+async function renderDocx(templateFile: string, data: unknown, store: Map<string, Uint8Array>): Promise<Blob> {
   const { default: PizZip } = await import("pizzip");
   const { default: Docxtemplater } = await import("docxtemplater");
   const ImageModule = (await import("docxtemplater-image-module-free")).default;
 
-  const isAccident = layoutOf(report.kind) === "accident";
-  const templateFile = isAccident ? "accident.docx" : "gen-common.docx";
   const res = await fetch(`/templates/${templateFile}`);
   if (!res.ok) throw new Error("워드 양식을 불러오지 못했습니다.");
   const content = await res.arrayBuffer();
-
-  const store = new Map<string, Uint8Array>();
-  const data = isAccident ? await buildAccidentData(report, store) : await buildCommonData(report, store);
 
   const imageModule = new ImageModule({
     getImage: (key: string) => store.get(key) ?? new Uint8Array(),
     getSize: () => [IMG_W, IMG_H],
   });
-
-  const zip = new PizZip(content);
-  const doc = new Docxtemplater(zip, {
+  const doc = new Docxtemplater(new PizZip(content), {
     modules: [imageModule],
     paragraphLoop: true,
     linebreaks: true,
-    nullGetter: () => "", // 값 없는 태그는 빈 문자열
+    nullGetter: () => "",
   });
   doc.render(data);
-
   return doc.getZip().generate({
     type: "blob",
     mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   });
+}
+
+export async function generateReportDocx(report: GenReport): Promise<Blob> {
+  const store = new Map<string, Uint8Array>();
+  const isAccident = layoutOf(report.kind) === "accident";
+  const data = isAccident ? await buildAccidentData(report, store) : await buildCommonData(report, store);
+  return renderDocx(TEMPLATE_BY_KIND[report.kind], data, store);
+}
+
+// ── 풍수해 예방 점검 보고서 (원본 양식) ──
+export async function generatePungReportDocx(report: PungReport): Promise<Blob> {
+  const store = new Map<string, Uint8Array>();
+  const data: Record<string, unknown> = {
+    점검일자: pungDotDate(report.date),
+    점검자: report.inspector || "",
+  };
+  // 점검결과 13칸 (항목 순서대로)
+  report.checklist.forEach((it, i) => {
+    data[`점검결과${i + 1}`] = it.result || "";
+  });
+  // 사진 5구간×3 = 최대 15칸 (구간 순서대로 평탄화)
+  const slots: { url?: string; caption?: string }[] = [];
+  report.sections.forEach((sec) => sec.slots.forEach((s) => slots.push(s)));
+  const imgs = await Promise.all(slots.map((s) => (s.url ? normalizePhoto(s.url) : Promise.resolve(null))));
+  for (let n = 1; n <= 15; n++) {
+    const bytes = imgs[n - 1];
+    if (bytes) {
+      store.set(`사진${n}`, bytes);
+      data[`사진${n}`] = `사진${n}`;
+    } else {
+      data[`사진${n}`] = "";
+    }
+  }
+  return renderDocx("pungsuhae.docx", data, store);
 }
