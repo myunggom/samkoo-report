@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import type { WeeklyDraft, WeeklyWork, 공종 } from "@/lib/weekly";
-import { 공종목록, emptyWork, defectDisplay, defectTotals, normalizeDraft, foldWeek, todayBaseDate } from "@/lib/weekly";
+import { 공종목록, emptyWork, defectDisplay, defectTotals, normalizeDraft, foldWeek } from "@/lib/weekly";
 import { uploadPhoto } from "@/lib/client";
 import { generateWeeklyPptx, type WorkPhrase } from "@/lib/weeklyPptxTemplate";
 import { shareOrDownloadFile } from "@/lib/pdf";
@@ -14,8 +14,7 @@ type Phrase = { 본문: string };
 
 export default function WeeklyEditor({ initial }: { initial: WeeklyDraft }) {
   const router = useRouter();
-  // 기준일은 항상 오늘(작성일)로 시작 — yyyy.mm.dd (요일) 기준
-  const [draft, setDraft] = useState<WeeklyDraft>(() => ({ ...normalizeDraft(initial), baseDate: todayBaseDate() }));
+  const [draft, setDraft] = useState<WeeklyDraft>(() => normalizeDraft(initial));
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [phrases, setPhrases] = useState<Record<string, Phrase> | null>(null);
@@ -126,15 +125,11 @@ export default function WeeklyEditor({ initial }: { initial: WeeklyDraft }) {
         <button onClick={logout} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-50">로그아웃</button>
       </div>
 
-      {/* 기간/기준일 */}
-      <div className="grid grid-cols-1 gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2">
+      {/* 표지 기간 */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-4">
         <label className="block">
           <span className="mb-1 block text-xs font-medium text-slate-500">표지 기간</span>
           <input value={draft.period} onChange={(e) => patch({ period: e.target.value })} placeholder="2026.08.25 ~ 08.29" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
-        </label>
-        <label className="block">
-          <span className="mb-1 block text-xs font-medium text-slate-500">하자리스트 기준일</span>
-          <input value={draft.baseDate} onChange={(e) => patch({ baseDate: e.target.value })} placeholder="2026.08.29 (금) 기준" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
         </label>
       </div>
 

@@ -116,12 +116,20 @@ function expandWorkSlides(zip: ZipLike, n: number): void {
 // 본문 텍스트 → 줄 배열. "# "로 시작하는 줄은 볼드 제목, 나머지는 일반.
 type BodyLine = { 글: string; 볼드: boolean };
 function parseBody(text: string): BodyLine[] {
-  const lines = (text || "").split(/\r?\n/);
-  while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
-  return lines.map((ln) => {
+  const src = (text || "").split(/\r?\n/);
+  while (src.length && !src[src.length - 1].trim()) src.pop();
+  const out: BodyLine[] = [];
+  for (const ln of src) {
     const m = /^#\s+(.*)$/.exec(ln.trim());
-    return m ? { 글: m[1], 볼드: true } : { 글: ln, 볼드: false };
-  });
+    if (m) {
+      // 카테고리(볼드 제목) 앞에 빈 줄 하나 넣어 가독성↑ (맨 앞/이미 빈 줄이면 생략)
+      if (out.length && out[out.length - 1].글.trim() !== "") out.push({ 글: "", 볼드: false });
+      out.push({ 글: m[1], 볼드: true });
+    } else {
+      out.push({ 글: ln, 볼드: false });
+    }
+  }
+  return out;
 }
 
 // 본문: Claude 정리 문구가 있으면 그것, 없으면 메모를 그대로
@@ -144,7 +152,6 @@ export async function generateWeeklyPptx(
   // 데이터 조립
   const data: Record<string, unknown> = {
     기간: draft.period,
-    기준일: draft.baseDate,
   };
   // 하자표 (발행 / 이번 주 치유 / 누적(이번주 포함) / 진행률)
   for (const k of 공종목록) {
