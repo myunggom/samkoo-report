@@ -1,0 +1,8 @@
+python-telegram-bot[job-queue]>=21.0
+python-dotenv>=1.0.0
+gspread>=6.0.0
+google-auth>=2.0.0
+xlwings>=0.30.0
+Pillow>=10.0.0
+ezdxf>=1.0.0
+matplotlib>=3.7.0

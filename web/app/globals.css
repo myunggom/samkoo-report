@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-noto);
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  font-family: var(--font-noto), "Malgun Gothic", sans-serif;
+}
+
+/* PDF 캡처용 문서는 항상 흰 배경/검정 글씨 */
+.report-doc {
+  color: #111;
+  background: #fff;
+}
