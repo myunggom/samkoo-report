@@ -11,8 +11,8 @@ export type 공종 = (typeof 공종목록)[number];
 
 export type DefectRow = {
   발행: number; // 하자 발행 수(총)
-  치유: number; // 하자 치유 수(누적)
-  증감: number; // 이번 주 치유 증가분
+  누적: number; // 지난주까지 누적 치유 수(저장·유지)
+  이번주: number; // 이번 주 치유 증가분(매주 입력)
 };
 
 export type WeeklyDefects = Record<공종, DefectRow>;
@@ -39,7 +39,7 @@ export function newWorkId(): string {
 }
 
 export function emptyDefectRow(): DefectRow {
-  return { 발행: 0, 치유: 0, 증감: 0 };
+  return { 발행: 0, 누적: 0, 이번주: 0 };
 }
 
 export function emptyDefects(): WeeklyDefects {
@@ -94,8 +94,9 @@ export function normalizeDraft(raw: unknown): WeeklyDraft {
         const rr = row as Record<string, unknown>;
         defects[k] = {
           발행: Number(rr.발행) || 0,
-          치유: Number(rr.치유) || 0,
-          증감: Number(rr.증감) || 0,
+          // 신 필드(누적/이번주) 우선, 구 필드(치유/증감) 호환
+          누적: Number(rr.누적 ?? rr.치유) || 0,
+          이번주: Number(rr.이번주 ?? rr.증감) || 0,
         };
       }
     }
@@ -125,33 +126,31 @@ export function normalizeDraft(raw: unknown): WeeklyDraft {
 }
 
 // ── 하자표 표시 문자열 계산 ──
+// 누적(지난주까지) + 이번주 = 이번 주 포함 누적. 진행률 = (누적+이번주)/발행.
 export type DefectDisplay = {
   발행: string;
-  치유: string;
-  치유증감: string; // " ( +6 )" 또는 ""
+  이번주: string; // 이번 주 치유 (0이면 "")
+  누적: string; // 이번 주 포함 누적
   진행률: string; // "77.7%"
-  진행률증감: string; // "( +6.4 %)" 또는 ""
 };
-
-function pct(cured: number, issued: number): number {
-  if (!issued) return 0;
-  return (cured / issued) * 100;
-}
 
 function fmtInt(n: number): string {
   return n.toLocaleString("en-US");
 }
 
+// 이번 주 포함 유효 누적
+export function effectiveCured(row: DefectRow): number {
+  return row.누적 + row.이번주;
+}
+
 export function defectDisplay(row: DefectRow): DefectDisplay {
-  const cur = pct(row.치유, row.발행);
-  const prev = pct(row.치유 - row.증감, row.발행);
-  const dPct = cur - prev;
+  const eff = effectiveCured(row);
+  const pct = row.발행 ? (eff / row.발행) * 100 : 0;
   return {
     발행: fmtInt(row.발행),
-    치유: fmtInt(row.치유),
-    치유증감: row.증감 > 0 ? ` ( +${fmtInt(row.증감)} )` : "",
-    진행률: `${cur.toFixed(1)}%`,
-    진행률증감: row.증감 > 0 ? `( +${dPct.toFixed(1)} %)` : "",
+    이번주: row.이번주 > 0 ? fmtInt(row.이번주) : "",
+    누적: fmtInt(eff),
+    진행률: `${pct.toFixed(1)}%`,
   };
 }
 
@@ -159,10 +158,18 @@ export function defectTotals(defects: WeeklyDefects): DefectRow {
   return 공종목록.reduce(
     (acc, k) => {
       acc.발행 += defects[k].발행;
-      acc.치유 += defects[k].치유;
-      acc.증감 += defects[k].증감;
+      acc.누적 += defects[k].누적;
+      acc.이번주 += defects[k].이번주;
       return acc;
     },
-    { 발행: 0, 치유: 0, 증감: 0 }
+    { 발행: 0, 누적: 0, 이번주: 0 }
   );
+}
+
+// 이번 주 치유를 누적에 반영하고 이번주=0으로 (다음 주 준비)
+export function foldWeek(defects: WeeklyDefects): WeeklyDefects {
+  return 공종목록.reduce((acc, k) => {
+    acc[k] = { 발행: defects[k].발행, 누적: defects[k].누적 + defects[k].이번주, 이번주: 0 };
+    return acc;
+  }, {} as WeeklyDefects);
 }

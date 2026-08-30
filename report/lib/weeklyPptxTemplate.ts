@@ -11,11 +11,11 @@ import type { WeeklyDraft, WeeklyWork } from "@/lib/weekly";
 import { 공종목록, defectDisplay, defectTotals } from "@/lib/weekly";
 import { proxied } from "@/lib/client";
 
+export type WorkPhrase = { 본문: string };
+
 // 작업 슬라이드 사진 슬롯(4.92×2.32in ≒ 472×222px)
 const IMG_W = 472;
 const IMG_H = 222;
-
-export type WorkPhrase = { 개요: string; 세부: string[] };
 
 async function normalizePhoto(url: string): Promise<Uint8Array | null> {
   try {
@@ -45,7 +45,7 @@ async function normalizePhoto(url: string): Promise<Uint8Array | null> {
 
 // 작업 슬라이드 태그에 _i 접미사 + 루프 마커 제거
 function suffixWorkTags(xml: string, i: number): string {
-  const toks = ["{번호}", "{주제}", "{개요}", "{사진1설명}", "{사진2설명}", "{%사진1}", "{%사진2}", "{#세부}", "{/세부}"];
+  const toks = ["{번호}", "{주제}", "{본문}", "{사진1설명}", "{사진2설명}", "{%사진1}", "{%사진2}"];
   let out = xml;
   for (const t of toks) {
     const inner = t.replace(/^\{[#/%]?/, "").replace(/\}$/, "");
@@ -112,13 +112,10 @@ function expandWorkSlides(zip: ZipLike, n: number): void {
   zip.file("ppt/presentation.xml", pres);
 }
 
-// 메모를 개요/세부로 (Claude 문구 없으면 메모 줄바꿈으로 대체)
-function workPhrase(work: WeeklyWork, phrase?: WorkPhrase): WorkPhrase {
-  if (phrase && (phrase.개요 || (phrase.세부 && phrase.세부.length))) {
-    return { 개요: phrase.개요 || "", 세부: (phrase.세부 || []).filter(Boolean) };
-  }
-  const lines = (work.memo || "").split("\n").map((s) => s.trim()).filter(Boolean);
-  return { 개요: lines[0] || work.title || "", 세부: lines.slice(1) };
+// 본문: Claude 정리 문구가 있으면 그것, 없으면 메모를 그대로(줄바꿈·띄어쓰기 보존)
+function workBody(work: WeeklyWork, phrase?: WorkPhrase): string {
+  if (phrase && phrase.본문 && phrase.본문.trim()) return phrase.본문;
+  return work.memo || "";
 }
 
 export async function generateWeeklyPptx(
@@ -137,31 +134,27 @@ export async function generateWeeklyPptx(
     기간: draft.period,
     기준일: draft.baseDate,
   };
-  // 하자표
+  // 하자표 (발행 / 이번 주 치유 / 누적(이번주 포함) / 진행률)
   for (const k of 공종목록) {
     const d = defectDisplay(draft.defects[k]);
     data[`${k}_발행`] = d.발행;
-    data[`${k}_치유`] = d.치유;
-    data[`${k}_치유증감`] = d.치유증감;
+    data[`${k}_이번주`] = d.이번주;
+    data[`${k}_누적`] = d.누적;
     data[`${k}_진행률`] = d.진행률;
-    data[`${k}_진행률증감`] = d.진행률증감;
   }
   const tot = defectDisplay(defectTotals(draft.defects));
   data["합계_발행"] = tot.발행;
-  data["합계_치유"] = tot.치유;
-  data["합계_치유증감"] = tot.치유증감;
+  data["합계_이번주"] = tot.이번주;
+  data["합계_누적"] = tot.누적;
   data["합계_진행률"] = tot.진행률;
-  data["합계_진행률증감"] = tot.진행률증감;
 
   // 작업 슬라이드 이미지 + 텍스트
   const store = new Map<string, Uint8Array>();
   for (let i = 0; i < N; i++) {
     const w = works[i];
-    const ph = workPhrase(w, phrases[w.id]);
     data[`번호_${i}`] = String(i + 2).padStart(2, "0");
     data[`주제_${i}`] = w.title || "(제목 없음)";
-    data[`개요_${i}`] = ph.개요;
-    data[`세부_${i}`] = ph.세부;
+    data[`본문_${i}`] = workBody(w, phrases[w.id]);
     const p1 = w.photos[0];
     const p2 = w.photos[1];
     data[`사진1설명_${i}`] = p1?.caption || "";
