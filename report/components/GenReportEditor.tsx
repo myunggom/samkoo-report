@@ -202,40 +202,44 @@ export default function GenReportEditor({ initial }: { initial: GenReport }) {
   );
 }
 
-function AccidentForm({ a, patch }: { a: AccidentFields; patch: (p: Partial<AccidentFields>) => void }) {
-  const f = "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm";
-  const L = ({ k, label, ph }: { k: keyof AccidentFields; label: string; ph?: string }) => (
+// 모듈 레벨 컴포넌트로 분리 — 렌더마다 새로 정의되면 입력 시 포커스가 빠져 1글자만 입력되는 버그가 생김
+const ACC_FIELD_CLASS = "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm";
+function AccField({ value, onChange, label, ph }: { value: string; onChange: (v: string) => void; label: string; ph?: string }) {
+  return (
     <label className="block">
       <span className="mb-1 block text-xs font-medium text-slate-500">{label}</span>
-      <input value={a[k]} onChange={(e) => patch({ [k]: e.target.value } as Partial<AccidentFields>)} placeholder={ph} className={f} />
+      <input value={value} onChange={(e) => onChange(e.target.value)} placeholder={ph} className={ACC_FIELD_CLASS} />
     </label>
   );
+}
+
+function AccidentForm({ a, patch }: { a: AccidentFields; patch: (p: Partial<AccidentFields>) => void }) {
   return (
     <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
       <div className="grid grid-cols-2 gap-3">
-        <L k="reporter" label="보고자" ph="예: 시설팀장 이명진" />
-        <L k="title" label="제목(사고 개요)" />
+        <AccField value={a.reporter} onChange={(v) => patch({ reporter: v })} label="보고자" ph="예: 시설팀장 이명진" />
+        <AccField value={a.title} onChange={(v) => patch({ title: v })} label="제목(사고 개요)" />
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <L k="occurredAt" label="발생 일시" />
-        <L k="place" label="발생 장소" />
+        <AccField value={a.occurredAt} onChange={(v) => patch({ occurredAt: v })} label="발생 일시" />
+        <AccField value={a.place} onChange={(v) => patch({ place: v })} label="발생 장소" />
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <L k="cause" label="발생 원인" />
-        <L k="scope" label="피해 범위" />
+        <AccField value={a.cause} onChange={(v) => patch({ cause: v })} label="발생 원인" />
+        <AccField value={a.scope} onChange={(v) => patch({ scope: v })} label="피해 범위" />
       </div>
       <div className="grid grid-cols-3 gap-3">
-        <L k="humanDamage" label="인적 피해" />
-        <L k="propertyDamage" label="물적 피해" />
-        <L k="damageCost" label="피해액" />
+        <AccField value={a.humanDamage} onChange={(v) => patch({ humanDamage: v })} label="인적 피해" />
+        <AccField value={a.propertyDamage} onChange={(v) => patch({ propertyDamage: v })} label="물적 피해" />
+        <AccField value={a.damageCost} onChange={(v) => patch({ damageCost: v })} label="피해액" />
       </div>
       <label className="block">
         <span className="mb-1 block text-xs font-medium text-slate-500">조치 사항 및 경과</span>
-        <textarea value={a.actions} onChange={(e) => patch({ actions: e.target.value })} rows={5} placeholder={"예:\n1) 10:48 누수 확인\n2) 10:49 보고"} className={f} />
+        <textarea value={a.actions} onChange={(e) => patch({ actions: e.target.value })} rows={5} placeholder={"예:\n1) 10:48 누수 확인\n2) 10:49 보고"} className={ACC_FIELD_CLASS} />
       </label>
       <label className="block">
         <span className="mb-1 block text-xs font-medium text-slate-500">대응 적합성 및 향후 방안</span>
-        <textarea value={a.followup} onChange={(e) => patch({ followup: e.target.value })} rows={3} className={f} />
+        <textarea value={a.followup} onChange={(e) => patch({ followup: e.target.value })} rows={3} className={ACC_FIELD_CLASS} />
       </label>
     </div>
   );
