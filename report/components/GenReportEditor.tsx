@@ -4,7 +4,9 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { GenReport, ReportTextSection, AccidentFields } from "@/lib/reports";
 import { KIND_LABEL, layoutOf, reportFileName } from "@/lib/reports";
-import { elementToPdfBlobFlow, shareOrDownloadPdf } from "@/lib/pdf";
+import { elementToPdfBlobFlow, shareOrDownloadPdf, shareOrDownloadFile } from "@/lib/pdf";
+import { generateReportDocx } from "@/lib/docxExport";
+import { generateReportPptx } from "@/lib/pptxExport";
 import ReportPhotoField from "@/components/ReportPhotoField";
 import GenReportDocument from "@/components/GenReportDocument";
 
@@ -14,6 +16,8 @@ export default function GenReportEditor({ initial }: { initial: GenReport }) {
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [exportingWord, setExportingWord] = useState(false);
+  const [exportingPpt, setExportingPpt] = useState(false);
   const docRef = useRef<HTMLDivElement>(null);
   const layout = layoutOf(r.kind);
 
@@ -71,6 +75,32 @@ export default function GenReportEditor({ initial }: { initial: GenReport }) {
       alert("PDF 출력에 실패했습니다. 다시 시도해 주세요.");
     } finally {
       setExporting(false);
+    }
+  }
+  async function exportWord() {
+    setExportingWord(true);
+    try {
+      await save();
+      const blob = await generateReportDocx(r);
+      const name = reportFileName(r).replace(/\.pdf$/, ".docx");
+      await shareOrDownloadFile(blob, name, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", name.replace(/\.docx$/, ""));
+    } catch {
+      alert("워드 출력에 실패했습니다. 다시 시도해 주세요.");
+    } finally {
+      setExportingWord(false);
+    }
+  }
+  async function exportPpt() {
+    setExportingPpt(true);
+    try {
+      await save();
+      const blob = await generateReportPptx(r);
+      const name = reportFileName(r).replace(/\.pdf$/, ".pptx");
+      await shareOrDownloadFile(blob, name, "application/vnd.openxmlformats-officedocument.presentationml.presentation", name.replace(/\.pptx$/, ""));
+    } catch {
+      alert("PPT 출력에 실패했습니다. 다시 시도해 주세요.");
+    } finally {
+      setExportingPpt(false);
     }
   }
 
@@ -150,7 +180,13 @@ export default function GenReportEditor({ initial }: { initial: GenReport }) {
               {saving ? "저장 중…" : "저장"}
             </button>
             <button onClick={exportPdf} disabled={exporting} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50">
-              {exporting ? "만드는 중…" : "PDF 출력 · 공유"}
+              {exporting ? "만드는 중…" : "PDF로 출력"}
+            </button>
+            <button onClick={exportWord} disabled={exportingWord} className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-600 disabled:opacity-50">
+              {exportingWord ? "만드는 중…" : "워드로 출력"}
+            </button>
+            <button onClick={exportPpt} disabled={exportingPpt} className="rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-500 disabled:opacity-50">
+              {exportingPpt ? "만드는 중…" : "PPT로 출력"}
             </button>
           </div>
         </div>

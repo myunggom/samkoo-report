@@ -88,16 +88,20 @@ function isMobileDevice(): boolean {
   return navigator.maxTouchPoints > 0 && window.matchMedia("(pointer: coarse)").matches;
 }
 
-export async function shareOrDownloadPdf(blob: Blob, filename: string, shareText?: string): Promise<"shared" | "downloaded"> {
-  const file = new File([blob], filename, { type: "application/pdf" });
+// 범용: 폰이면 공유창(카톡·메일 첨부), PC면 다운로드. PDF·워드·PPT 등 모든 파일에 사용.
+export async function shareOrDownloadFile(
+  blob: Blob,
+  filename: string,
+  mime: string,
+  shareText?: string
+): Promise<"shared" | "downloaded"> {
+  const file = new File([blob], filename, { type: mime });
   const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
-  // 폰에서만 공유창 사용(카톡·메일로 바로 첨부). PC는 아래 다운로드로 진행.
   if (isMobileDevice() && nav.canShare && nav.canShare({ files: [file] })) {
     try {
       await navigator.share({ files: [file], title: filename, text: shareText });
       return "shared";
     } catch (e) {
-      // 사용자가 공유를 취소한 경우
       if ((e as Error).name === "AbortError") return "shared";
       // 그 외 오류는 아래 다운로드로 폴백
     }
@@ -111,4 +115,8 @@ export async function shareOrDownloadPdf(blob: Blob, filename: string, shareText
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 3000);
   return "downloaded";
+}
+
+export async function shareOrDownloadPdf(blob: Blob, filename: string, shareText?: string): Promise<"shared" | "downloaded"> {
+  return shareOrDownloadFile(blob, filename, "application/pdf", shareText);
 }
