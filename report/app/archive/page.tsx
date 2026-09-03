@@ -6,6 +6,7 @@ import { MEDIA_CATEGORIES } from "@/lib/archive";
 import MediaUploader from "@/components/MediaUploader";
 import MediaCard from "@/components/MediaCard";
 import MediaEditModal from "@/components/MediaEditModal";
+import MediaViewer from "@/components/MediaViewer";
 
 export default function ArchivePage() {
   const [items, setItems] = useState<MediaItem[]>([]);
@@ -14,6 +15,7 @@ export default function ArchivePage() {
   const [typeFilter, setTypeFilter] = useState<"all" | "image" | "video" | "file">("all");
   const [q, setQ] = useState("");
   const [editing, setEditing] = useState<MediaItem | null>(null);
+  const [viewing, setViewing] = useState<MediaItem | null>(null);
 
   async function load() {
     setLoading(true);
@@ -87,7 +89,7 @@ export default function ArchivePage() {
           <p className="text-xs text-slate-400">{filtered.length}개</p>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
             {filtered.map((m) => (
-              <MediaCard key={m.id} item={m} onEdit={setEditing} onDelete={remove} />
+              <MediaCard key={m.id} item={m} onEdit={setEditing} onDelete={remove} onView={setViewing} />
             ))}
           </div>
         </>
@@ -103,6 +105,8 @@ export default function ArchivePage() {
           }}
         />
       )}
+
+      {viewing && <MediaViewer item={viewing} onClose={() => setViewing(null)} />}
     </div>
   );
 }

@@ -17,6 +17,7 @@ export default function DashCalendar({ media, notes }: { media: MediaItem[]; not
   const [month, setMonth] = useState(today.getMonth());
   const [events, setEvents] = useState<CalEvent[]>([]);
   const [openDay, setOpenDay] = useState<string | null>(null);
+  const [dragOverKey, setDragOverKey] = useState<string | null>(null);
 
   async function loadEvents() {
     const res = await fetch("/api/events", { cache: "no-store" });
@@ -25,6 +26,31 @@ export default function DashCalendar({ media, notes }: { media: MediaItem[]; not
   useEffect(() => {
     loadEvents();
   }, []);
+
+  // 일정 날짜 이동 (드래그앤드롭 / 모달) — 반복 일정은 이동하지 않음
+  function addDaysKey(key: string, delta: number): string {
+    const [yy, mm, dd] = key.split("-").map(Number);
+    const dt = new Date(yy, mm - 1, dd + delta);
+    return `${dt.getFullYear()}-${p2(dt.getMonth() + 1)}-${p2(dt.getDate())}`;
+  }
+  function daysBetween(a: string, b: string): number {
+    const [ay, am, ad] = a.split("-").map(Number);
+    const [by, bm, bd] = b.split("-").map(Number);
+    return Math.round((Date.UTC(by, bm - 1, bd) - Date.UTC(ay, am - 1, ad)) / 86400000);
+  }
+  async function moveEvent(id: string, newDate: string) {
+    const ev = events.find((e) => e.id === id);
+    if (!ev || ev.date === newDate) return;
+    if (ev.repeat && ev.repeat !== "none") return; // 반복 일정은 이동 불가
+    const patch: Partial<CalEvent> = { date: newDate };
+    if (ev.endDate && ev.endDate !== ev.date) patch.endDate = addDaysKey(ev.endDate, daysBetween(ev.date, newDate));
+    setEvents((prev) => prev.map((e) => (e.id === id ? { ...e, ...patch } : e))); // 낙관적 갱신
+    try {
+      await fetch(`/api/events/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch) });
+    } finally {
+      loadEvents();
+    }
+  }
 
   const { mediaByDay, noteDays } = useMemo(() => {
     const m: Record<string, number> = {};
@@ -81,7 +107,10 @@ export default function DashCalendar({ media, notes }: { media: MediaItem[]; not
             <button
               key={i}
               onClick={() => setOpenDay(key)}
-              className={"flex min-h-[62px] flex-col rounded-lg border p-1 text-left hover:bg-slate-50 " + (isToday ? "border-slate-900" : "border-slate-100")}
+              onDragOver={(ev) => { ev.preventDefault(); if (dragOverKey !== key) setDragOverKey(key); }}
+              onDragLeave={() => setDragOverKey((cur) => (cur === key ? null : cur))}
+              onDrop={(ev) => { ev.preventDefault(); const id = ev.dataTransfer.getData("text/plain"); setDragOverKey(null); if (id) moveEvent(id, key); }}
+              className={"flex min-h-[62px] flex-col rounded-lg border p-1 text-left hover:bg-slate-50 " + (dragOverKey === key ? "border-indigo-500 bg-indigo-50 ring-1 ring-indigo-400" : isToday ? "border-slate-900" : "border-slate-100")}
             >
               <div className="flex items-center justify-between">
                 <span className={"text-[11px] font-medium " + (i % 7 === 0 ? "text-red-400" : i % 7 === 6 ? "text-sky-500" : "text-slate-600")}>{d}</span>
@@ -93,8 +122,15 @@ export default function DashCalendar({ media, notes }: { media: MediaItem[]; not
               <div className="mt-0.5 space-y-0.5 overflow-hidden">
                 {evs.slice(0, 2).map((e) => {
                   const done = isDoneOn(e, key);
+                  const isRepeat = !!e.repeat && e.repeat !== "none";
                   return (
-                    <div key={e.id} className="flex items-center gap-0.5">
+                    <div
+                      key={e.id}
+                      draggable={!isRepeat}
+                      onDragStart={(ev) => { ev.dataTransfer.setData("text/plain", e.id); ev.dataTransfer.effectAllowed = "move"; }}
+                      title={isRepeat ? "반복 일정은 드래그로 옮길 수 없어요" : "드래그해서 다른 날짜로 이동"}
+                      className={"flex items-center gap-0.5 rounded " + (isRepeat ? "" : "cursor-grab active:cursor-grabbing hover:bg-slate-100")}
+                    >
                       {done ? (
                         <span className="shrink-0 text-[9px] leading-none text-emerald-500">✓</span>
                       ) : (
@@ -127,6 +163,7 @@ export default function DashCalendar({ media, notes }: { media: MediaItem[]; not
           hasNote={noteDays.has(openDay)}
           onClose={() => setOpenDay(null)}
           onChanged={loadEvents}
+          onMove={moveEvent}
           onGotoLogs={() => router.push("/logs")}
         />
       )}
@@ -135,10 +172,10 @@ export default function DashCalendar({ media, notes }: { media: MediaItem[]; not
 }
 
 function DayModal({
-  date, events, mediaCount, hasNote, onClose, onChanged, onGotoLogs,
+  date, events, mediaCount, hasNote, onClose, onChanged, onMove, onGotoLogs,
 }: {
   date: string; events: CalEvent[]; mediaCount: number; hasNote: boolean;
-  onClose: () => void; onChanged: () => void; onGotoLogs: () => void;
+  onClose: () => void; onChanged: () => void; onMove: (id: string, newDate: string) => void; onGotoLogs: () => void;
 }) {
   const [type, setType] = useState(DEFAULT_EVENT_TYPE);
   const [title, setTitle] = useState("");
@@ -211,6 +248,17 @@ function DayModal({
                     {e.note && <p className="truncate text-[11px] text-slate-400">{e.note}</p>}
                   </div>
                   <div className="flex shrink-0 items-center gap-1.5">
+                    {!(e.repeat && e.repeat !== "none") && (
+                      <label className="flex items-center gap-0.5 text-[11px] text-slate-400" title="날짜 이동">
+                        📅
+                        <input
+                          type="date"
+                          value={date}
+                          onChange={(ev) => { if (ev.target.value) { onMove(e.id, ev.target.value); onClose(); } }}
+                          className="w-[7.5rem] rounded border border-slate-200 px-1 py-0.5 text-[11px]"
+                        />
+                      </label>
+                    )}
                     <button
                       onClick={() => toggleDone(e.id, !done)}
                       className={"rounded-lg border px-2 py-1 text-[11px] font-semibold " + (done ? "border-emerald-200 bg-emerald-50 text-emerald-600" : "border-slate-300 text-slate-600 hover:bg-slate-50")}

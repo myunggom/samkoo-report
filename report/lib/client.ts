@@ -34,6 +34,28 @@ export async function uploadPhoto(file: File): Promise<string> {
   return data.url as string;
 }
 
+// 아카이브 항목(사진·동영상·문서) 다운로드 — Blob을 받아 저장(모바일은 공유시트)
+export async function downloadMedia(item: {
+  url: string;
+  type?: string;
+  fileName?: string;
+  ext?: string;
+  title?: string;
+  takenAt?: string;
+}): Promise<void> {
+  const res = await fetch(item.url);
+  if (!res.ok) throw new Error("다운로드 실패");
+  const blob = await res.blob();
+  let name = item.fileName || "";
+  if (!name) {
+    const ext = item.ext || (item.type === "video" ? "mp4" : "jpg");
+    const base = String(item.title || item.takenAt || "archive").replace(/[\\/:*?"<>|]/g, "_");
+    name = `${base}.${ext}`;
+  }
+  const { shareOrDownloadFile } = await import("@/lib/pdf");
+  await shareOrDownloadFile(blob, name, blob.type || "application/octet-stream");
+}
+
 // 외부(Blob) 이미지는 프록시를 거쳐 동일 출처로 만들어 PDF 캡처 시 오염을 방지
 export function proxied(url: string): string {
   if (url.startsWith("http")) return `/api/img?url=${encodeURIComponent(url)}`;
