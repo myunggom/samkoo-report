@@ -16,6 +16,7 @@ import type { GenReport } from "./reports";
 import type { CalEvent } from "./events";
 import type { Issue } from "./issues";
 import type { WeeklyDraft } from "./weekly";
+import type { Task } from "./tasks";
 
 const BLOB_TOKEN = process.env.BLOB_READ_WRITE_TOKEN || "";
 const USE_BLOB = !!BLOB_TOKEN;
@@ -27,6 +28,7 @@ const GENREPORT_PREFIX = "db/genreports/";
 const EVENT_PREFIX = "db/events/";
 const ISSUE_PREFIX = "db/issues/";
 const WEEKLY_PREFIX = "db/weekly/";
+const TASK_PREFIX = "db/tasks/";
 
 const DATA_DIR = path.join(process.cwd(), ".data");
 const PUNG_FILE = path.join(DATA_DIR, "pungsuhae.json");
@@ -36,6 +38,7 @@ const GENREPORT_FILE = path.join(DATA_DIR, "genreports.json");
 const EVENT_FILE = path.join(DATA_DIR, "events.json");
 const ISSUE_FILE = path.join(DATA_DIR, "issues.json");
 const WEEKLY_FILE = path.join(DATA_DIR, "weekly.json");
+const TASK_FILE = path.join(DATA_DIR, "tasks.json");
 const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads");
 
 async function readLocal<T>(file: string, fallback: T): Promise<T> {
@@ -315,6 +318,48 @@ export async function saveWeeklyDraft(draft: WeeklyDraft): Promise<WeeklyDraft> 
   if (USE_BLOB) await writeBlobJson(WEEKLY_PREFIX, next);
   else await writeLocal(WEEKLY_FILE, next);
   return next;
+}
+
+// ── 개인 할 일 (운영자 전용 · 단일 집계 JSON) ─────────────────────
+async function allTasks(): Promise<Task[]> {
+  if (USE_BLOB) return readBlobJson<Task[]>(TASK_PREFIX, []);
+  return readLocal<Task[]>(TASK_FILE, []);
+}
+async function putTasks(list: Task[]): Promise<void> {
+  if (USE_BLOB) await writeBlobJson(TASK_PREFIX, list);
+  else await writeLocal(TASK_FILE, list);
+}
+
+// 마감일 이른 순. 마감일 없는 항목은 맨 뒤로 보낸다.
+export async function listTasks(): Promise<Task[]> {
+  const all = await allTasks();
+  return all.sort((a, b) => {
+    if (a.due && b.due) return a.due.localeCompare(b.due) || a.createdAt.localeCompare(b.createdAt);
+    if (a.due) return -1;
+    if (b.due) return 1;
+    return a.createdAt.localeCompare(b.createdAt);
+  });
+}
+
+export async function addTasks(items: Task[]): Promise<Task[]> {
+  const all = await allTasks();
+  all.push(...items);
+  await putTasks(all);
+  return items;
+}
+
+export async function updateTask(id: string, patch: Partial<Task>): Promise<Task | null> {
+  const all = await allTasks();
+  const idx = all.findIndex((x) => x.id === id);
+  if (idx < 0) return null;
+  all[idx] = { ...all[idx], ...patch, id: all[idx].id, updatedAt: new Date().toISOString() };
+  await putTasks(all);
+  return all[idx];
+}
+
+export async function deleteTask(id: string): Promise<void> {
+  const all = await allTasks();
+  await putTasks(all.filter((x) => x.id !== id));
 }
 
 // ── 사진 업로드 (고유 파일명 — 불변이라 덮어쓰기 문제 없음) ────────
