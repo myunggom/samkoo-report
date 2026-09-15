@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
@@ -13,10 +13,22 @@ const TABS: { href: string; label: string; match: (p: string) => boolean }[] = [
   { href: "/reports", label: "보고서", match: (p) => p.startsWith("/reports") || p.startsWith("/report/") || p.startsWith("/pungsuhae") },
 ];
 
+// 로그인한 본인에게만 보이는 탭
+const PRIVATE_TABS: typeof TABS = [
+  { href: "/tasks", label: "할 일", match: (p) => p.startsWith("/tasks") },
+];
+
 export default function TopNav() {
   const pathname = usePathname() || "/";
   const router = useRouter();
   const [q, setQ] = useState("");
+
+  // wr_ui는 표시 여부만 결정한다 (실제 잠금은 proxy.ts).
+  // 서버에서 읽으면 루트 레이아웃 전체가 동적 렌더링이 되므로 클라이언트에서 확인한다.
+  const [unlocked, setUnlocked] = useState(false);
+  useEffect(() => {
+    setUnlocked(document.cookie.split("; ").some((c) => c === "wr_ui=1"));
+  }, []);
 
   function submitSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -26,7 +38,7 @@ export default function TopNav() {
 
   return (
     <nav className="mx-auto flex max-w-5xl items-center gap-1 overflow-x-auto px-4">
-      {TABS.map((t) => {
+      {[...TABS, ...(unlocked ? PRIVATE_TABS : [])].map((t) => {
         const active = t.match(pathname);
         return (
           <Link

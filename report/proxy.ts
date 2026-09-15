@@ -26,5 +26,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/weekly-report/:path*", "/api/weekly/:path*"],
+  matcher: ["/weekly-report/:path*", "/api/weekly/:path*", "/tasks/:path*", "/api/tasks/:path*"],
 };

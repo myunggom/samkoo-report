@@ -21,6 +21,15 @@ export async function POST(req: NextRequest) {
     path: "/",
     maxAge: 60 * 60 * 24 * 30, // 30일
   });
+  // 상단 메뉴에 잠금 탭을 보여줄지 판단하는 용도(httpOnly 아님).
+  // 접근 통제는 proxy와 각 라우트가 하므로 이 값은 위조돼도 안전하다.
+  res.cookies.set("wr_ui", "1", {
+    httpOnly: false,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 30,
+  });
   return res;
 }
 
@@ -28,5 +37,6 @@ export async function POST(req: NextRequest) {
 export async function DELETE() {
   const res = NextResponse.json({ ok: true });
   res.cookies.set(WEEKLY_COOKIE, "", { path: "/", maxAge: 0 });
+  res.cookies.set("wr_ui", "", { path: "/", maxAge: 0 });
   return res;
 }
