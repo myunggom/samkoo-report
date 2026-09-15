@@ -79,3 +79,53 @@ export function dueGroup(due: string | undefined, now: Date): DueGroup {
   if (due === today) return "today";
   return due <= endOfKstWeek(now) ? "week" : "later";
 }
+
+// AI가 제안한 할 일 한 건. shared·reason은 화면 표시용이며 저장되지 않는다.
+export type ParsedTask = {
+  title: string;
+  note?: string;
+  category: TaskCategory;
+  due?: string;
+  source?: string;
+  shared: boolean;
+  reason?: string;
+};
+
+function str(v: unknown): string | undefined {
+  if (typeof v !== "string") return undefined;
+  const s = v.trim();
+  return s ? s : undefined;
+}
+
+// AI 응답에서 JSON 배열을 꺼내 형식을 맞춘다.
+// 코드펜스·앞뒤 설명은 무시하고, 값이 이상하면 버리거나 안전한 기본값으로 떨어뜨린다.
+export function parseTasksJson(raw: string): ParsedTask[] {
+  const start = raw.indexOf("[");
+  const end = raw.lastIndexOf("]");
+  if (start < 0 || end < start) throw new Error("AI 응답에서 JSON 배열을 찾지 못했습니다.");
+
+  let data: unknown;
+  try {
+    data = JSON.parse(raw.slice(start, end + 1));
+  } catch {
+    throw new Error("AI 응답의 JSON을 해석하지 못했습니다.");
+  }
+  if (!Array.isArray(data)) throw new Error("AI 응답에서 JSON 배열을 찾지 못했습니다.");
+
+  return data
+    .map((entry): ParsedTask => {
+      const it = (entry ?? {}) as Record<string, unknown>;
+      const category = it.category as TaskCategory;
+      const due = str(it.due);
+      return {
+        title: str(it.title) ?? "",
+        note: str(it.note),
+        category: TASK_CATEGORIES.includes(category) ? category : "etc",
+        due: due && DATE_RE.test(due) ? due : undefined,
+        source: str(it.source),
+        shared: it.shared === true,
+        reason: str(it.reason),
+      };
+    })
+    .filter((t) => t.title);
+}
