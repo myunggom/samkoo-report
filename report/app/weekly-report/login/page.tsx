@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 // 오픈 리다이렉트 방지: 내부 경로("/…")만 허용, "//"·외부 URL은 기본값으로
 function safeNext(raw: string | null): string {
@@ -12,6 +12,13 @@ export default function WeeklyLoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // /tasks에서 넘어왔으면 "주간 업무보고"가 아니라 그 맥락에 맞는 제목을 보여준다
+  const [forTasks, setForTasks] = useState(false);
+  useEffect(() => {
+    const next = new URLSearchParams(window.location.search).get("next") || "";
+    setForTasks(next.startsWith("/tasks"));
+  }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -40,8 +47,12 @@ export default function WeeklyLoginPage() {
   return (
     <div className="mx-auto max-w-sm">
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h1 className="mb-1 text-lg font-bold text-slate-900">🔒 주간 업무보고</h1>
-        <p className="mb-5 text-sm text-slate-500">사장님 전용 페이지입니다. 비밀번호를 입력하세요.</p>
+        <h1 className="mb-1 text-lg font-bold text-slate-900">
+          🔒 {forTasks ? "개인 업무 관리" : "주간 업무보고"}
+        </h1>
+        <p className="mb-5 text-sm text-slate-500">
+          {forTasks ? "본인 전용 페이지입니다." : "사장님 전용 페이지입니다."} 비밀번호를 입력하세요.
+        </p>
         <form onSubmit={submit} className="space-y-3">
           <input
             type="password"
