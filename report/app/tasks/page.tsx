@@ -10,6 +10,7 @@ import {
   DUE_GROUP_STYLE,
   TASK_CATEGORIES,
   dueGroup,
+  newStepId,
 } from "@/lib/tasks";
 import type { IssueStatus } from "@/lib/issues";
 import { STATUS_LABEL as ISSUE_STATUS_LABEL, STATUS_STYLE as ISSUE_STATUS_STYLE } from "@/lib/issues";
@@ -116,6 +117,16 @@ export default function TasksPage() {
     if (!confirm(`'${t.title}' 항목을 삭제할까요?`)) return;
     setTasks((prev) => prev.filter((x) => x.id !== t.id));
     await fetch(`/api/tasks/${t.id}`, { method: "DELETE" });
+  }
+
+  // 처리 단계(steps) 등 부분 수정 — 낙관적 갱신 후 저장
+  async function patchTask(id: string, patch: Partial<Task>) {
+    setTasks((prev) => prev.map((x) => (x.id === id ? { ...x, ...patch } : x)));
+    await fetch(`/api/tasks/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
   }
 
   async function saveDraft() {
@@ -266,7 +277,7 @@ export default function TasksPage() {
                 </div>
                 <div className="space-y-2">
                   {grouped[g].map((t) => (
-                    <TaskCard key={t.id} task={t} onToggle={toggleDone} onShare={share} onRemove={remove} />
+                    <TaskCard key={t.id} task={t} onToggle={toggleDone} onShare={share} onRemove={remove} onPatch={patchTask} />
                   ))}
                 </div>
               </div>
@@ -290,7 +301,7 @@ export default function TasksPage() {
               {showDone && (
                 <div className="mt-2 space-y-2">
                   {doneTasks.map((t) => (
-                    <TaskCard key={t.id} task={t} onToggle={toggleDone} onShare={share} onRemove={remove} />
+                    <TaskCard key={t.id} task={t} onToggle={toggleDone} onShare={share} onRemove={remove} onPatch={patchTask} />
                   ))}
                 </div>
               )}
@@ -346,13 +357,34 @@ function TaskCard({
   onToggle,
   onShare,
   onRemove,
+  onPatch,
 }: {
   task: TaskRow;
   onToggle: (t: TaskRow) => void;
   onShare: (t: TaskRow) => void;
   onRemove: (t: TaskRow) => void;
+  onPatch: (id: string, patch: Partial<Task>) => void;
 }) {
   const done = task.status === "done";
+  const steps = task.steps ?? [];
+  const doneSteps = steps.filter((s) => s.done).length;
+  const [stepText, setStepText] = useState("");
+
+  function addStep() {
+    const t = stepText.trim();
+    if (!t) return;
+    onPatch(task.id, { steps: [...steps, { id: newStepId(), text: t, done: false, createdAt: new Date().toISOString() }] });
+    setStepText("");
+  }
+  function toggleStep(id: string) {
+    onPatch(task.id, {
+      steps: steps.map((s) => (s.id === id ? { ...s, done: !s.done, doneAt: !s.done ? new Date().toISOString() : undefined } : s)),
+    });
+  }
+  function removeStep(id: string) {
+    onPatch(task.id, { steps: steps.filter((s) => s.id !== id) });
+  }
+
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-3">
       <div className="flex items-start gap-3">
@@ -373,6 +405,11 @@ function TaskCard({
               {CATEGORY_LABEL[task.category]}
             </span>
             {task.due && <span className="text-xs text-slate-500">{task.due.slice(5).replace("-", "/")}</span>}
+            {steps.length > 0 && (
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-500">
+                처리 {doneSteps}/{steps.length}
+              </span>
+            )}
             {task.issueId &&
               (task.issueStatus ? (
                 <a
@@ -402,6 +439,56 @@ function TaskCard({
             className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-400 hover:bg-red-50 hover:text-red-500"
           >
             삭제
+          </button>
+        </div>
+      </div>
+
+      {/* 처리 내역(하부 단계) */}
+      <div className="mt-2 border-t border-slate-100 pt-2 pl-7">
+        {steps.length > 0 && (
+          <div className="space-y-1">
+            {steps.map((s) => (
+              <div key={s.id} className="group/step flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={s.done}
+                  onChange={() => toggleStep(s.id)}
+                  className="h-3.5 w-3.5 shrink-0"
+                  aria-label="단계 완료"
+                />
+                <span className={"flex-1 text-xs " + (s.done ? "text-slate-300 line-through" : "text-slate-600")}>
+                  {s.text}
+                </span>
+                <button
+                  onClick={() => removeStep(s.id)}
+                  className="shrink-0 text-[11px] text-slate-300 opacity-0 hover:text-red-500 group-hover/step:opacity-100"
+                  aria-label="단계 삭제"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="mt-1.5 flex gap-1.5">
+          <input
+            value={stepText}
+            onChange={(e) => setStepText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                addStep();
+              }
+            }}
+            placeholder="처리 단계 추가 (예: 업체 견적 요청 → 완료되면 체크)"
+            className="flex-1 rounded-lg border border-slate-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-slate-300"
+          />
+          <button
+            onClick={addStep}
+            disabled={!stepText.trim()}
+            className="shrink-0 rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+          >
+            추가
           </button>
         </div>
       </div>

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { deleteTask, updateTask } from "@/lib/store";
 import { WEEKLY_COOKIE, isTokenValid } from "@/lib/weeklyAuth";
-import { TASK_CATEGORIES } from "@/lib/tasks";
-import type { Task, TaskCategory, TaskStatus } from "@/lib/tasks";
+import { TASK_CATEGORIES, newStepId } from "@/lib/tasks";
+import type { Task, TaskCategory, TaskStatus, TaskStep } from "@/lib/tasks";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +40,23 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     patch.status = s;
     // 완료를 풀면 처리 시각도 지운다
     patch.doneAt = s === "done" ? new Date().toISOString() : undefined;
+  }
+  if (b.steps !== undefined) {
+    const arr = Array.isArray(b.steps) ? (b.steps as unknown[]) : [];
+    patch.steps = arr
+      .map((raw): TaskStep => {
+        const s = (raw ?? {}) as Record<string, unknown>;
+        const done = s.done === true;
+        return {
+          id: typeof s.id === "string" && s.id ? s.id : newStepId(),
+          text: String(s.text ?? "").trim(),
+          done,
+          createdAt: typeof s.createdAt === "string" ? s.createdAt : new Date().toISOString(),
+          doneAt: done ? (typeof s.doneAt === "string" ? s.doneAt : new Date().toISOString()) : undefined,
+        };
+      })
+      .filter((s) => s.text)
+      .slice(0, 100);
   }
 
   const updated = await updateTask(id, patch);

@@ -5,6 +5,15 @@ export type TaskStatus = "todo" | "doing" | "done";
 export type TaskCategory = "facility" | "contract" | "report" | "meeting" | "etc";
 export type DueGroup = "overdue" | "today" | "week" | "later" | "none";
 
+// 할 일 아래에 쌓는 처리 단계(하부 체크리스트) 한 건
+export type TaskStep = {
+  id: string;
+  text: string;
+  done: boolean;
+  createdAt: string;   // ISO 8601
+  doneAt?: string;     // ISO 8601
+};
+
 export type Task = {
   id: string;
   title: string;       // 할 일 한 줄 요약
@@ -14,10 +23,15 @@ export type Task = {
   due?: string;        // "2026-09-19" — KST 기준 날짜
   source?: string;     // 이 할 일의 근거가 된 원문 문장
   issueId?: string;    // 문제 관리로 공유했으면 연결
+  steps?: TaskStep[];  // 처리 내역(하부 단계)
   createdAt: string;   // ISO 8601
   updatedAt: string;   // ISO 8601
   doneAt?: string;     // ISO 8601
 };
+
+export function newStepId(): string {
+  return `s-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+}
 
 export const TASK_CATEGORIES: TaskCategory[] = ["facility", "contract", "report", "meeting", "etc"];
 
