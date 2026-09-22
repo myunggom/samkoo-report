@@ -5,7 +5,8 @@ import PhotoGrid from "./PhotoGrid";
 import ReportDocument from "./ReportDocument";
 import type { Photo, Report, ReportSection, Schedule } from "@/lib/shoot/types";
 import { SECTION_LABELS, SECTION_ORDER } from "@/lib/shoot/types";
-import { elementToPdfBlob, shareOrDownloadPdf } from "@/lib/pdf";
+import { elementToPdfBlob, shareOrDownloadFile, shareOrDownloadPdf } from "@/lib/pdf";
+import { generateShootPptx } from "@/lib/shoot/pptx";
 import { buildEmailBody, ymd } from "@/lib/shoot/format";
 
 type Props = {
@@ -18,6 +19,7 @@ export default function ReportEditor({ schedule, initialReport }: Props) {
   const [active, setActive] = useState<ReportSection | "special">("setup");
   const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [generating, setGenerating] = useState(false);
+  const [generatingPpt, setGeneratingPpt] = useState(false);
   const [rounds, setRounds] = useState<Schedule[]>([]);
   const docRef = useRef<HTMLDivElement>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -69,16 +71,33 @@ export default function ReportEditor({ schedule, initialReport }: Props) {
     })();
   }, [schedule]);
 
+  // 파일명: [촬영완료보고서] 한독 · 제넥신 · 프로젠 연구소_촬영명_yyyy.mm.dd.확장자
+  function fileName(ext: "pdf" | "pptx") {
+    const dateStr = ymd(schedule.start).replace(/-/g, ".");
+    return `[촬영완료보고서] 한독 · 제넥신 · 프로젠 연구소_${schedule.title}_${dateStr}.${ext}`.replace(/[\\/:*?"<>|]/g, "_");
+  }
+
+  // PPT = 촬영 완료보고서 PPT 양식(public/templates/shoot.pptx)을 채워서 출력
+  async function exportPpt() {
+    setGeneratingPpt(true);
+    try {
+      const blob = await generateShootPptx(schedule, report, rounds);
+      const name = fileName("pptx");
+      await shareOrDownloadFile(blob, name, "application/vnd.openxmlformats-officedocument.presentationml.presentation", name.replace(/\.pptx$/, ""));
+    } catch (e) {
+      console.error(e);
+      alert("PPT 생성에 실패했습니다. 사진이 모두 올라간 뒤 다시 시도해 주세요.");
+    } finally {
+      setGeneratingPpt(false);
+    }
+  }
+
   async function exportPdf() {
     if (!docRef.current) return;
     setGenerating(true);
     try {
       const blob = await elementToPdfBlob(docRef.current);
-      const dateStr = ymd(schedule.start).replace(/-/g, "."); // yyyy.mm.dd
-      const filename = `[촬영완료보고서] 한독 · 제넥신 · 프로젠 연구소_${schedule.title}_${dateStr}.pdf`.replace(
-        /[\\/:*?"<>|]/g,
-        "_"
-      );
+      const filename = fileName("pdf");
       const result = await shareOrDownloadPdf(blob, filename, buildEmailBody(schedule));
       if (result === "downloaded") {
         alert("PDF를 다운로드했습니다. 저장된 파일을 메일·카톡에 첨부해 보고하세요.");
@@ -172,13 +191,22 @@ export default function ReportEditor({ schedule, initialReport }: Props) {
         <span className="text-xs text-slate-400">
           {status === "saving" ? "저장 중…" : status === "saved" ? "자동 저장됨 ✓" : "사진 " + totalPhotos + "장"}
         </span>
-        <button
-          onClick={exportPdf}
-          disabled={generating}
-          className="rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-500 disabled:opacity-50"
-        >
-          {generating ? "PDF 생성 중…" : "📄 PDF 출력 · 공유"}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={exportPpt}
+            disabled={generatingPpt}
+            className="rounded-lg bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-orange-500 disabled:opacity-50"
+          >
+            {generatingPpt ? "PPT 생성 중…" : "📊 PPT 출력"}
+          </button>
+          <button
+            onClick={exportPdf}
+            disabled={generating}
+            className="rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-500 disabled:opacity-50"
+          >
+            {generating ? "PDF 생성 중…" : "📄 PDF 출력 · 공유"}
+          </button>
+        </div>
       </div>
 
       {/* PDF 캡처용(화면 밖) 문서 */}
