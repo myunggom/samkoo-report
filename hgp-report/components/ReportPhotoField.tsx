@@ -37,9 +37,16 @@ export default function ReportPhotoField({
     }
   }
 
-  function setCaption(i: number, caption: string) {
+  function setField(i: number, p: Partial<ReportPhoto>) {
     const copy = photos.slice();
-    copy[i] = { ...copy[i], caption };
+    copy[i] = { ...copy[i], ...p };
+    onChange(copy);
+  }
+  function move(i: number, d: -1 | 1) {
+    const j = i + d;
+    if (j < 0 || j >= photos.length) return;
+    const copy = photos.slice();
+    [copy[i], copy[j]] = [copy[j], copy[i]];
     onChange(copy);
   }
   function remove(i: number) {
@@ -66,14 +73,24 @@ export default function ReportPhotoField({
               >
                 ×
               </button>
-              <span className="absolute left-1.5 top-1.5 rounded bg-black/50 px-1.5 py-0.5 text-[10px] text-white">{i + 1}</span>
+              <span className="absolute left-1.5 top-1.5 rounded bg-black/50 px-1.5 py-0.5 text-[10px] text-white">PHOTO {i + 1}</span>
             </div>
             <input
               value={p.caption ?? ""}
-              onChange={(e) => setCaption(i, e.target.value)}
-              placeholder="사진 설명"
-              className="mt-1.5 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-slate-300"
+              onChange={(e) => setField(i, { caption: e.target.value })}
+              placeholder="사진 제목"
+              className="mt-1.5 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-slate-300"
             />
+            <input
+              value={p.note ?? ""}
+              onChange={(e) => setField(i, { note: e.target.value })}
+              placeholder="부가 설명 (선택)"
+              className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs text-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-300"
+            />
+            <div className="mt-1 flex justify-end gap-1">
+              <button onClick={() => move(i, -1)} className="rounded border border-slate-200 px-1.5 text-xs text-slate-400 hover:bg-slate-50" title="앞으로">←</button>
+              <button onClick={() => move(i, 1)} className="rounded border border-slate-200 px-1.5 text-xs text-slate-400 hover:bg-slate-50" title="뒤로">→</button>
+            </div>
           </div>
         ))}
       </div>

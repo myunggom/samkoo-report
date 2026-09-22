@@ -93,8 +93,12 @@ export async function searchAll(query: string, limit = 60): Promise<SearchHit[]>
   for (const r of genReports) {
     const a = r.accident || ({} as typeof r.accident);
     const secText = (r.sections || []).map((s) => `${s.heading} ${s.body}`).join(" ");
-    const accText = [a.title, a.place, a.cause, a.scope, a.actions, a.followup].map((x) => x || "").join(" ");
-    const fields = [r.subject, r.docTitle, r.bracket, r.site, secText, accText].map((x) => x || "");
+    const accText = [
+      a.title, a.place, a.cause, a.scope, a.reportPath, a.actions, a.followup,
+      ...(a.timeline || []).map((t) => `${t.kind} ${t.content} ${t.actor}`),
+      ...[...(a.plans || []), ...(a.prevents || [])].map((p) => p.text),
+    ].map((x) => x || "").join(" ");
+    const fields = [r.subject, r.docTitle, r.bracket, r.site, r.summary, r.reporter, r.place, secText, accText].map((x) => x || "");
     if (!fields.some((f) => f.toLowerCase().includes(kw))) continue;
     const label = KIND_LABEL[r.kind] || "보고서";
     hits.push({ kind: `보고서·${label}`, icon: "📄", title: r.subject || r.docTitle || label, snippet: snippetOf(fields, kw), href: `/reports/${r.id}`, date: r.date });

@@ -1,23 +1,24 @@
 "use client";
 
-// 보고서를 사장 원본 양식(.docx) 그대로 채워 생성 — 클라이언트 전용.
-//  · 사고: accident.docx (필드표 그대로 + 사진 반복표)
-//  · 점검/완료/보수요청: inspection/completion/repair.docx (반복 섹션 + 사진 반복표)
+// 보고서를 사장 원본 양식(.docx)으로 채워 생성 — 클라이언트 전용.
+//  · 사고/완료/점검/보수요청: 원본 [사고보고서] 한독·제넥신·프로젠 양식 기반 템플릿
+//    (scripts/build_report_templates.py 가 public/templates/*.docx 생성)
 //  · 풍수해: pungsuhae.docx (점검표 결과 + 사진 5구간×3)
-// 사진은 개수에 맞춰 표가 늘어나고, 셀에 꽉 차게(cover) 들어갑니다. 글꼴은 양식에서 맑은 고딕.
+// 표 행(조치 경과·대책·사진)은 입력 개수만큼 늘어나고, 사진은 칸에 꽉 차게(cover) 들어갑니다.
 
-import type { GenReport, ReportKind } from "@/lib/reports";
-import { dotDate, layoutOf } from "@/lib/reports";
+import type { GenReport, PlanRow, ReportKind } from "@/lib/reports";
+import { DEFAULT_SIGNOFF, KIND_BANNER, KIND_PLACE_LABEL, layoutOf } from "@/lib/reports";
 import type { PungReport } from "@/lib/pungsuhae";
 import { dotDate as pungDotDate } from "@/lib/pungsuhae";
 import { proxied } from "@/lib/client";
 
 // 사진 박스(px). 양식의 사진 셀 크기에 맞춰 넣어야 표 크기가 변하지 않음.
 type Box = { w: number; h: number };
-const COMMON_BOX: Box = { w: 300, h: 225 }; // 일반 보고서 2열 표(셀 3.25in, 높이 자동)
+const COMMON_BOX: Box = { w: 240, h: 180 }; // 보고서 2열 사진표(셀 3.44in) 안 4:3
 const PUNG_BOX: Box = { w: 198, h: 138 }; // 풍수해 사진 셀(2.25×1.50in 고정) 안에 맞춤
 
-// 사진을 흰 배경 고정 박스에 여백 없이 cover-crop → 셀 크기에 딱 맞게(표가 커지지 않음)
+// 사진을 흰 배경 고정 박스에 여백 없이 cover-crop → 셀 크기에 딱 맞게(표가 커지지 않음).
+// 인쇄 선명도를 위해 2배 해상도로 저장(표시 크기는 box).
 async function normalizePhoto(url: string, box: Box = COMMON_BOX): Promise<Uint8Array | null> {
   try {
     const res = await fetch(proxied(url));
@@ -26,17 +27,17 @@ async function normalizePhoto(url: string, box: Box = COMMON_BOX): Promise<Uint8
     const bitmap = await createImageBitmap(blob).catch(() => null);
     if (!bitmap) return null;
     const canvas = document.createElement("canvas");
-    canvas.width = box.w;
-    canvas.height = box.h;
+    canvas.width = box.w * 2;
+    canvas.height = box.h * 2;
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
     ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, box.w, box.h);
-    const ratio = Math.max(box.w / bitmap.width, box.h / bitmap.height);
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const ratio = Math.max(canvas.width / bitmap.width, canvas.height / bitmap.height);
     const w = bitmap.width * ratio;
     const h = bitmap.height * ratio;
-    ctx.drawImage(bitmap, (box.w - w) / 2, (box.h - h) / 2, w, h);
-    const outBlob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/jpeg", 0.82));
+    ctx.drawImage(bitmap, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h);
+    const outBlob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/jpeg", 0.85));
     if (!outBlob) return null;
     return new Uint8Array(await outBlob.arrayBuffer());
   } catch {
@@ -44,23 +45,29 @@ async function normalizePhoto(url: string, box: Box = COMMON_BOX): Promise<Uint8
   }
 }
 
-// 사진들 → 2열 반복표 데이터 (개수에 맞춰 행 생성, 홀수 마지막은 빈 셀)
-type PhotoRow = { c1img: string; c1cap: string; c2img: string; c2cap: string };
+// 사진들 → 2열 반복표 데이터 (개수에 맞춰 행 생성, 홀수 마지막은 빈 칸)
+type PhotoRow = {
+  c1img: string; c1label: string; c1cap: string; c1sub: string;
+  c2img: string; c2label: string; c2cap: string; c2sub: string;
+};
 async function buildPhotoRows(
-  photos: { url?: string; caption?: string }[],
+  photos: { url?: string; caption?: string; note?: string }[],
   store: Map<string, Uint8Array>,
   box: Box = COMMON_BOX
 ): Promise<PhotoRow[]> {
   const filled = photos.filter((p) => p.url);
   const imgs = await Promise.all(filled.map((p) => normalizePhoto(p.url!, box)));
   const items = filled
-    .map((p, i) => ({ img: imgs[i], cap: p.caption || "" }))
-    .filter((x): x is { img: Uint8Array; cap: string } => x.img != null);
+    .map((p, i) => ({ img: imgs[i], cap: p.caption || "", sub: p.note || "" }))
+    .filter((x): x is { img: Uint8Array; cap: string; sub: string } => x.img != null);
   items.forEach((it, i) => store.set(`p${i}`, it.img));
   const rows: PhotoRow[] = [];
   for (let i = 0; i < items.length; i += 2) {
-    const hasB = i + 1 < items.length;
-    rows.push({ c1img: `p${i}`, c1cap: items[i].cap, c2img: hasB ? `p${i + 1}` : "", c2cap: hasB ? items[i + 1].cap : "" });
+    const b = i + 1 < items.length ? items[i + 1] : null;
+    rows.push({
+      c1img: `p${i}`, c1label: `PHOTO ${i + 1}`, c1cap: items[i].cap, c1sub: items[i].sub,
+      c2img: b ? `p${i + 1}` : "", c2label: b ? `PHOTO ${i + 2}` : "", c2cap: b?.cap ?? "", c2sub: b?.sub ?? "",
+    });
   }
   return rows;
 }
@@ -72,55 +79,128 @@ const TEMPLATE_BY_KIND: Record<ReportKind, string> = {
   repair: "repair.docx",
 };
 
-function splitLines(text: string, n: number): string[] {
-  const lines = (text || "").split("\n").map((s) => s.trim());
-  const out: string[] = [];
-  for (let i = 0; i < n; i++) out.push(lines[i] ?? "");
-  if (lines.length > n) out[n - 1] = lines.slice(n - 1).join(" ");
-  return out;
+// ── 글자색 자동 (템플릿의 {#prefix_tone} 조건 런과 이름 일치) ──
+type Tone = "green" | "blue" | "orange" | "red" | "gray" | "navy";
+function toneFlags(prefix: string, tone: Tone): Record<string, boolean> {
+  return { [`${prefix}_${tone}`]: true };
+}
+const isNone = (v: string) => !v.trim() || /없\s*음|해당\s*없|^-$|^0원?$/.test(v.trim());
+// 피해 값: 없음=초록, 있으면 빨강
+const damageTone = (v: string): Tone => (isNone(v) ? "green" : "red");
+// 사고 등급
+function gradeTone(v: string): Tone {
+  if (/중대|심각|level\s*3/i.test(v)) return "red";
+  if (/보통|주의|level\s*2/i.test(v)) return "orange";
+  return "green";
+}
+// 조치 경과 구분
+function kindTone(v: string): Tone {
+  if (/접수|신고|원인/.test(v)) return "orange";
+  if (/현장|확인|출동|합동/.test(v)) return "blue";
+  if (/조치|복구|완료|해제/.test(v)) return "green";
+  if (/보고|전파|공유/.test(v)) return "navy";
+  return "gray";
+}
+// 대책 결과
+function resultTone(v: string): Tone {
+  if (/완료/.test(v)) return "green";
+  if (/진행/.test(v)) return "blue";
+  if (/예정/.test(v)) return "orange";
+  return "gray";
+}
+
+// "2026-08-28" → "2026. 08. 28 (금)"
+function reportDate(ymd: string): string {
+  const [y, m, d] = (ymd || "").split("-").map(Number);
+  if (!y || !m || !d) return ymd || "";
+  const wd = "일월화수목금토"[new Date(y, m - 1, d).getDay()];
+  return `${y}. ${String(m).padStart(2, "0")}. ${String(d).padStart(2, "0")} (${wd})`;
+}
+
+function planRows(list: PlanRow[]) {
+  const rows = list
+    .filter((p) => p.text.trim() || p.result.trim())
+    .map((p) => ({ 내용: p.text, 결과: p.result, ...toneFlags("r", resultTone(p.result)) }));
+  return { first: rows.slice(0, 1), rest: rows.slice(1) };
 }
 
 async function buildCommonData(report: GenReport, store: Map<string, Uint8Array>) {
   const photoRows = await buildPhotoRows(report.photos, store);
-  return {
-    제목: report.subject || report.docTitle || "",
-    "작성 일자": dotDate(report.date),
-    // 본문은 줄마다 ○ 항목으로 반복(엔터 줄바꿈 = 항목 분리). 빈 줄은 제외.
-    sections: report.sections.map((s) => ({
+  const sections = report.sections
+    .filter((s) => s.heading.trim() || s.body.trim())
+    .map((s, i) => ({
+      no: String(i + 1),
       heading: s.heading,
-      내용: (s.body || "").split(/\r?\n/).map((l) => l.trim()).filter(Boolean),
-    })),
-    // 첨부사진은 제목과 같은 자동번호 목록 → Word가 다음 번호를 자동 부여(형식 일치)
-    photosLabel: "첨부사진",
+      // 본문은 줄마다 한 문단(• 글머리). 이미 기호로 시작하면 그대로.
+      lines: (s.body || "")
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter(Boolean)
+        .map((l) => (/^[•·○●\-※▶■□◆*]/.test(l) ? l : `• ${l}`)),
+    }));
+  return {
+    문서제목: KIND_BANNER[report.kind],
+    제목: report.docTitle || report.subject || "",
+    보고자: report.reporter,
+    보고일: reportDate(report.date),
+    보고대상: report.reportTo,
+    항목4라벨: KIND_PLACE_LABEL[report.kind],
+    항목4: report.place,
+    has요약: !!report.summary.trim(),
+    요약라벨: "한 줄 요약",
+    한줄요약: report.summary,
+    sections,
+    hasPhotos: photoRows.length > 0,
+    photoNo: String(sections.length + 1),
     photoRows,
+    발신: report.signoff || DEFAULT_SIGNOFF,
   };
 }
 
 async function buildAccidentData(report: GenReport, store: Map<string, Uint8Array>) {
   const a = report.accident;
-  const data: Record<string, unknown> = {
-    "보고자 직책": a.reporter,
-    이름: "",
-    "보고 일자": dotDate(report.date),
+  const photoRows = await buildPhotoRows(report.photos, store);
+  const plans = planRows(a.plans || []);
+  const prevents = planRows(a.prevents || []);
+  const note = (a.damageNote || "").trim();
+  return {
+    문서제목: KIND_BANNER.accident,
     제목: a.title,
-    "사고 발생일자": a.occurredAt,
-    "사고 장소": a.place,
-    "사고 발생 원인": a.cause,
-    "피해 범위": a.scope,
-    "인적 피해": a.humanDamage,
-    "물적 피해": a.propertyDamage,
-    "피해 금액": a.damageCost,
-    "사고 발생일": a.occurredAt,
+    보고자: report.reporter,
+    보고일: reportDate(report.date),
+    보고대상: report.reportTo,
+    등급: a.grade,
+    ...toneFlags("g", gradeTone(a.grade)),
+    등급비고: a.gradeNote,
+    요약일시: a.sumTime || a.occurredAt,
+    요약장소: a.sumPlace || a.place,
+    피해규모: a.sumDamage,
+    ...toneFlags("d", damageTone(a.sumDamage)),
+    임시조치: a.sumTemp,
+    한줄요약: report.summary,
+    발생일시: a.occurredAt,
+    발생장소: a.place,
+    발생원인: a.cause,
+    영향범위: a.scope,
+    신고경로: a.reportPath,
+    인적피해: a.humanDamage,
+    ...toneFlags("h", damageTone(a.humanDamage)),
+    물적피해: a.propertyDamage,
+    ...toneFlags("m", damageTone(a.propertyDamage)),
+    피해금액: a.damageCost,
+    ...toneFlags("c", damageTone(a.damageCost)),
+    피해비고: note ? (note.startsWith("※") ? note : `※ ${note}`) : "",
+    경과: (a.timeline || [])
+      .filter((t) => t.time.trim() || t.kind.trim() || t.content.trim() || t.actor.trim())
+      .map((t) => ({ 시각: t.time, 구분: t.kind, 내용: t.content, 담당: t.actor, ...toneFlags("t", kindTone(t.kind)) })),
+    조치첫: plans.first,
+    조치나머지: plans.rest,
+    재발첫: prevents.first,
+    재발나머지: prevents.rest,
+    hasPhotos: photoRows.length > 0,
+    photoRows,
+    발신: report.signoff || DEFAULT_SIGNOFF,
   };
-  splitLines(a.actions, 5).forEach((line, i) => {
-    data[`사고 시간${i + 1}`] = "";
-    data[`사고 시간${i + 1} 내용`] = line;
-  });
-  const fol = splitLines(a.followup, 2);
-  data["대응 적합성 및 향후 방안1"] = fol[0];
-  data["대응 적합성 및 향후 방안2"] = fol[1];
-  data.photoRows = await buildPhotoRows(report.photos, store);
-  return data;
 }
 
 async function renderDocx(templateFile: string, data: unknown, store: Map<string, Uint8Array>, box: Box = COMMON_BOX): Promise<Blob> {
