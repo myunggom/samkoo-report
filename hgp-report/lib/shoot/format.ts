@@ -74,7 +74,7 @@ export function buildEmailBody(s: Schedule): string {
   const type = s.shootType?.trim() || "촬영";
   return `안녕하십니까.
 
-한독 및 제넥신&프로젠 ${type} "${s.title}" 촬영이 완료되어 촬영완료보고서를 첨부드립니다. 업무에 참고하시기 바랍니다.
+한독 · 제넥신 · 프로젠 연구소 ${type} "${s.title}" 촬영이 완료되어 촬영완료보고서를 첨부드립니다. 업무에 참고하시기 바랍니다.
 
 ※ 내용
 1. ${type} 제목 : ${s.title}

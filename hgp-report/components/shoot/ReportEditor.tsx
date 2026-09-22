@@ -75,7 +75,7 @@ export default function ReportEditor({ schedule, initialReport }: Props) {
     try {
       const blob = await elementToPdfBlob(docRef.current);
       const dateStr = ymd(schedule.start).replace(/-/g, "."); // yyyy.mm.dd
-      const filename = `[촬영완료보고서] 제넥신·프로젠_${schedule.title}_${dateStr}.pdf`.replace(
+      const filename = `[촬영완료보고서] 한독 · 제넥신 · 프로젠 연구소_${schedule.title}_${dateStr}.pdf`.replace(
         /[\\/:*?"<>|]/g,
         "_"
       );

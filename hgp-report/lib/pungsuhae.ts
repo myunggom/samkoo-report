@@ -59,7 +59,7 @@ export function fileDate(ymd: string): string {
 }
 
 // PDF 파일명
-export const PUNG_FILE_PREFIX = "[풍수해예방 점검보고] 프로젠·제넥신·셀리드 연구소";
+export const PUNG_FILE_PREFIX = "[풍수해예방 점검보고] 한독 · 제넥신 · 프로젠 연구소";
 export function pungFileName(report: Pick<PungReport, "date">): string {
   return `${PUNG_FILE_PREFIX}_${fileDate(report.date)}.pdf`;
 }
@@ -112,7 +112,7 @@ export function emptyPungReport(id: string): PungReport {
   return {
     id,
     date: todayYmd(),
-    site: "프로젠·제넥신·셀리드",
+    site: "한독 · 제넥신 · 프로젠 연구소",
     inspector: "",
     checklist: defaultChecklist(),
     sections: defaultSections(),

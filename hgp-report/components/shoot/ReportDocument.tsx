@@ -156,7 +156,7 @@ const ReportDocument = forwardRef<HTMLDivElement, Props>(function ReportDocument
         <img src="/samkoo.png" alt="Samkoo" style={{ position: "absolute", top: 36, right: 44, height: 46, width: "auto" }} />
         {/* 텍스트 블록 */}
         <div style={{ position: "absolute", left: 60, top: 0, bottom: 0, width: 640, display: "flex", flexDirection: "column", justifyContent: "center", color: "#fff" }}>
-          <div style={{ fontSize: 16, letterSpacing: 3, color: "#cfe0f5", fontWeight: 600 }}>제넥신 · 프로젠</div>
+          <div style={{ fontSize: 16, letterSpacing: 3, color: "#cfe0f5", fontWeight: 600 }}>한독 · 제넥신 · 프로젠 연구소</div>
           <div style={{ fontSize: 15, letterSpacing: 2, color: "#9db8dd", marginTop: 4 }}>{schedule.shootType || "촬영"}</div>
           <h1 style={{ fontSize: 58, fontWeight: 800, margin: "14px 0 6px", lineHeight: 1.1 }}>촬영 완료보고서</h1>
           <div style={{ fontSize: 30, fontWeight: 600, color: "#eaf1fb" }}>{schedule.title}</div>

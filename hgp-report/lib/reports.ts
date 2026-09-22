@@ -133,7 +133,7 @@ export function emptyGenReport(id: string, kind: ReportKind): GenReport {
     id,
     kind,
     bracket: KIND_LABEL[kind],
-    site: "프로젠·제넥신·셀리드",
+    site: "한독 · 제넥신 · 프로젠 연구소",
     subject: "",
     docTitle: kind === "accident" ? "사 고 보 고 서" : "",
     date: todayYmd(),

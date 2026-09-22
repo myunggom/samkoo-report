@@ -162,6 +162,7 @@ export async function generatePungReportDocx(report: PungReport): Promise<Blob> 
   const data: Record<string, unknown> = {
     점검일자: pungDotDate(report.date),
     점검자: report.inspector || "",
+    사업장명: report.site || "",
   };
   // 점검결과 13칸 (항목 순서대로)
   report.checklist.forEach((it, i) => {
