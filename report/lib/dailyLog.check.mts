@@ -1,0 +1,85 @@
+// lib/dailyLog.ts 순수 함수 자체점검 — 프레임워크 없이 node로 직접 실행.
+//   node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON lib/dailyLog.check.mts
+// 저장소가 공개라 실제 고객사 값이 아닌 가짜 값만 쓴다.
+import assert from "node:assert/strict";
+import { draftFor, meterRows, normalizeLog } from "./dailyLog.ts";
+import type { DailyLog } from "./dailyLog.ts";
+
+const log = (date: string, meters: DailyLog["meters"], extra: Partial<DailyLog> = {}): DailyLog => ({
+  date, work: {}, meters, updatedAt: "", ...extra,
+});
+
+// 8/31 = 전월 말 지침만 있는 줄. 9/7 은 주말을 건너뜀
+const logs: DailyLog[] = [
+  log("2026-08-31", { power: 100.0, heat: 50.0, water: 10 }),
+  log("2026-09-03", { power: 100.5, solar: 200, heat: 50.02, water: 12 }, {
+    people: { to: [9, 0, 2, 2], actual: [9, 0, 2, 2], off: 0, leave: 1 },
+    work: { 전기: { today: "A 점검", plan: "B 점검", note: "비고1" } },
+  }),
+  log("2026-09-04", { power: 100.8, solar: 300, heat: 50.05, water: 12 }),
+  log("2026-09-07", { power: 101.8, solar: 900, heat: 50.1, water: 11 }),
+];
+
+const byKey = (date: string) => Object.fromEntries(meterRows(logs, date).map((r) => [r.def.key, r]));
+
+// 첫날: 전월 말 지침이 전일검침. 전력은 배율 3600
+let r = byKey("2026-09-03");
+assert.equal(r.power.prev, 100.0);
+assert.equal(r.power.usage, 1800, "(100.5-100)*3600");
+assert.equal(r.power.month, 1800, "월 첫 기록이면 누계 = 사용량");
+assert.equal(r.heat.usage, 0.02, "부동소수 찌꺼기 없이");
+
+// 주말을 건너뛴 날: 직전 기록(9/4)이 전일검침
+r = byKey("2026-09-07");
+assert.equal(r.power.prev, 100.8);
+assert.equal(r.power.usage, 3600, "(101.8-100.8)*3600");
+assert.equal(r.power.month, 1800 + 1080 + 3600, "월 누계는 날짜별 사용량 합");
+
+// 태양광: 입력값이 그날 발전량, 전일 칸 = 이번 달 어제까지 누계 (예전 엑셀과 동일)
+assert.equal(r.solar.today, 900);
+assert.equal(r.solar.prev, 500);
+assert.equal(r.solar.month, 1400);
+assert.equal(r.solar.usage, null);
+
+// 지침이 줄면 경고
+assert.equal(r.water.usage, -1);
+assert.ok(r.water.warn, "음수 사용량 경고");
+
+// 입력 안 한 계량기는 빈칸, 누계는 0
+assert.equal(r.gas.today, null);
+assert.equal(r.gas.usage, null);
+assert.equal(r.gas.month, 0);
+
+// 다음 달 1일: 누계는 새로 시작하지만 전일검침은 전월 마지막 값
+const oct = [...logs, log("2026-10-01", { power: 102.0 })];
+const o = Object.fromEntries(meterRows(oct, "2026-10-01").map((x) => [x.def.key, x]));
+assert.equal(o.power.prev, 101.8);
+assert.equal(o.power.month, 720, "(102-101.8)*3600, 9월 사용량은 빠진다");
+
+// 새 날짜 초안: 인원은 그대로, 어제 '명일 계획'이 오늘 '금일'로
+const d = draftFor(logs, "2026-09-08");
+assert.deepEqual(d.people?.to, [9, 0, 2, 2]);
+assert.equal(d.work["전기"].today, "B 점검");
+assert.equal(d.work["전기"].plan, "B 점검");
+assert.equal(d.work["전기"].note, "비고1");
+assert.deepEqual(d.meters, {}, "계량은 매일 새로");
+// 이미 저장된 날짜는 저장본 그대로
+assert.equal(draftFor(logs, "2026-09-03").work["전기"].today, "A 점검");
+
+// 입력 검증: 형식 틀린 날짜·모르는 구분·숫자 아닌 계량값은 버린다
+assert.equal(normalizeLog({ date: "2026/09/29" }), null);
+const n = normalizeLog({
+  date: "2026-09-29",
+  work: { 전기: { today: "  점검 \r\n완료  ", plan: "" }, 해킹: { today: "x" } },
+  meters: { power: "267.08", solar: "", gas: "abc" },
+  people: { to: [9, "0", -3], actual: [9], off: "1", leave: 0 },
+});
+assert.ok(n);
+assert.deepEqual(Object.keys(n.work), ["전기"]);
+assert.equal(n.work["전기"].today, "  점검 \n완료");
+assert.equal(n.work["전기"].plan, undefined);
+assert.deepEqual(n.meters, { power: 267.08 });
+assert.deepEqual(n.people?.to, [9, 0, 0, 0], "음수·빈 값은 0");
+assert.equal(n.people?.off, 1);
+
+console.log("dailyLog check ok");

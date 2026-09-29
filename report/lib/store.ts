@@ -17,6 +17,7 @@ import type { CalEvent } from "./events";
 import type { Issue } from "./issues";
 import type { WeeklyDraft } from "./weekly";
 import type { Task } from "./tasks";
+import type { DailyLog } from "./dailyLog";
 
 const BLOB_TOKEN = process.env.BLOB_READ_WRITE_TOKEN || "";
 const USE_BLOB = !!BLOB_TOKEN;
@@ -29,6 +30,7 @@ const EVENT_PREFIX = "db/events/";
 const ISSUE_PREFIX = "db/issues/";
 const WEEKLY_PREFIX = "db/weekly/";
 const TASK_PREFIX = "db/tasks/";
+const DAILYLOG_PREFIX = "db/dailylog/";
 
 const DATA_DIR = path.join(process.cwd(), ".data");
 const PUNG_FILE = path.join(DATA_DIR, "pungsuhae.json");
@@ -39,6 +41,7 @@ const EVENT_FILE = path.join(DATA_DIR, "events.json");
 const ISSUE_FILE = path.join(DATA_DIR, "issues.json");
 const WEEKLY_FILE = path.join(DATA_DIR, "weekly.json");
 const TASK_FILE = path.join(DATA_DIR, "tasks.json");
+const DAILYLOG_FILE = path.join(DATA_DIR, "dailylog.json");
 const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads");
 
 async function readLocal<T>(file: string, fallback: T): Promise<T> {
@@ -360,6 +363,23 @@ export async function updateTask(id: string, patch: Partial<Task>): Promise<Task
 export async function deleteTask(id: string): Promise<void> {
   const all = await allTasks();
   await putTasks(all.filter((x) => x.id !== id));
+}
+
+// ── 고객사 일일 업무일지 (날짜별 · 단일 집계 JSON) ────────────────
+export async function listDailyLogs(): Promise<DailyLog[]> {
+  const all = USE_BLOB
+    ? await readBlobJson<DailyLog[]>(DAILYLOG_PREFIX, [])
+    : await readLocal<DailyLog[]>(DAILYLOG_FILE, []);
+  return all.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+// 날짜별 upsert (여러 건 한 번에 — 가져오기에도 사용)
+export async function saveDailyLogs(items: DailyLog[]): Promise<void> {
+  const byDate = new Map((await listDailyLogs()).map((l) => [l.date, l]));
+  for (const it of items) byDate.set(it.date, it);
+  const all = [...byDate.values()];
+  if (USE_BLOB) await writeBlobJson(DAILYLOG_PREFIX, all);
+  else await writeLocal(DAILYLOG_FILE, all);
 }
 
 // ── 사진 업로드 (고유 파일명 — 불변이라 덮어쓰기 문제 없음) ────────
