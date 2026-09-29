@@ -40,24 +40,3 @@ export function isTokenValid(token: string | undefined): boolean {
   if (!expected || !token) return false;
   return safeEqual(token, expected);
 }
-
-// ── 일일 업무일지: 과장급 공용 비밀번호 (DAILY_LOG_PASSWORD) ─────────
-// 할 일 탭(개인용)과 비밀번호를 나눠서, 공용 비밀번호로는 할 일이 열리지 않게 한다.
-// 운영자(WEEKLY 쿠키)는 이 탭도 그대로 들어갈 수 있다.
-export const DAILYLOG_COOKIE = "dl_auth";
-
-export function dailyLogToken(password: string): string {
-  return createHash("sha256").update(`dailylog:${password}`, "utf8").digest("hex");
-}
-
-export function checkDailyLogPassword(password: string): boolean {
-  const pw = process.env.DAILY_LOG_PASSWORD || "";
-  return !!pw && safeEqual(password, pw);
-}
-
-export function canUseDailyLog(cookies: { get(name: string): { value: string } | undefined }): boolean {
-  if (isTokenValid(cookies.get(WEEKLY_COOKIE)?.value)) return true;
-  const pw = process.env.DAILY_LOG_PASSWORD || "";
-  const token = cookies.get(DAILYLOG_COOKIE)?.value;
-  return !!pw && !!token && safeEqual(token, dailyLogToken(pw));
-}

@@ -28,7 +28,6 @@ export default function DailyLogPage() {
 
   async function load() {
     const res = await fetch("/api/daily-log", { cache: "no-store" });
-    if (res.status === 401) return window.location.assign("/daily-log/login");
     setLogs(res.ok ? await res.json() : []);
     setLoading(false);
   }

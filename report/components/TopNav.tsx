@@ -11,7 +11,6 @@ const TABS: { href: string; label: string; match: (p: string) => boolean }[] = [
   { href: "/logs", label: "일일 기록", match: (p) => p.startsWith("/logs") },
   { href: "/issues", label: "문제 관리", match: (p) => p.startsWith("/issues") },
   { href: "/reports", label: "보고서", match: (p) => p.startsWith("/reports") || p.startsWith("/report/") || p.startsWith("/pungsuhae") },
-  // 과장급 공용 비밀번호로 잠김 (proxy.ts) — 탭은 누구에게나 보이고 누르면 로그인 화면
   { href: "/daily-log", label: "업무일지", match: (p) => p.startsWith("/daily-log") },
 ];
 

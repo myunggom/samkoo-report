@@ -3,24 +3,15 @@
 
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { WEEKLY_COOKIE, isTokenValid, canUseDailyLog } from "@/lib/weeklyAuth";
+import { WEEKLY_COOKIE, isTokenValid } from "@/lib/weeklyAuth";
 
 // 잠금에서 제외할 공개 경로 (로그인 화면 + 로그인 처리 API)
-const PUBLIC_PATHS = new Set(["/weekly-report/login", "/api/weekly/auth", "/daily-log/login", "/api/daily-log/auth"]);
+const PUBLIC_PATHS = new Set(["/weekly-report/login", "/api/weekly/auth"]);
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (PUBLIC_PATHS.has(pathname)) return NextResponse.next();
-
-  // 일일 업무일지: 과장급 공용 비밀번호 또는 운영자 로그인
-  if (pathname.startsWith("/daily-log") || pathname.startsWith("/api/daily-log")) {
-    if (canUseDailyLog(request.cookies)) return NextResponse.next();
-    if (pathname.startsWith("/api/")) {
-      return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
-    }
-    return NextResponse.redirect(new URL("/daily-log/login", request.url));
-  }
 
   const token = request.cookies.get(WEEKLY_COOKIE)?.value;
   if (isTokenValid(token)) return NextResponse.next();
@@ -35,8 +26,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    "/weekly-report/:path*", "/api/weekly/:path*", "/tasks/:path*", "/api/tasks/:path*",
-    "/daily-log/:path*", "/api/daily-log/:path*",
-  ],
+  matcher: ["/weekly-report/:path*", "/api/weekly/:path*", "/tasks/:path*", "/api/tasks/:path*"],
 };
