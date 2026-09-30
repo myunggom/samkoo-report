@@ -21,6 +21,26 @@ const TABS = ["표지", "교육·조직도", "에너지", "고객사", "시설�
 type Tab = (typeof TABS)[number];
 
 // 사진 한 칸: 촬영 / 앨범 / 아카이브
+// 미리보기: 세로(794)·가로(1123) 페이지를 각각 화면 폭에 맞춰 줄인다. PDF 는 숨긴 원본 크기로 만든다.
+function Preview({ report }: { report: MonthlyReport }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [w, setW] = useState(0);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([e]) => setW(e.contentRect.width));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const z = (px: number) => (w ? Math.min(1, w / px) : 1);
+  return (
+    <div ref={ref} className="mr-preview rounded-xl border border-slate-200 bg-slate-100 p-3" style={{ "--zp": z(794), "--zl": z(1123) } as React.CSSProperties}>
+      <style>{`.mr-preview .mr-page{zoom:var(--zp);margin:0 auto 12px;box-shadow:0 1px 4px #0003}.mr-preview .mr-page[data-landscape="1"]{zoom:var(--zl)}`}</style>
+      <MonthlyReportDocument report={report} />
+    </div>
+  );
+}
+
 function PhotoSlot({ url, onChange, label }: { url?: string; onChange: (u?: string) => void; label?: string }) {
   const cam = useRef<HTMLInputElement>(null);
   const alb = useRef<HTMLInputElement>(null);
@@ -298,16 +318,17 @@ export default function MonthlyReportPage() {
             <p className="text-xs text-slate-500">칸을 누르면 주→야→비→휴→연→빈칸 순으로 바뀝니다(연차 등). 교대기사는 1일 근무를 고르면 주주야야비비로 자동 순환합니다.</p>
             <div className="overflow-x-auto">
               <table className="text-xs">
-                <thead><tr><th className="px-1">성명</th><th className="px-1">직급</th><th className="px-1">연락처</th><th className="px-1">교대(1일)</th>
+                <thead><tr><th className="px-1">부서</th><th className="px-1">성명</th><th className="px-1">직급</th><th className="px-1">투입일자</th><th className="px-1">교대(1일)</th>
                   {daysIn(nextMonth).map((dd) => { const w = weekday(dd); return <th key={dd} className={"w-6 " + (w === 0 || d.holidays.includes(dd) ? "text-red-600" : w === 6 ? "text-blue-700" : "")}>{Number(dd.slice(8))}</th>; })}<th /></tr></thead>
                 <tbody>
                   {d.staff.map((s, i) => {
                     const row = scheduleRow(s, nextMonth, d.holidays, d.overrides[s.name]);
                     return (
                       <tr key={i}>
+                        <td><input value={s.dept} onChange={(e) => setStaff(i, { dept: e.target.value })} className="w-12 rounded border px-1" /></td>
                         <td><input value={s.name} onChange={(e) => setStaff(i, { name: e.target.value })} className="w-16 rounded border px-1" /></td>
                         <td><input value={s.title} onChange={(e) => setStaff(i, { title: e.target.value })} className="w-24 rounded border px-1" /></td>
-                        <td><input value={s.phone ?? ""} onChange={(e) => setStaff(i, { phone: e.target.value })} className="w-28 rounded border px-1" /></td>
+                        <td><input type="date" value={s.start ?? ""} onChange={(e) => setStaff(i, { start: e.target.value })} className="w-28 rounded border px-1" /></td>
                         <td><select value={isShift(s) ? String(s.shift) : ""} onChange={(e) => setStaff(i, { shift: e.target.value === "" ? undefined : Number(e.target.value) })} className="rounded border">
                           <option value="">일반</option>{SHIFT_CYCLE.map((c, k) => <option key={k} value={k}>{c}{"①②③④⑤⑥"[k]}</option>)}</select></td>
                         {row.map((v, j) => <td key={j}><button onClick={() => cycleCell(s.name, daysIn(nextMonth)[j], v.trim())} className={"h-6 w-6 rounded " + (v === "휴" ? "bg-slate-100" : v === "야" ? "bg-amber-100" : v === "연" ? "bg-rose-100" : "")}>{v}</button></td>)}
@@ -330,7 +351,7 @@ export default function MonthlyReportPage() {
         {msg && <span className="text-sm text-slate-600">{msg}</span>}
       </div>
 
-      {preview && <div className="overflow-x-auto rounded-xl border border-slate-200 bg-slate-100 p-3"><div className="mx-auto w-fit space-y-3 [&_.mr-page]:shadow"><MonthlyReportDocument report={d} /></div></div>}
+      {preview && <Preview report={d} />}
       <div aria-hidden style={{ position: "fixed", left: -20000, top: 0 }}><div ref={docRef}><MonthlyReportDocument report={d} /></div></div>
     </div>
   );

@@ -33,6 +33,13 @@ function chunk<T>(xs: T[], size: number): T[][] {
 }
 // 연속된 같은 값은 첫 칸만 보이게 (엑셀의 세로 병합 대신)
 const shown = (xs: string[], i: number) => (i === 0 || xs[i] !== xs[i - 1] ? xs[i] : "");
+// 세로 병합: 같은 값이 이어지는 첫 줄이면 이어지는 줄 수, 아니면 0
+const span = (xs: string[], i: number) => {
+  if (i > 0 && xs[i] === xs[i - 1]) return 0;
+  let k = i;
+  while (k < xs.length && xs[k] === xs[i]) k++;
+  return k - i;
+};
 
 export default function MonthlyReportDocument({ report: m }: { report: MonthlyReport }) {
   const dataMonth = addMonths(m.month, -1);          // 에너지·광열비는 전월분까지
@@ -79,9 +86,12 @@ export default function MonthlyReportDocument({ report: m }: { report: MonthlyRe
     );
   };
 
-  const hol = new Set(m.holidays);
   const days = daysIn(nextMonth);
   const staffRows = m.staff.map((s) => scheduleRow(s, nextMonth, m.holidays, m.overrides[s.name]));
+  const total = m.staff.reduce((a, s) => a + (s.to || 0), 0);
+  const depts = [...new Set(m.staff.map((s) => s.dept))];
+  // 엑셀 근무표처럼 머리글은 토요일 파랑, 일요일 빨강 (공휴일은 칸의 '휴'로만 보임)
+  const dayColor = (d: string) => (weekday(d) === 0 ? "#e00" : weekday(d) === 6 ? "#0070c0" : "#111");
   const facilityPages = chunk(m.facility, 44);
   const planPages = chunk(m.nextPlan, 46);
 
@@ -150,7 +160,7 @@ export default function MonthlyReportDocument({ report: m }: { report: MonthlyRe
       </div>
 
       {/* 2-1 광열비 분석 */}
-      <div className="mr-page" style={P}>
+      <div className="mr-page" data-landscape="1" style={L}>
         <H1>2. 에너지 사용현황</H1>
         <H2>2-1. 광열비 분석</H2>
         <div style={{ margin: "6px 0 3px", fontWeight: 700 }}>&lt;증감량 비교표&gt;</div>
@@ -260,29 +270,47 @@ export default function MonthlyReportDocument({ report: m }: { report: MonthlyRe
 
       {/* 5-2 차월 근무표 (가로) */}
       <div className="mr-page" data-landscape="1" style={{ ...L, padding: "26px 22px" }}>
-        <H2>5-2. 차월 근무표</H2>
-        <div style={{ textAlign: "center", fontSize: 15, fontWeight: 700, marginBottom: 6 }}>{SITE} {monthLabel(nextMonth)} 근무표</div>
-        <table style={{ ...T, fontSize: 8.5 }}>
-          <colgroup><col style={{ width: 62 }} /><col style={{ width: 34 }} /><col style={{ width: 70 }} /><col style={{ width: 22 }} /><col style={{ width: 44 }} /><col style={{ width: 78 }} />{days.map((d) => <col key={d} />)}</colgroup>
+        <div style={{ background: "#595959", color: "#fff", fontSize: 15, fontWeight: 700, padding: "4px 8px", marginBottom: 10 }}>■ {SITE} 삼구INC {monthLabel(nextMonth)} 근무표</div>
+        <style>{".mr-sched td{height:30px}"}</style>
+        <table className="mr-sched" style={{ ...T, fontSize: 10 }}>
+          <colgroup><col style={{ width: 64 }} /><col style={{ width: 44 }} /><col style={{ width: 84 }} /><col style={{ width: 26 }} /><col style={{ width: 48 }} /><col style={{ width: 68 }} />{days.map((d) => <col key={d} />)}<col style={{ width: 34 }} /></colgroup>
           <tbody>
             <tr>
-              <td style={th} rowSpan={2}>구분</td><td style={th} rowSpan={2}>부서</td><td style={th} rowSpan={2}>직급</td><td style={th} rowSpan={2}>TO</td><td style={th} rowSpan={2}>성명</td><td style={th} rowSpan={2}>연락처</td>
-              {days.map((d) => <td key={d} style={{ ...th, padding: 1 }}>{Number(d.slice(8))}</td>)}
+              <td style={th} rowSpan={3} colSpan={2}>구분</td><td style={th} rowSpan={3}>직급</td><td style={th} rowSpan={3}>TO</td><td style={th} rowSpan={3}>성명</td><td style={th} rowSpan={3}>투입일자</td>
+              <td style={th} colSpan={days.length}>{monthLabel(nextMonth)}</td><td style={th} rowSpan={3}>비고</td>
             </tr>
-            <tr>{days.map((d) => { const w = weekday(d); return <td key={d} style={{ ...th, padding: 1, color: w === 0 || hol.has(d) ? "#c00" : w === 6 ? "#036" : "#111" }}>{"일월화수목금토"[w]}</td>; })}</tr>
-            {m.staff.map((s, i) => (
-              <tr key={i}>
-                <td style={{ ...c, fontSize: 8 }}>{shown(m.staff.map((x) => x.group), i)}</td>
-                <td style={c}>{shown(m.staff.map((x) => x.group + x.dept), i) ? s.dept : ""}</td>
-                <td style={c}>{s.title}</td><td style={c}>{s.to}</td><td style={c}>{s.name}</td><td style={{ ...c, fontSize: 8 }}>{s.phone}</td>
-                {staffRows[i].map((v, j) => <td key={j} style={{ ...c, padding: 1, background: v === "휴" ? "#f2f2f2" : v === "야" ? "#fff2cc" : undefined }}>{v}</td>)}
+            <tr>{days.map((d) => <td key={d} style={{ ...th, padding: 1, color: dayColor(d) }}>{Number(d.slice(8))}</td>)}</tr>
+            <tr>{days.map((d) => <td key={d} style={{ ...th, padding: 1, color: dayColor(d) }}>{"일월화수목금토"[weekday(d)]}</td>)}</tr>
+            {m.staff.map((s, i) => {
+              const g = span(m.staff.map((x) => x.group), i), dp = span(m.staff.map((x) => x.group + "|" + x.dept), i);
+              return (
+                <tr key={i}>
+                  {g > 0 && <td style={{ ...c, fontWeight: 700 }} rowSpan={g}>{s.group}</td>}
+                  {dp > 0 && <td style={{ ...c, fontWeight: 700 }} rowSpan={dp}>{s.dept}</td>}
+                  <td style={c}>{s.title}</td><td style={c}>{s.to}</td><td style={c}>{s.name}</td><td style={c}>{s.start}</td>
+                  {staffRows[i].map((v, j) => <td key={j} style={{ ...c, padding: 1, color: v === "휴" ? "#e00" : undefined, background: typeof s.shift === "number" ? "#ccf5f5" : undefined }}>{v}</td>)}
+                  <td style={c} />
+                </tr>
+              );
+            })}
+            <tr style={{ background: "#d9d9d9", fontWeight: 700 }}>
+              <td style={c} colSpan={3}>소계</td><td style={c}>{total}</td><td style={c} /><td style={c}>{m.staff.length}</td>
+              {days.map((d) => <td key={d} style={c} />)}<td style={c} />
+            </tr>
+            {depts.map((dept, k) => (
+              <tr key={dept} style={{ background: "#9bdcf5", fontWeight: 700 }}>
+                {k === 0 && <td style={c} colSpan={2} rowSpan={depts.length}>소계</td>}
+                <td style={c}>{dept}</td><td style={c}>{m.staff.filter((s) => s.dept === dept).reduce((a, s) => a + (s.to || 0), 0)}</td><td style={c} /><td style={c} />
+                {days.map((d, j) => <td key={d} style={{ ...c, padding: 1 }}>{staffRows.filter((row, i) => m.staff[i].dept === dept && row[j]).length}</td>)}<td style={c} />
               </tr>
             ))}
-            <tr><td style={th} colSpan={3}>총계</td><td style={c}>{m.staff.reduce((a, s) => a + (s.to || 0), 0)}</td><td style={c} colSpan={2} />
-              {days.map((d, j) => <td key={d} style={{ ...c, padding: 1 }}>{staffRows.filter((row) => row[j]).length}</td>)}</tr>
+            <tr style={{ background: "#d9c3e9", fontWeight: 700 }}>
+              <td style={c} colSpan={3}>총계</td><td style={c}>{total}</td><td style={c} /><td style={c} />
+              {days.map((d, j) => <td key={d} style={{ ...c, padding: 1 }}>{staffRows.filter((row) => row[j]).length}</td>)}<td style={c} />
+            </tr>
           </tbody>
         </table>
-        <div style={{ marginTop: 6, fontSize: 9.5, whiteSpace: "pre-wrap" }}>{m.scheduleNote ?? " - 상기 일정은 현장 업무진행 상황에 따라 변경될 수 있음 (주: 주간, 야: 야간, 비: 비번, 휴: 휴무)"}</div>
+        <div style={{ marginTop: 6, fontSize: 9.5, whiteSpace: "pre-wrap" }}>{m.scheduleNote ?? " - 상기 일정은 현장 업무진행 상황에 따라 변경될 수 있음."}</div>
       </div>
     </div>
   );
