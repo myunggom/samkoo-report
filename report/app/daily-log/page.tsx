@@ -3,7 +3,7 @@
 // 고객사 일일 업무일지 — 입력 → 미리보기 → PDF. 메일은 보내지 않는다(받은 PDF를 직접 발송).
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DailyLog, MeterKey, People, WorkEntry } from "@/lib/dailyLog";
-import { METERS, POWER_PARTS, TEAMS, WORK_SLOTS, dateLabel, draftFor, fmt, meterRows, sumParts } from "@/lib/dailyLog";
+import { METERS, POWER_PARTS, TEAMS, WORK_SLOTS, dateLabel, draftFor, fmt, meterRows, solarFromMonthTotal, sumParts } from "@/lib/dailyLog";
 import { kstDateString } from "@/lib/tasks";
 import DailyLogDocument, { MonthlyLogDocument } from "@/components/DailyLogDocument";
 import { elementToPdfBlobFlow, shareOrDownloadPdf } from "@/lib/pdf";
@@ -21,6 +21,7 @@ export default function DailyLogPage() {
   const [draft, setDraft] = useState<DailyLog | null>(null);
   const [meterText, setMeterText] = useState<MeterText>({});
   const [parts, setParts] = useState<string[]>(["", "", ""]); // 전력량계 3요소
+  const [solarMwh, setSolarMwh] = useState(""); // 태양광 금월 발전량(MWh)
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
@@ -43,6 +44,7 @@ export default function DailyLogPage() {
     setDraft(structuredClone(d));
     setMeterText(Object.fromEntries(METERS.map((m) => [m.key, d.meters[m.key]?.toString() ?? ""])));
     setParts(d.powerParts ? d.powerParts.map(String) : ["", "", ""]);
+    setSolarMwh(d.solarMonthMWh?.toString() ?? "");
     setDirty(false);
     // logs 는 저장 직후에도 바뀌지만 그때 입력 중인 초안을 덮어쓰면 안 되므로 date·loading 만 본다
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -62,8 +64,12 @@ export default function DailyLogPage() {
     const nums = parts.map((s) => (s.trim() === "" ? NaN : Number(s)));
     const full = nums.every((n) => Number.isFinite(n));
     if (full) meters.power = sumParts(nums);
-    return { ...draft, meters, powerParts: full ? nums : undefined };
-  }, [draft, meterText, parts]);
+    // 태양광: 금월 발전량(MWh)을 넣으면 오늘 발전량(kWh)으로 바꿔 넣는다. 안 넣었으면 예전 값 유지
+    const mwh = solarMwh.trim() === "" ? NaN : Number(solarMwh);
+    const hasSolar = Number.isFinite(mwh) && mwh >= 0;
+    if (hasSolar) meters.solar = solarFromMonthTotal(logs, draft.date, mwh);
+    return { ...draft, meters, powerParts: full ? nums : undefined, solarMonthMWh: hasSolar ? mwh : undefined };
+  }, [draft, meterText, parts, solarMwh, logs]);
   // 3요소 칸 안내용: 지난 기록의 3요소 값
   const prevParts = useMemo(
     () => [...logs].filter((l) => l.date < date && l.powerParts).sort((a, b) => b.date.localeCompare(a.date))[0]?.powerParts,
@@ -156,7 +162,24 @@ export default function DailyLogPage() {
       <section className="rounded-2xl border border-slate-200 bg-white p-4">
         <h2 className="mb-3 font-bold">계량 (금일 지침)</h2>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {rows.map((r) => r.def.key === "power" ? (
+          {rows.map((r) => r.def.key === "solar" ? (
+            <label key="solar" className="flex items-center gap-2 text-sm">
+              <span className="w-28 shrink-0 text-slate-600">태양광 금월<br /><span className="text-xs">(MWh)</span></span>
+              <input
+                inputMode="decimal"
+                value={solarMwh}
+                onChange={(e) => {
+                  setSolarMwh(e.target.value);
+                  setDirty(true);
+                }}
+                placeholder={`어제까지 ${fmt((r.prev ?? 0) / 1000, 3)}`}
+                className={input + (r.warn ? " border-red-400 bg-red-50" : "")}
+              />
+              <span className="w-24 shrink-0 text-right text-xs text-slate-500">
+                {r.today === null ? "" : `오늘 ${fmt(r.today, 1)} kWh`}
+              </span>
+            </label>
+          ) : r.def.key === "power" ? (
             <div key="power" className="rounded-lg bg-slate-50 p-2 text-sm sm:col-span-2">
               <div className="mb-1 flex items-center justify-between">
                 <span className="font-semibold text-slate-700">전력량계 (3요소 지침)</span>

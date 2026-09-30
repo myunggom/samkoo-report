@@ -66,8 +66,20 @@ export type DailyLog = {
   meters: Partial<Record<MeterKey, number>>;
   // 전력량계 3요소 지침 (POWER_PARTS 순서). 있으면 meters.power = 세 값의 합
   powerParts?: number[];
+  // 태양광 모니터링의 "금월 발전량"(MWh) 입력값. 있으면 meters.solar = 이 값×1000 − 어제까지 이번 달 발전량
+  solarMonthMWh?: number;
   updatedAt: string;
 };
+
+// 태양광: 금월 누적(MWh) → 그날 발전량(kWh). 어제까지는 이번 달 일지에 적힌 일 발전량의 합.
+// 주말처럼 일지가 빠진 날의 발전량은 다음 일지에 합쳐진다 (예전 엑셀도 같았다).
+export function solarFromMonthTotal(logs: DailyLog[], date: string, monthMWh: number): number {
+  const monthStart = date.slice(0, 8) + "01";
+  const before = logs
+    .filter((l) => l.date >= monthStart && l.date < date)
+    .reduce((s, l) => s + (typeof l.meters.solar === "number" ? l.meters.solar : 0), 0);
+  return Math.round((monthMWh * 1000 - before) * 10) / 10;
+}
 
 // 전력량계는 시간대별 3요소를 따로 읽는다 — 전력 지침은 그 합 (엑셀 '전기 에너지 사용량' I·J·K 열)
 export const POWER_PARTS = ["주간·중부하", "저녁·최대부하", "심야·경부하"] as const;
@@ -125,7 +137,7 @@ export function meterRows(logs: DailyLog[], date: string): MeterRow[] {
     const monthTotal = clean(usages.reduce((s, x) => s + (x.u ?? 0), 0));
     if (def.daily) {
       const before = clean(usages.filter((x) => x.date < date).reduce((s, x) => s + (x.u ?? 0), 0));
-      return { def, prev: before, today, usage: null, month: monthTotal };
+      return { def, prev: before, today, usage: null, month: monthTotal, warn: today !== null && today < 0 ? "금월 발전량이 어제까지 합보다 작습니다" : undefined };
     }
     const usage = usageOn(logs, date, def);
     let warn: string | undefined;
@@ -199,6 +211,9 @@ export function normalizeLog(input: unknown): DailyLog | null {
     }
   }
 
+  const smw = typeof it.solarMonthMWh === "string" && it.solarMonthMWh.trim() !== "" ? Number(it.solarMonthMWh) : it.solarMonthMWh;
+  const solarMonthMWh = typeof smw === "number" && Number.isFinite(smw) && smw >= 0 ? smw : undefined;
+
   let people: People | undefined;
   const p = it.people as Record<string, unknown> | undefined;
   if (p && typeof p === "object") {
@@ -206,7 +221,7 @@ export function normalizeLog(input: unknown): DailyLog | null {
     people = { to: arr(p.to), actual: arr(p.actual), off: count(p.off), leave: count(p.leave), note: text(p.note) };
   }
 
-  return { date, people, work, special: text(it.special), meters, powerParts, updatedAt: new Date().toISOString() };
+  return { date, people, work, special: text(it.special), meters, powerParts, solarMonthMWh, updatedAt: new Date().toISOString() };
 }
 
 export function sumPeople(xs: number[] | undefined): number {

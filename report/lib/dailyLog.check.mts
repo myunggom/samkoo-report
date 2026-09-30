@@ -2,7 +2,7 @@
 //   node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON lib/dailyLog.check.mts
 // 저장소가 공개라 실제 고객사 값이 아닌 가짜 값만 쓴다.
 import assert from "node:assert/strict";
-import { draftFor, meterRows, normalizeLog } from "./dailyLog.ts";
+import { draftFor, meterRows, normalizeLog, solarFromMonthTotal } from "./dailyLog.ts";
 import type { DailyLog } from "./dailyLog.ts";
 
 const log = (date: string, meters: DailyLog["meters"], extra: Partial<DailyLog> = {}): DailyLog => ({
@@ -89,5 +89,13 @@ assert.equal(pp?.meters.power, 267.08, "85.17+43.89+138.02, 부동소수 찌꺼�
 const pp2 = normalizeLog({ date: "2026-09-29", powerParts: [85.17, "", 138.02], meters: { power: 267.08 } });
 assert.equal(pp2?.powerParts, undefined);
 assert.equal(pp2?.meters.power, 267.08);
+
+// 태양광: 금월 발전량(MWh) − 어제까지 이번 달 일 발전량(kWh 합) = 오늘(kWh)
+// logs 의 9월 태양광: 200+300+900 = 1400 kWh
+assert.equal(solarFromMonthTotal(logs, "2026-09-08", 1.95), 550, "1.95 MWh = 1950 kWh − 1400");
+assert.equal(solarFromMonthTotal(logs, "2026-09-04", 0.5), 300, "9/3 까지만(200) 뺀다");
+assert.equal(solarFromMonthTotal(logs, "2026-10-01", 0.123), 123, "달이 바뀌면 전월은 빼지 않는다");
+assert.equal(normalizeLog({ date: "2026-09-08", solarMonthMWh: "1.95" })?.solarMonthMWh, 1.95);
+assert.equal(normalizeLog({ date: "2026-09-08", solarMonthMWh: "abc" })?.solarMonthMWh, undefined);
 
 console.log("dailyLog check ok");
