@@ -107,3 +107,19 @@ export function normalizeWeekly(input: unknown): WeeklyLog | null {
   }
   return { date, thisFrom, thisTo, nextFrom, nextTo, work, updatedAt: new Date().toISOString() };
 }
+
+// AI 요약 응답 검사: {"행정":{"done":"...","plan":"..."}, ...} 만 받는다. 모르는 분야·빈 값은 버린다.
+export function parseSummaryJson(raw: string): Record<string, WeekEntry> {
+  const m = raw.match(/\{[\s\S]*\}/);
+  if (!m) throw new Error("JSON 없음");
+  const obj = JSON.parse(m[0]) as Record<string, Record<string, unknown>>;
+  const out: Record<string, WeekEntry> = {};
+  for (const s of WEEK_SLOTS) {
+    const e = obj[s.key];
+    if (!e || typeof e !== "object") continue;
+    const pick = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : undefined);
+    const entry = { done: pick(e.done), plan: pick(e.plan) };
+    if (entry.done || entry.plan) out[s.key] = entry;
+  }
+  return out;
+}

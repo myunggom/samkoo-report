@@ -21,6 +21,7 @@ export default function WeeklyLogPage() {
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
+  const [undo, setUndo] = useState<WeeklyLog["work"] | null>(null); // AI 요약 전 내용
   const pdfRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -37,6 +38,7 @@ export default function WeeklyLogPage() {
   useEffect(() => {
     if (loading) return;
     setDraft(structuredClone(draftWeekly(weeklies, dailies, date)));
+    setUndo(null);
     setDirty(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date, loading]);
@@ -63,6 +65,34 @@ export default function WeeklyLogPage() {
     if (!draft) return;
     if (!confirm(`${periodLabel(draft.thisFrom, draft.thisTo)} 일일 업무일지 ${daysInRange}일치로 내용을 다시 채울까요? 지금 입력한 내용은 바뀝니다.`)) return;
     edit({ work: compileFromDaily(dailies, draft.thisFrom, draft.thisTo) });
+  }
+
+  async function summarize() {
+    if (!draft) return;
+    setBusy("ai");
+    setMsg("");
+    try {
+      const res = await fetch("/api/weekly-log/summarize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ work: draft.work }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setMsg(d.error || "요약에 실패했습니다.");
+        return;
+      }
+      setUndo(draft.work);
+      // AI 가 돌려주지 않은 분야는 원래 내용 유지
+      const next = { ...draft.work };
+      for (const [k, e] of Object.entries(d.work as WeeklyLog["work"])) next[k] = { ...next[k], ...Object.fromEntries(Object.entries(e).filter(([, v]) => v)) };
+      edit({ work: next });
+      setMsg("AI가 요약했습니다. 확인하고 저장하세요 (마음에 안 들면 되돌리기).");
+    } catch {
+      setMsg("네트워크 오류로 요약하지 못했습니다.");
+    } finally {
+      setBusy("");
+    }
   }
 
   async function save(): Promise<boolean> {
@@ -148,6 +178,14 @@ export default function WeeklyLogPage() {
         <button onClick={refill} className="mt-3 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700">
           일일 업무일지에서 다시 채우기 ({daysInRange}일치)
         </button>
+        <button onClick={summarize} disabled={!!busy} className="ml-2 mt-3 rounded-lg bg-violet-600 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50">
+          {busy === "ai" ? "AI 요약 중… (20초 정도)" : "✨ AI 요약 (비슷한 항목 묶기)"}
+        </button>
+        {undo && (
+          <button onClick={() => { edit({ work: undo }); setUndo(null); setMsg("요약 전으로 되돌렸습니다."); }} className="ml-2 mt-3 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700">
+            ↩ 되돌리기
+          </button>
+        )}
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4">

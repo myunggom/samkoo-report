@@ -1,7 +1,7 @@
 // lib/weeklyLog.ts 자체점검 — node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON lib/weeklyLog.check.mts
 // 공개 저장소라 가짜 값만 쓴다.
 import assert from "node:assert/strict";
-import { compileFromDaily, draftWeekly, joinItems, normalizeWeekly, periodLabel, splitItems } from "./weeklyLog.ts";
+import { compileFromDaily, draftWeekly, joinItems, normalizeWeekly, parseSummaryJson, periodLabel, splitItems } from "./weeklyLog.ts";
 import type { DailyLog } from "./dailyLog.ts";
 
 assert.equal(periodLabel("2026-09-18", "2026-09-23"), "26.09.18~09.23");
@@ -36,4 +36,9 @@ assert.equal(draft.work["전기"].done, w["전기"].done, "일지가 있으면 �
 assert.equal(draftWeekly([prev], dailies, "2026-09-17"), prev, "저장된 주는 그대로");
 
 assert.equal(normalizeWeekly({ date: "2026-09-23" }), null, "기간 빠지면 거부");
+// AI 요약 응답: 코드펜스·설명이 섞여도 JSON 만, 모르는 분야·빈 값은 버린다
+const sum = parseSummaryJson('요약입니다\n```json\n{"전기":{"done":"1. 점검","plan":""},"해킹":{"done":"x"},"기계":{"plan":"1. 냉동기"}}\n```');
+assert.deepEqual(sum, { 전기: { done: "1. 점검", plan: undefined }, 기계: { done: undefined, plan: "1. 냉동기" } });
+assert.throws(() => parseSummaryJson("JSON 없음"));
+
 console.log("weeklyLog check ok");
