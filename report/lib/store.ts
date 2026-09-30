@@ -19,6 +19,7 @@ import type { WeeklyDraft } from "./weekly";
 import type { Task } from "./tasks";
 import type { DailyLog } from "./dailyLog";
 import type { WeeklyLog } from "./weeklyLog";
+import type { MonthlyReport } from "./monthlyReport";
 
 const BLOB_TOKEN = process.env.BLOB_READ_WRITE_TOKEN || "";
 const USE_BLOB = !!BLOB_TOKEN;
@@ -33,6 +34,7 @@ const WEEKLY_PREFIX = "db/weekly/";
 const TASK_PREFIX = "db/tasks/";
 const DAILYLOG_PREFIX = "db/dailylog/";
 const WEEKLYLOG_PREFIX = "db/weeklylog/";
+const MONTHLY_PREFIX = "db/monthlyreport/";
 
 const DATA_DIR = path.join(process.cwd(), ".data");
 const PUNG_FILE = path.join(DATA_DIR, "pungsuhae.json");
@@ -45,6 +47,7 @@ const WEEKLY_FILE = path.join(DATA_DIR, "weekly.json");
 const TASK_FILE = path.join(DATA_DIR, "tasks.json");
 const DAILYLOG_FILE = path.join(DATA_DIR, "dailylog.json");
 const WEEKLYLOG_FILE = path.join(DATA_DIR, "weeklylog.json");
+const MONTHLY_FILE = path.join(DATA_DIR, "monthlyreport.json");
 const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads");
 
 async function readLocal<T>(file: string, fallback: T): Promise<T> {
@@ -399,6 +402,21 @@ export async function saveWeeklyLogs(items: WeeklyLog[]): Promise<void> {
   const all = [...byDate.values()];
   if (USE_BLOB) await writeBlobJson(WEEKLYLOG_PREFIX, all);
   else await writeLocal(WEEKLYLOG_FILE, all);
+}
+
+// ── 고객사 월간 보고서 (보고월별 · 단일 집계 JSON) ───────────────
+export async function listMonthlyReports(): Promise<MonthlyReport[]> {
+  const all = USE_BLOB
+    ? await readBlobJson<MonthlyReport[]>(MONTHLY_PREFIX, [])
+    : await readLocal<MonthlyReport[]>(MONTHLY_FILE, []);
+  return all.sort((a, b) => a.month.localeCompare(b.month));
+}
+
+export async function saveMonthlyReport(item: MonthlyReport): Promise<void> {
+  const all = (await listMonthlyReports()).filter((r) => r.month !== item.month);
+  all.push(item);
+  if (USE_BLOB) await writeBlobJson(MONTHLY_PREFIX, all);
+  else await writeLocal(MONTHLY_FILE, all);
 }
 
 // ── 사진 업로드 (고유 파일명 — 불변이라 덮어쓰기 문제 없음) ────────

@@ -120,3 +120,23 @@ export async function shareOrDownloadFile(
 export async function shareOrDownloadPdf(blob: Blob, filename: string, shareText?: string): Promise<"shared" | "downloaded"> {
   return shareOrDownloadFile(blob, filename, "application/pdf", shareText);
 }
+
+// 페이지마다 방향이 다른 문서(월간 보고서) — 각 페이지 element 의 data-landscape="1" 이면 가로 A4
+export async function pagesToPdfBlob(el: HTMLElement, selector: string): Promise<Blob> {
+  const { default: html2canvas } = await import("html2canvas-pro");
+  const { default: jsPDF } = await import("jspdf");
+  await waitForImages(el);
+  const pages = Array.from(el.querySelectorAll<HTMLElement>(selector));
+  let pdf: InstanceType<typeof jsPDF> | null = null;
+  for (const page of pages) {
+    const landscape = page.dataset.landscape === "1";
+    const orientation = landscape ? "landscape" : "portrait";
+    const [w, h] = landscape ? [297, 210] : [210, 297];
+    const canvas = await html2canvas(page, { scale: 2, useCORS: true, backgroundColor: "#ffffff", logging: false });
+    if (!pdf) pdf = new jsPDF({ orientation, unit: "mm", format: "a4" });
+    else pdf.addPage("a4", orientation);
+    pdf.addImage(canvas.toDataURL("image/jpeg", 0.9), "JPEG", 0, 0, w, h);
+  }
+  if (!pdf) throw new Error("페이지 없음");
+  return pdf.output("blob");
+}
