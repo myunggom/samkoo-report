@@ -288,6 +288,10 @@ export default function MonthlyReportPage() {
         {tab === "작업사진" && (
           <div className="space-y-3">
             <div className="flex flex-wrap gap-1">{TRADES.map((t) => <button key={t} onClick={() => setTrade(t)} className={"rounded-full px-3 py-1 text-sm " + (trade === t ? "bg-sky-600 text-white" : "border border-slate-300")}>{t} ({(d.photos[t] ?? []).filter((s) => s.a || s.b).length}/12)</button>)}</div>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={() => confirm(`${trade} 사진을 모두 지울까요? (작업명은 남습니다)`) && up({ photos: { ...d.photos, [trade]: (d.photos[trade] ?? []).map((s) => ({ name: s.name })) } })} className={btn + " text-rose-600"}>🗑 {trade} 사진 모두 지우기</button>
+              <button onClick={() => confirm(`${trade} 사진과 작업명을 모두 지울까요?`) && up({ photos: { ...d.photos, [trade]: [] } })} className={btn + " text-rose-600"}>🗑 작업명까지 모두 지우기</button>
+            </div>
             <div className="grid gap-3 sm:grid-cols-2">
               {Array.from({ length: 12 }, (_, i) => (d.photos[trade] ?? [])[i] ?? { name: "" }).map((s, i) => {
                 const set = (patch: Partial<typeof s>) => { const arr = Array.from({ length: 12 }, (_, j) => (d.photos[trade] ?? [])[j] ?? { name: "" }); arr[i] = { ...arr[i], ...patch }; up({ photos: { ...d.photos, [trade]: arr } }); };
