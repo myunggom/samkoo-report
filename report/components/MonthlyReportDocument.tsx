@@ -26,13 +26,49 @@ const Img = ({ url, h }: { url?: string; h: number }) =>
   url ? <img src={proxied(url)} alt="" style={{ width: "100%", height: h, objectFit: "contain", display: "block" }} />
       : <div style={{ height: h, display: "grid", placeItems: "center", color: "#bbb", border: "1px dashed #ccc" }}>사진 없음</div>;
 
+// 엑셀 에너지 시트와 같은 묶은 세로 막대(전년 파랑, 올해 주황). html2canvas 가 그대로 찍도록 인라인 SVG.
+function BarChart({ labels, series, w, h }: { labels: string[]; series: { name: string; color: string; values: Num[] }[]; w: number; h: number }) {
+  const max = Math.max(0, ...series.flatMap((s) => s.values.map((v) => v ?? 0)));
+  const raw = max / 5 || 1, mag = 10 ** Math.floor(Math.log10(raw));
+  const step = [1, 2, 2.5, 5, 10].map((k) => k * mag).find((k) => k >= raw) ?? raw;
+  const top = step * Math.max(1, Math.ceil(max / step));
+  const L = 62, R = 6, T = 8, B = 34, pw = w - L - R, ph = h - T - B, cw = pw / labels.length;
+  const bw = Math.min(14, (cw * 0.6) / series.length);
+  const y = (v: number) => T + ph - (v / top) * ph;
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: "block", fontFamily: "inherit" }}>
+      {Array.from({ length: Math.round(top / step) + 1 }, (_, i) => i * step).map((v) => (
+        <g key={v}>
+          <line x1={L} x2={w - R} y1={y(v)} y2={y(v)} stroke="#d9d9d9" strokeWidth={0.7} />
+          <text x={L - 4} y={y(v) + 3} fontSize={8} textAnchor="end" fill="#555">{v.toLocaleString("ko-KR")}</text>
+        </g>
+      ))}
+      {labels.map((lb, i) => (
+        <g key={lb}>
+          {series.map((s, k) => {
+            const v = s.values[i];
+            if (!v || v <= 0) return null;
+            const x = L + cw * i + cw / 2 - (bw * series.length) / 2 + bw * k;
+            return <rect key={k} x={x} y={y(v)} width={bw - 1} height={T + ph - y(v)} fill={s.color} />;
+          })}
+          <text x={L + cw * i + cw / 2} y={T + ph + 12} fontSize={8} textAnchor="middle" fill="#333">{lb}</text>
+        </g>
+      ))}
+      {series.map((s, k) => (
+        <g key={s.name} transform={`translate(${w / 2 - 55 + k * 60}, ${h - 8})`}>
+          <rect x={0} y={-7} width={7} height={7} fill={s.color} />
+          <text x={10} y={0} fontSize={8} fill="#333">{s.name}</text>
+        </g>
+      ))}
+    </svg>
+  );
+}
+
 function chunk<T>(xs: T[], size: number): T[][] {
   const out: T[][] = [];
   for (let i = 0; i < xs.length; i += size) out.push(xs.slice(i, i + size));
   return out.length ? out : [[]];
 }
-// 연속된 같은 값은 첫 칸만 보이게 (엑셀의 세로 병합 대신)
-const shown = (xs: string[], i: number) => (i === 0 || xs[i] !== xs[i - 1] ? xs[i] : "");
 // 세로 병합: 같은 값이 이어지는 첫 줄이면 이어지는 줄 수, 아니면 0
 const span = (xs: string[], i: number) => {
   if (i > 0 && xs[i] === xs[i - 1]) return 0;
@@ -69,10 +105,17 @@ export default function MonthlyReportDocument({ report: m }: { report: MonthlyRe
               {row("㎡ 당", cur.map((v) => (v && v > 0 ? v / AREA_M2 : null)), [sc.sum / AREA_M2, sc.avg === null ? null : sc.avg / AREA_M2, null, null, null], 2, (v) => n(v, 2))}
             </tbody>
           </table>
-          <table style={{ ...T, marginTop: 6 }}><tbody>
-            <tr><td style={th}>특이사항</td></tr>
-            <tr><td style={{ ...txt, height: 70 }}>{note ?? ""}</td></tr>
-          </tbody></table>
+          <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
+            <div style={{ border: "1px solid #bbb", flex: "0 0 640px" }}>
+              <BarChart w={638} h={150} labels={[...monthsHead, "월 평균", "최고", "최저"]}
+                series={[{ name: `${year - 1}년`, color: "#4472c4", values: [...prev, sp.avg, sp.max, sp.min] },
+                         { name: `${year}년`, color: "#ed7d31", values: [...cur, sc.avg, sc.max, sc.min] }]} />
+            </div>
+            <table style={{ ...T, flex: 1 }}><tbody>
+              <tr><td style={th}>특이사항</td></tr>
+              <tr><td style={{ ...txt, height: 132 }}>{note ?? ""}</td></tr>
+            </tbody></table>
+          </div>
         </>
       );
     };
@@ -192,9 +235,19 @@ export default function MonthlyReportDocument({ report: m }: { report: MonthlyRe
         <H2>3-2. 고객사 연락처</H2>
         <table style={T}><tbody>
           <tr>{["입주사", "층", "담당자", "연락처", "개인연락처(H.P)", "상주인원(명)", "비고"].map((h) => <td key={h} style={th}>{h}</td>)}</tr>
-          {m.contacts.map((x, i, a) => (
-            <tr key={i}>{[shown(a.map((y) => y.tenant), i), x.floor, shown(a.map((y) => y.tenant + y.person), i) ? x.person : "", x.tel, shown(a.map((y) => y.tenant + y.mobile), i) ? x.mobile : "", x.count, x.note].map((v, j) => <td key={j} style={c}>{v}</td>)}</tr>
-          ))}
+          {m.contacts.map((x, i, a) => {
+            const cell = (v: string | number | undefined, key?: (y: (typeof a)[number]) => string) => {
+              const k = key ? span(a.map(key), i) : 1;
+              return k > 0 ? <td style={c} rowSpan={k}>{v}</td> : null;
+            };
+            return (
+              <tr key={i}>
+                {cell(x.tenant, (y) => y.tenant)}{cell(x.floor)}{cell(x.person, (y) => y.tenant + "|" + y.person)}
+                {cell(x.tel, (y) => y.tenant + "|" + y.person + "|" + y.tel)}{cell(x.mobile, (y) => y.tenant + "|" + y.person + "|" + y.mobile)}
+                {cell(x.count, (y) => y.tenant + "|" + y.count)}{cell(x.note, (y) => y.tenant + "|" + y.note)}
+              </tr>
+            );
+          })}
         </tbody></table>
       </div>
 
@@ -211,14 +264,16 @@ export default function MonthlyReportDocument({ report: m }: { report: MonthlyRe
               <tbody>
                 <tr><td style={th}>구분</td><td style={th}>세부</td><td style={th}>내용</td><td style={th}>완료</td><td style={th}>진행중</td><td style={th}>계획중</td><td style={th}>비고</td></tr>
                 {rows.map((x, i) => {
-                  const k = off + i;
+                  const g = span(rows.map((y) => y.group), i), sb = span(rows.map((y) => y.group + "|" + y.sub), i);
+                  const nt = span(rows.map((y) => y.group + "|" + y.sub + "|" + y.note), i);
+                  const noSub = rows.every((y) => y.group !== x.group || !y.sub);
                   return (
-                    <tr key={k}>
-                      <td style={{ ...c, fontWeight: 700 }}>{k === off || all[k - 1].group !== x.group ? x.group : ""}</td>
-                      <td style={c}>{k === off || all[k - 1].sub !== x.sub || all[k - 1].group !== x.group ? x.sub : ""}</td>
+                    <tr key={off + i}>
+                      {g > 0 && <td style={{ ...c, fontWeight: 700 }} rowSpan={g} colSpan={noSub ? 2 : 1}>{x.group}</td>}
+                      {!noSub && sb > 0 && <td style={c} rowSpan={sb}>{x.sub}</td>}
                       <td style={td}>{x.content}</td>
                       {(["완료", "진행중", "계획중"] as const).map((s) => <td key={s} style={c}>{x.status === s ? "○" : ""}</td>)}
-                      <td style={c}>{x.note}</td>
+                      {nt > 0 && <td style={c} rowSpan={nt}>{x.note}</td>}
                     </tr>
                   );
                 })}
@@ -260,8 +315,16 @@ export default function MonthlyReportDocument({ report: m }: { report: MonthlyRe
             <tbody>
               <tr><td style={th}>작업 구분</td><td style={th}>작업 내용</td><td style={th}>작업 예정일</td><td style={th}>비고</td></tr>
               {rows.map((x, i) => {
-                const k = pi * 46 + i;
-                return <tr key={k}><td style={{ ...c, fontWeight: 700 }}>{k === pi * 46 || m.nextPlan[k - 1].group !== x.group ? x.group : ""}</td><td style={td}>{x.content}</td><td style={c}>{x.when}</td><td style={c}>{x.note}</td></tr>;
+                const g = span(rows.map((y) => y.group), i);
+                const wn = span(rows.map((y) => y.group + "|" + y.when), i), nt = span(rows.map((y) => y.group + "|" + y.note), i);
+                return (
+                  <tr key={pi * 46 + i}>
+                    {g > 0 && <td style={{ ...c, fontWeight: 700 }} rowSpan={g}>{x.group}</td>}
+                    <td style={td}>{x.content}</td>
+                    {wn > 0 && <td style={c} rowSpan={wn}>{x.when}</td>}
+                    {nt > 0 && <td style={c} rowSpan={nt}>{x.note}</td>}
+                  </tr>
+                );
               })}
             </tbody>
           </table>
