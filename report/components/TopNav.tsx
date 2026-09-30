@@ -12,6 +12,7 @@ const TABS: { href: string; label: string; match: (p: string) => boolean }[] = [
   { href: "/issues", label: "문제 관리", match: (p) => p.startsWith("/issues") },
   { href: "/reports", label: "보고서", match: (p) => p.startsWith("/reports") || p.startsWith("/report/") || p.startsWith("/pungsuhae") },
   { href: "/daily-log", label: "업무일지", match: (p) => p.startsWith("/daily-log") },
+  { href: "/weekly-log", label: "주간보고", match: (p) => p.startsWith("/weekly-log") },
 ];
 
 // 로그인한 본인에게만 보이는 탭

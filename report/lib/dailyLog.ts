@@ -64,8 +64,17 @@ export type DailyLog = {
   work: Record<string, WorkEntry>;       // WORK_SLOTS.key → 내용
   special?: string;                      // 특이사항
   meters: Partial<Record<MeterKey, number>>;
+  // 전력량계 3요소 지침 (POWER_PARTS 순서). 있으면 meters.power = 세 값의 합
+  powerParts?: number[];
   updatedAt: string;
 };
+
+// 전력량계는 시간대별 3요소를 따로 읽는다 — 전력 지침은 그 합 (엑셀 '전기 에너지 사용량' I·J·K 열)
+export const POWER_PARTS = ["주간·중부하", "저녁·최대부하", "심야·경부하"] as const;
+
+export function sumParts(parts: number[]): number {
+  return Math.round(parts.reduce((a, b) => a + b, 0) * 100) / 100;
+}
 
 export type MeterRow = {
   def: MeterDef;
@@ -180,6 +189,16 @@ export function normalizeLog(input: unknown): DailyLog | null {
     if (typeof v === "number" && Number.isFinite(v)) meters[d.key] = v;
   }
 
+  // 3요소가 모두 숫자면 합을 전력 지침으로 쓴다 (한 칸이라도 비면 버리고 입력된 power 를 그대로)
+  let powerParts: number[] | undefined;
+  if (Array.isArray(it.powerParts) && it.powerParts.length === POWER_PARTS.length) {
+    const ps = it.powerParts.map((v) => (typeof v === "string" && v.trim() !== "" ? Number(v) : v));
+    if (ps.every((v) => typeof v === "number" && Number.isFinite(v))) {
+      powerParts = ps as number[];
+      meters.power = sumParts(powerParts);
+    }
+  }
+
   let people: People | undefined;
   const p = it.people as Record<string, unknown> | undefined;
   if (p && typeof p === "object") {
@@ -187,7 +206,7 @@ export function normalizeLog(input: unknown): DailyLog | null {
     people = { to: arr(p.to), actual: arr(p.actual), off: count(p.off), leave: count(p.leave), note: text(p.note) };
   }
 
-  return { date, people, work, special: text(it.special), meters, updatedAt: new Date().toISOString() };
+  return { date, people, work, special: text(it.special), meters, powerParts, updatedAt: new Date().toISOString() };
 }
 
 export function sumPeople(xs: number[] | undefined): number {

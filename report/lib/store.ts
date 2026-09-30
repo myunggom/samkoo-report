@@ -18,6 +18,7 @@ import type { Issue } from "./issues";
 import type { WeeklyDraft } from "./weekly";
 import type { Task } from "./tasks";
 import type { DailyLog } from "./dailyLog";
+import type { WeeklyLog } from "./weeklyLog";
 
 const BLOB_TOKEN = process.env.BLOB_READ_WRITE_TOKEN || "";
 const USE_BLOB = !!BLOB_TOKEN;
@@ -31,6 +32,7 @@ const ISSUE_PREFIX = "db/issues/";
 const WEEKLY_PREFIX = "db/weekly/";
 const TASK_PREFIX = "db/tasks/";
 const DAILYLOG_PREFIX = "db/dailylog/";
+const WEEKLYLOG_PREFIX = "db/weeklylog/";
 
 const DATA_DIR = path.join(process.cwd(), ".data");
 const PUNG_FILE = path.join(DATA_DIR, "pungsuhae.json");
@@ -42,6 +44,7 @@ const ISSUE_FILE = path.join(DATA_DIR, "issues.json");
 const WEEKLY_FILE = path.join(DATA_DIR, "weekly.json");
 const TASK_FILE = path.join(DATA_DIR, "tasks.json");
 const DAILYLOG_FILE = path.join(DATA_DIR, "dailylog.json");
+const WEEKLYLOG_FILE = path.join(DATA_DIR, "weeklylog.json");
 const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads");
 
 async function readLocal<T>(file: string, fallback: T): Promise<T> {
@@ -380,6 +383,22 @@ export async function saveDailyLogs(items: DailyLog[]): Promise<void> {
   const all = [...byDate.values()];
   if (USE_BLOB) await writeBlobJson(DAILYLOG_PREFIX, all);
   else await writeLocal(DAILYLOG_FILE, all);
+}
+
+// ── 고객사 주간 업무 보고 (보고일별 · 단일 집계 JSON) ──────────────
+export async function listWeeklyLogs(): Promise<WeeklyLog[]> {
+  const all = USE_BLOB
+    ? await readBlobJson<WeeklyLog[]>(WEEKLYLOG_PREFIX, [])
+    : await readLocal<WeeklyLog[]>(WEEKLYLOG_FILE, []);
+  return all.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+export async function saveWeeklyLogs(items: WeeklyLog[]): Promise<void> {
+  const byDate = new Map((await listWeeklyLogs()).map((w) => [w.date, w]));
+  for (const it of items) byDate.set(it.date, it);
+  const all = [...byDate.values()];
+  if (USE_BLOB) await writeBlobJson(WEEKLYLOG_PREFIX, all);
+  else await writeLocal(WEEKLYLOG_FILE, all);
 }
 
 // ── 사진 업로드 (고유 파일명 — 불변이라 덮어쓰기 문제 없음) ────────

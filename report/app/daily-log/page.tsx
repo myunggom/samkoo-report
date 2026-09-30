@@ -3,7 +3,7 @@
 // 고객사 일일 업무일지 — 입력 → 미리보기 → PDF. 메일은 보내지 않는다(받은 PDF를 직접 발송).
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DailyLog, MeterKey, People, WorkEntry } from "@/lib/dailyLog";
-import { METERS, TEAMS, WORK_SLOTS, dateLabel, draftFor, fmt, meterRows } from "@/lib/dailyLog";
+import { METERS, POWER_PARTS, TEAMS, WORK_SLOTS, dateLabel, draftFor, fmt, meterRows, sumParts } from "@/lib/dailyLog";
 import { kstDateString } from "@/lib/tasks";
 import DailyLogDocument, { MonthlyLogDocument } from "@/components/DailyLogDocument";
 import { elementToPdfBlobFlow, shareOrDownloadPdf } from "@/lib/pdf";
@@ -20,6 +20,7 @@ export default function DailyLogPage() {
   const [date, setDate] = useState(() => kstDateString(new Date()));
   const [draft, setDraft] = useState<DailyLog | null>(null);
   const [meterText, setMeterText] = useState<MeterText>({});
+  const [parts, setParts] = useState<string[]>(["", "", ""]); // 전력량계 3요소
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
@@ -41,6 +42,7 @@ export default function DailyLogPage() {
     const d = draftFor(logs, date);
     setDraft(structuredClone(d));
     setMeterText(Object.fromEntries(METERS.map((m) => [m.key, d.meters[m.key]?.toString() ?? ""])));
+    setParts(d.powerParts ? d.powerParts.map(String) : ["", "", ""]);
     setDirty(false);
     // logs 는 저장 직후에도 바뀌지만 그때 입력 중인 초안을 덮어쓰면 안 되므로 date·loading 만 본다
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -56,8 +58,17 @@ export default function DailyLogPage() {
       const v = Number(meterText[m.key]);
       if (meterText[m.key]?.trim() && Number.isFinite(v)) meters[m.key] = v;
     }
-    return { ...draft, meters };
-  }, [draft, meterText]);
+    // 3요소가 다 들어오면 그 합이 전력 지침. 덜 들어왔으면 예전에 저장된 전력 지침을 그대로 둔다
+    const nums = parts.map((s) => (s.trim() === "" ? NaN : Number(s)));
+    const full = nums.every((n) => Number.isFinite(n));
+    if (full) meters.power = sumParts(nums);
+    return { ...draft, meters, powerParts: full ? nums : undefined };
+  }, [draft, meterText, parts]);
+  // 3요소 칸 안내용: 지난 기록의 3요소 값
+  const prevParts = useMemo(
+    () => [...logs].filter((l) => l.date < date && l.powerParts).sort((a, b) => b.date.localeCompare(a.date))[0]?.powerParts,
+    [logs, date],
+  );
   const merged = useMemo(() => (current ? [...logs.filter((l) => l.date !== current.date), current] : logs), [logs, current]);
   const rows = useMemo(() => (current ? meterRows(merged, current.date) : []), [merged, current]);
 
@@ -145,7 +156,34 @@ export default function DailyLogPage() {
       <section className="rounded-2xl border border-slate-200 bg-white p-4">
         <h2 className="mb-3 font-bold">계량 (금일 지침)</h2>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {rows.map((r) => (
+          {rows.map((r) => r.def.key === "power" ? (
+            <div key="power" className="rounded-lg bg-slate-50 p-2 text-sm sm:col-span-2">
+              <div className="mb-1 flex items-center justify-between">
+                <span className="font-semibold text-slate-700">전력량계 (3요소 지침)</span>
+                <span className="text-xs text-slate-500">
+                  합계 {r.today === null ? "—" : fmt(r.today)} · 전일 {fmt(r.prev)}
+                  {r.usage !== null && <b className="ml-1 text-slate-800">→ 사용 {fmt(r.usage, 0)} kWh</b>}
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {POWER_PARTS.map((label, i) => (
+                  <label key={label} className="text-xs text-slate-500">
+                    {label}
+                    <input
+                      inputMode="decimal"
+                      value={parts[i]}
+                      onChange={(e) => {
+                        setParts((ps) => ps.map((x, j) => (j === i ? e.target.value : x)));
+                        setDirty(true);
+                      }}
+                      placeholder={prevParts ? `전일 ${fmt(prevParts[i])}` : ""}
+                      className={input + (r.warn ? " border-red-400 bg-red-50" : "")}
+                    />
+                  </label>
+                ))}
+              </div>
+            </div>
+          ) : (
             <label key={r.def.key} className="flex items-center gap-2 text-sm">
               <span className="w-28 shrink-0 text-slate-600">{r.def.label}</span>
               <input

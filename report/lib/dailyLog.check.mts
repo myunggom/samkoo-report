@@ -82,4 +82,12 @@ assert.deepEqual(n.meters, { power: 267.08 });
 assert.deepEqual(n.people?.to, [9, 0, 0, 0], "음수·빈 값은 0");
 assert.equal(n.people?.off, 1);
 
+// 전력 3요소: 합이 전력 지침이 된다. 한 칸이라도 비면 3요소는 버리고 입력된 power 유지
+const pp = normalizeLog({ date: "2026-09-29", powerParts: ["85.17", 43.89, 138.02], meters: { power: 1 } });
+assert.deepEqual(pp?.powerParts, [85.17, 43.89, 138.02]);
+assert.equal(pp?.meters.power, 267.08, "85.17+43.89+138.02, 부동소수 찌꺼기 없이");
+const pp2 = normalizeLog({ date: "2026-09-29", powerParts: [85.17, "", 138.02], meters: { power: 267.08 } });
+assert.equal(pp2?.powerParts, undefined);
+assert.equal(pp2?.meters.power, 267.08);
+
 console.log("dailyLog check ok");
