@@ -280,9 +280,18 @@ export default function MonthlyReportPage() {
         )}
 
         {tab === "시설실적" && (
-          <Rows rows={d.facility as unknown as Record<string, string>[]} onChange={(rows) => up({ facility: rows as unknown as MonthlyReport["facility"] })}
-            blank={{ group: "", sub: "", content: "", status: "완료", note: "매월" }}
-            cols={[{ key: "group", label: "구분", w: "w-20" }, { key: "sub", label: "세부", w: "w-28" }, { key: "content", label: "내용", w: "flex-[4]" }, { key: "status", label: "진행", w: "w-24", select: ["완료", "진행중", "계획중", ""] }, { key: "note", label: "비고", w: "w-20" }]} />
+          // 내용은 고정 — 진행 상태만 누른다(다시 누르면 해제)
+          <div className="divide-y divide-slate-100">
+            {d.facility.map((x, i) => (
+              <div key={i} className="flex items-center gap-2 py-1.5">
+                <span className="flex-1 text-sm">{x.content}</span>
+                {(["완료", "진행중", "계획중"] as const).map((st) => (
+                  <button key={st} onClick={() => up({ facility: d.facility.map((y, j) => (j === i ? { ...y, status: y.status === st ? "" : st } : y)) })}
+                    className={"shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold " + (x.status === st ? "bg-sky-600 text-white" : "border border-slate-300 text-slate-500")}>{st}</button>
+                ))}
+              </div>
+            ))}
+          </div>
         )}
 
         {tab === "작업사진" && (
@@ -308,8 +317,15 @@ export default function MonthlyReportPage() {
         )}
 
         {tab === "차월계획" && (
-          <Rows rows={d.nextPlan} onChange={(nextPlan) => up({ nextPlan })} blank={{ group: "", content: "", when: "", note: "" }}
-            cols={[{ key: "group", label: "구분", w: "w-20" }, { key: "content", label: "작업 내용", w: "flex-[4]" }, { key: "when", label: "예정일", w: "w-28" }, { key: "note", label: "비고", w: "w-24" }]} />
+          // 작업 내용은 고정 — 작업 예정일만 고친다
+          <div className="divide-y divide-slate-100">
+            {d.nextPlan.map((x, i) => (
+              <div key={i} className="flex items-center gap-2 py-1.5">
+                <span className="flex-1 text-sm">{x.content}</span>
+                <input value={x.when} onChange={(ev) => up({ nextPlan: d.nextPlan.map((y, j) => (j === i ? { ...y, when: ev.target.value } : y)) })} className={input.replace("w-full", "w-32 shrink-0")} placeholder="예정일" />
+              </div>
+            ))}
+          </div>
         )}
 
         {tab === "근무표" && (
