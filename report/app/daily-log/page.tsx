@@ -6,7 +6,7 @@ import type { DailyLog, MeterKey, People, WorkEntry } from "@/lib/dailyLog";
 import { METERS, POWER_PARTS, TEAMS, WORK_SLOTS, dateLabel, draftFor, fmt, meterRows, solarFromMonthTotal, sumParts } from "@/lib/dailyLog";
 import { kstDateString } from "@/lib/tasks";
 import DailyLogDocument, { MonthlyLogDocument } from "@/components/DailyLogDocument";
-import { elementToPdfBlobFlow, shareOrDownloadPdf } from "@/lib/pdf";
+import { elementToPdfBlobFlow, shareOrDownloadFile, shareOrDownloadPdf } from "@/lib/pdf";
 
 type MeterText = Partial<Record<MeterKey, string>>;
 const EMPTY_PEOPLE: People = { to: [0, 0, 0, 0], actual: [0, 0, 0, 0], off: 0, leave: 0 };
@@ -134,6 +134,25 @@ export default function DailyLogPage() {
       await shareOrDownloadPdf(blob, name);
     } catch {
       setMsg("PDF를 만들지 못했습니다. 다시 시도해 주세요.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  // 예전 엑셀과 같은 월별 파일(날짜별 시트) — 화면에 입력 중인 오늘 값도 들어간다
+  async function exportXlsx() {
+    setBusy("xlsx");
+    try {
+      const month = date.slice(0, 7);
+      const [{ buildMonthXlsx }, tpl] = await Promise.all([
+        import("@/lib/dailyLogXlsx"),
+        fetch("/daily-log-template.xlsx").then((r) => r.arrayBuffer()),
+      ]);
+      const bytes = buildMonthXlsx(tpl, merged, month);
+      const type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+      await shareOrDownloadFile(new Blob([bytes as BlobPart], { type }), `삼구INC 일일업무일지_${month.replace("-", ".")}.xlsx`, type);
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "엑셀을 만들지 못했습니다.");
     } finally {
       setBusy("");
     }
@@ -307,6 +326,9 @@ export default function DailyLogPage() {
         </button>
         <button onClick={() => exportPdf("month")} disabled={!!busy} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 disabled:opacity-50">
           {busy === "month" ? "만드는 중…" : `${Number(date.slice(5, 7))}월 월간 PDF`}
+        </button>
+        <button onClick={exportXlsx} disabled={!!busy} className="rounded-lg border border-emerald-600 px-4 py-2 text-sm font-semibold text-emerald-700 disabled:opacity-50">
+          {busy === "xlsx" ? "만드는 중…" : `${Number(date.slice(5, 7))}월 엑셀`}
         </button>
         {msg && <span className="text-sm text-slate-600">{msg}</span>}
       </div>

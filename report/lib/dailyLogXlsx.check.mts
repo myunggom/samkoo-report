@@ -1,0 +1,37 @@
+// lib/dailyLogXlsx.ts 자체점검 — 양식에 가짜 일지 2건을 채워 시트 수·칸 값을 확인.
+//   node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON lib/dailyLogXlsx.check.mts
+// 저장소가 공개라 가짜 값만 쓴다.
+import assert from "node:assert/strict";
+import { readFileSync, writeFileSync } from "node:fs";
+import PizZip from "pizzip";
+import { buildMonthXlsx, excelSerial, setCell } from "./dailyLogXlsx.ts";
+import type { DailyLog } from "./dailyLog.ts";
+
+assert.equal(excelSerial("2026-09-29"), 46294); // 원본 엑셀 L2 값
+assert.equal(setCell('<c r="C1" s="3"/><c r="C11" s="7"/>', "C1", "a<b"), '<c r="C1" s="3" t="inlineStr"><is><t xml:space="preserve">a&lt;b</t></is></c><c r="C11" s="7"/>');
+assert.throws(() => setCell("<c r=\"A1\"/>", "Z9", 1));
+
+const log = (date: string, power: number, extra: Partial<DailyLog> = {}): DailyLog => ({ date, work: {}, meters: { power }, updatedAt: "", ...extra });
+const logs: DailyLog[] = [
+  log("2026-08-31", 100),
+  log("2026-09-01", 100.5, { people: { to: [9, 0, 2, 2], actual: [8, 0, 2, 2], off: 1, leave: 0 }, work: { 전기: { today: "1. 가짜 점검\n2. 둘째 줄", plan: "내일 계획" }, 미화공용: { today: "청소" } }, special: "특이 없음" }),
+  log("2026-09-02", 101),
+  log("2026-10-01", 102),
+];
+const out = buildMonthXlsx(readFileSync(new URL("../public/daily-log-template.xlsx", import.meta.url)), logs, "2026-09");
+const z = new PizZip(out);
+const wb = z.file("xl/workbook.xml")!.asText();
+assert.deepEqual([...wb.matchAll(/<sheet name="([^"]+)"/g)].map((m) => m[1]), ["09.01", "09.02"]);
+const s1 = z.file("xl/worksheets/sheet1.xml")!.asText();
+const v = (s: string, ref: string) => s.match(new RegExp(`<c r="${ref}"[^>]*>(?:<v>([^<]*)</v>|<is><t[^>]*>([^<]*)</t></is>)`))?.slice(1).find((x) => x !== undefined);
+assert.equal(v(s1, "L2"), String(excelSerial("2026-09-01")));
+assert.equal(v(s1, "G4"), "13"); assert.equal(v(s1, "J4"), "1");
+assert.equal(v(s1, "C11"), "1. 가짜 점검\n2. 둘째 줄"); assert.equal(v(s1, "I11"), "내일 계획");
+assert.equal(v(s1, "D21"), "청소"); assert.equal(v(s1, "B26"), "특이 없음");
+assert.equal(v(s1, "E30"), "100"); assert.equal(v(s1, "I30"), "1800"); // (100.5-100)×3600
+const s2 = z.file("xl/worksheets/sheet2.xml")!.asText();
+assert.equal(v(s2, "K30"), "3600"); // 월 누계 1800+1800
+assert.ok(!s2.includes('tabSelected="1"'));
+assert.ok(!z.file("xl/worksheets/sheet3.xml"));
+if (process.argv[2]) writeFileSync(process.argv[2], out); // 엑셀로 열어 보려면 경로를 넘긴다
+console.log("dailyLogXlsx check ok");
