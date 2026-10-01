@@ -91,23 +91,24 @@ export const xlsxFileName = (date: string) => `[일일업무일지] 바이오 �
 export function buildDayXlsx(template: ArrayBuffer | Uint8Array, logs: DailyLog[], date: string): Uint8Array {
   const days = logs.filter((l) => l.date.startsWith(date.slice(0, 8)) && l.date <= date).sort((a, b) => a.date.localeCompare(b.date));
   if (days.at(-1)?.date !== date) throw new Error("이 날 업무일지가 저장되어 있지 않습니다");
+  const names = days.map((l) => `${l.date.slice(5, 7)}.${l.date.slice(8, 10)}`);
+  return assembleWorkbook(template, (tpl) => days.map((l, i) => ({ name: names[i], xml: fillSheet(tpl, logs, l, i > 0 ? names[i - 1] : null) })), days.length - 1);
+}
+
+// 시트 한 장짜리 양식(xl/worksheets/sheet1.xml)을 여러 장으로 — 주간업무보고 엑셀도 같이 쓴다.
+// active 번째 시트가 선택된 채로 열리고, 열 때 수식을 다시 계산한다.
+export function assembleWorkbook(template: ArrayBuffer | Uint8Array, build: (sheetXml: string) => { name: string; xml: string }[], active: number): Uint8Array {
   const zip = new PizZip(template);
   const read = (p: string) => zip.file(p)!.asText();
-  const tpl = read("xl/worksheets/sheet1.xml");
-  const names = days.map((l) => `${l.date.slice(5, 7)}.${l.date.slice(8, 10)}`);
+  const sheets = build(read("xl/worksheets/sheet1.xml"));
+  const names = sheets.map((s) => s.name);
 
   zip.remove("xl/worksheets/sheet1.xml");
-  days.forEach((l, i) => {
-    let sheet = fillSheet(tpl, logs, l, i > 0 ? names[i - 1] : null);
-    if (i < days.length - 1) sheet = sheet.replace(/ tabSelected="1"/, "");
-    zip.file(`xl/worksheets/sheet${i + 1}.xml`, sheet);
-  });
+  sheets.forEach((s, i) => zip.file(`xl/worksheets/sheet${i + 1}.xml`, i === active ? s.xml : s.xml.replace(/ tabSelected="1"/, "")));
 
-  // 열 때 수식을 다시 계산하게 한다
-  // 열면 맨 뒤(그날) 시트가 보이게 activeTab
   const wbXml = read("xl/workbook.xml").replace(/<sheets>[\s\S]*?<\/sheets>/,
     `<sheets>${names.map((n, i) => `<sheet name="${n}" sheetId="${i + 1}" r:id="rIdS${i + 1}"/>`).join("")}</sheets>`)
-    .replace(/<workbookView( activeTab="\d+")?/, `<workbookView activeTab="${names.length - 1}"`);
+    .replace(/<workbookView( activeTab="\d+")?/, `<workbookView activeTab="${active}"`);
   // 양식에 <calcPr calcId=…/> 가 있다 — 거기에 fullCalcOnLoad 만 붙인다
   zip.file("xl/workbook.xml", wbXml.replace(/<calcPr([^>]*?)\s*\/>/, (_, a: string) => `<calcPr${a.replace(/ fullCalcOnLoad="[^"]*"/, "")} fullCalcOnLoad="1"/>`));
   zip.file("xl/_rels/workbook.xml.rels", read("xl/_rels/workbook.xml.rels")

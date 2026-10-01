@@ -7,7 +7,7 @@ import type { WeeklyLog } from "@/lib/weeklyLog";
 import { WEEK_SLOTS, compileFromDaily, draftWeekly, periodLabel } from "@/lib/weeklyLog";
 import { kstDateString } from "@/lib/tasks";
 import WeeklyLogDocument from "@/components/WeeklyLogDocument";
-import { elementToPdfBlobFlow, shareOrDownloadPdf } from "@/lib/pdf";
+import { elementToPdfBlobFlow, shareOrDownloadFile, shareOrDownloadPdf } from "@/lib/pdf";
 
 const input = "w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400";
 const area = input + " min-h-[7rem] leading-snug";
@@ -136,6 +136,26 @@ export default function WeeklyLogPage() {
     }
   }
 
+  // 제출용 엑셀 — 예전 엑셀처럼 보고일마다 시트, 이 보고가 맨 앞. 저장본과 같도록 저장부터 한다
+  async function exportXlsx() {
+    if ((dirty || !saved) && !(await save())) return;
+    if (!draft) return;
+    setBusy("xlsx");
+    try {
+      const [{ buildWeeklyXlsx, weeklyXlsxFileName }, tpl] = await Promise.all([
+        import("@/lib/weeklyLogXlsx"),
+        fetch("/weekly-log-template.xlsx").then((r) => r.arrayBuffer()),
+      ]);
+      const bytes = buildWeeklyXlsx(tpl, [...weeklies.filter((w) => w.date !== draft.date), draft], date);
+      const type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+      await shareOrDownloadFile(new Blob([bytes as BlobPart], { type }), weeklyXlsxFileName(date), type);
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "엑셀을 만들지 못했습니다.");
+    } finally {
+      setBusy("");
+    }
+  }
+
   if (loading || !draft) return <p className="text-sm text-slate-400">불러오는 중…</p>;
 
   return (
@@ -209,6 +229,9 @@ export default function WeeklyLogPage() {
         </button>
         <button onClick={exportPdf} disabled={!!busy} className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
           {busy === "pdf" ? "PDF 만드는 중…" : "주간 PDF 받기"}
+        </button>
+        <button onClick={exportXlsx} disabled={!!busy} className="rounded-lg border border-emerald-600 px-4 py-2 text-sm font-semibold text-emerald-700 disabled:opacity-50">
+          {busy === "xlsx" ? "만드는 중…" : "엑셀 받기"}
         </button>
         {msg && <span className="text-sm text-slate-600">{msg}</span>}
       </div>
