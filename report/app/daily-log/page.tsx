@@ -139,18 +139,18 @@ export default function DailyLogPage() {
     }
   }
 
-  // 예전 엑셀과 같은 월별 파일(날짜별 시트) — 화면에 입력 중인 오늘 값도 들어간다
+  // 제출용 엑셀 — 예전 엑셀처럼 이 달 1일~이 날까지 날짜별 시트, 이 날 시트가 맨 뒤. 낸 파일과 저장본이 같도록 저장부터 한다
   async function exportXlsx() {
+    if ((dirty || !saved) && !(await save())) return;
     setBusy("xlsx");
     try {
-      const month = date.slice(0, 7);
-      const [{ buildMonthXlsx }, tpl] = await Promise.all([
+      const [{ buildDayXlsx, xlsxFileName }, tpl] = await Promise.all([
         import("@/lib/dailyLogXlsx"),
         fetch("/daily-log-template.xlsx").then((r) => r.arrayBuffer()),
       ]);
-      const bytes = buildMonthXlsx(tpl, merged, month);
+      const bytes = buildDayXlsx(tpl, merged, date);
       const type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-      await shareOrDownloadFile(new Blob([bytes as BlobPart], { type }), `삼구INC 일일업무일지_${month.replace("-", ".")}.xlsx`, type);
+      await shareOrDownloadFile(new Blob([bytes as BlobPart], { type }), xlsxFileName(date), type);
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "엑셀을 만들지 못했습니다.");
     } finally {
@@ -328,7 +328,7 @@ export default function DailyLogPage() {
           {busy === "month" ? "만드는 중…" : `${Number(date.slice(5, 7))}월 월간 PDF`}
         </button>
         <button onClick={exportXlsx} disabled={!!busy} className="rounded-lg border border-emerald-600 px-4 py-2 text-sm font-semibold text-emerald-700 disabled:opacity-50">
-          {busy === "xlsx" ? "만드는 중…" : `${Number(date.slice(5, 7))}월 엑셀`}
+          {busy === "xlsx" ? "만드는 중…" : "엑셀 받기"}
         </button>
         {msg && <span className="text-sm text-slate-600">{msg}</span>}
       </div>

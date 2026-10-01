@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { readFileSync, writeFileSync } from "node:fs";
 import PizZip from "pizzip";
-import { buildMonthXlsx, excelSerial, setCell } from "./dailyLogXlsx.ts";
+import { buildDayXlsx, excelSerial, setCell, xlsxFileName } from "./dailyLogXlsx.ts";
 import type { DailyLog } from "./dailyLog.ts";
 
 assert.equal(excelSerial("2026-09-29"), 46294); // 원본 엑셀 L2 값
@@ -18,7 +18,12 @@ const logs: DailyLog[] = [
   log("2026-09-02", 101),
   log("2026-10-01", 102),
 ];
-const out = buildMonthXlsx(readFileSync(new URL("../public/daily-log-template.xlsx", import.meta.url)), logs, "2026-09");
+const tplBytes = readFileSync(new URL("../public/daily-log-template.xlsx", import.meta.url));
+assert.equal(xlsxFileName("2026-09-02"), "[일일업무일지] 바이오 이노베이션 허브_2026.09.02.xlsx");
+assert.throws(() => buildDayXlsx(tplBytes, logs, "2026-09-03")); // 그날 일지가 없으면 만들지 않는다
+// 9/1 기준이면 9/1 시트 하나 (9/2·전월·다음 달은 빠짐)
+assert.deepEqual([...new PizZip(buildDayXlsx(tplBytes, logs, "2026-09-01")).file("xl/workbook.xml")!.asText().matchAll(/<sheet name="([^"]+)"/g)].map((m) => m[1]), ["09.01"]);
+const out = buildDayXlsx(tplBytes, logs, "2026-09-02");
 const z = new PizZip(out);
 const wb = z.file("xl/workbook.xml")!.asText();
 assert.deepEqual([...wb.matchAll(/<sheet name="([^"]+)"/g)].map((m) => m[1]), ["09.01", "09.02"]);
@@ -40,7 +45,9 @@ assert.equal(v(s2, "K30"), "3600"); // 월 누계 1800+1800
 assert.equal(f(s2, "K30"), "'09.01'!K30+I30");
 assert.equal(f(s2, "E31"), "'09.01'!K31"); assert.equal(f(s2, "K31"), "G31+E31");
 assert.deepEqual(wb.match(/<calcPr[^>]*>/g), ['<calcPr calcId="191029" fullCalcOnLoad="1"/>']); // 하나만 (둘이면 엑셀이 못 연다)
-assert.ok(!s2.includes('tabSelected="1"'));
+// 그날(맨 뒤) 시트만 선택된 채로 열린다
+assert.ok(s2.includes('tabSelected="1"')); assert.ok(!s1.includes('tabSelected="1"'));
+assert.ok(wb.includes('<workbookView activeTab="1"'));
 assert.ok(!z.file("xl/worksheets/sheet3.xml"));
 if (process.argv[2]) writeFileSync(process.argv[2], out); // 엑셀로 열어 보려면 경로를 넘긴다
 console.log("dailyLogXlsx check ok");
