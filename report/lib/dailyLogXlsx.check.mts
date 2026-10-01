@@ -23,14 +23,23 @@ const z = new PizZip(out);
 const wb = z.file("xl/workbook.xml")!.asText();
 assert.deepEqual([...wb.matchAll(/<sheet name="([^"]+)"/g)].map((m) => m[1]), ["09.01", "09.02"]);
 const s1 = z.file("xl/worksheets/sheet1.xml")!.asText();
-const v = (s: string, ref: string) => s.match(new RegExp(`<c r="${ref}"[^>]*>(?:<v>([^<]*)</v>|<is><t[^>]*>([^<]*)</t></is>)`))?.slice(1).find((x) => x !== undefined);
+const v = (s: string, ref: string) => s.match(new RegExp(`<c r="${ref}"[^>]*>(?:<f>[^<]*</f>)?(?:<v>([^<]*)</v>|<is><t[^>]*>([^<]*)</t></is>)`))?.slice(1).find((x) => x !== undefined);
+const f = (s: string, ref: string) => s.match(new RegExp(`<c r="${ref}"[^>]*><f>([^<]*)</f>`))?.[1];
 assert.equal(v(s1, "L2"), String(excelSerial("2026-09-01")));
 assert.equal(v(s1, "G4"), "13"); assert.equal(v(s1, "J4"), "1");
 assert.equal(v(s1, "C11"), "1. 가짜 점검\n2. 둘째 줄"); assert.equal(v(s1, "I11"), "내일 계획");
 assert.equal(v(s1, "D21"), "청소"); assert.equal(v(s1, "B26"), "특이 없음");
 assert.equal(v(s1, "E30"), "100"); assert.equal(v(s1, "I30"), "1800"); // (100.5-100)×3600
+// 원본 엑셀과 같은 수식: 첫 시트 누계 =I30, 다음 시트 ='앞시트'!K30+I30
+assert.equal(f(s1, "G4"), "SUM(C4:F4)"); assert.equal(f(s1, "J4"), "G4-G5");
+assert.equal(f(s1, "I30"), "(G30-E30)*3600"); assert.equal(f(s1, "K30"), "I30");
+assert.equal(f(s1, "K31"), "G31+I31"); assert.equal(f(s1, "E31"), undefined);
+assert.equal(f(s1, "I32"), undefined); assert.equal(f(s1, "K32"), "I32"); // 지침 없는 날은 사용량 수식 없음
 const s2 = z.file("xl/worksheets/sheet2.xml")!.asText();
 assert.equal(v(s2, "K30"), "3600"); // 월 누계 1800+1800
+assert.equal(f(s2, "K30"), "'09.01'!K30+I30");
+assert.equal(f(s2, "E31"), "'09.01'!K31"); assert.equal(f(s2, "K31"), "G31+E31");
+assert.deepEqual(wb.match(/<calcPr[^>]*>/g), ['<calcPr calcId="191029" fullCalcOnLoad="1"/>']); // 하나만 (둘이면 엑셀이 못 연다)
 assert.ok(!s2.includes('tabSelected="1"'));
 assert.ok(!z.file("xl/worksheets/sheet3.xml"));
 if (process.argv[2]) writeFileSync(process.argv[2], out); // 엑셀로 열어 보려면 경로를 넘긴다

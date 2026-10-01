@@ -1,7 +1,9 @@
 // 일일 업무일지 → 예전 엑셀과 같은 월별 파일(날짜마다 시트 "09.29").
 // 양식은 public/daily-log-template.xlsx — 예전 엑셀 시트 한 장에서 값만 비운 것(서식·병합·인쇄 설정 그대로).
 // 시트 XML 의 빈 칸(<c r="C11" s="72"/>)에 값만 넣으므로 서식은 손대지 않는다.
-// 숫자는 웹이 계산한 값을 그대로 넣는다(예전처럼 전날 시트를 잇는 수식은 쓰지 않는다).
+// 계산 칸은 예전 엑셀과 같은 수식(사용량 =(G30-E30)*3600, 월 누계 ='전날시트'!K30+I30 …)을 넣는다 —
+// 상사가 전날 시트를 따라가며 확인하는 방식이라. 입력값(인원·지침)만 웹 데이터로 채우고,
+// 수식 칸에는 웹이 계산한 값을 캐시로 같이 넣어 재계산 전에도 숫자가 보이게 한다.
 
 import PizZip from "pizzip";
 import type { DailyLog } from "./dailyLog.ts";
@@ -19,29 +21,39 @@ export function excelSerial(date: string): number {
   return (Date.UTC(y, m - 1, d) - Date.UTC(1899, 11, 30)) / 86400000;
 }
 
-export function setCell(xml: string, ref: string, value: string | number | null | undefined): string {
-  if (value === null || value === undefined || value === "") return xml;
+// 양식의 한 칸(<c r="C11" s="72"/> 또는 <c ...>...</c>)을 서식(s)은 두고 내용만 바꾼다
+function putCell(xml: string, ref: string, body: (attrs: string) => string): string {
   const re = new RegExp(`<c r="${ref}"((?: [a-z]+="[^"]*")*?)(?:/>|>[\\s\\S]*?</c>)`);
   const m = xml.match(re);
   if (!m) throw new Error(`양식에 ${ref} 칸이 없습니다`);
-  const attrs = m[1].replace(/ t="[^"]*"/, "");
-  const cell = typeof value === "number"
-    ? `<c r="${ref}"${attrs}><v>${value}</v></c>`
-    : `<c r="${ref}"${attrs} t="inlineStr"><is><t xml:space="preserve">${esc(value)}</t></is></c>`;
-  return xml.replace(re, cell);
+  return xml.replace(re, body(m[1].replace(/ t="[^"]*"/, "")));
 }
 
-export function fillSheet(tpl: string, logs: DailyLog[], log: DailyLog): string {
+export function setCell(xml: string, ref: string, value: string | number | null | undefined): string {
+  if (value === null || value === undefined || value === "") return xml;
+  return putCell(xml, ref, (a) => typeof value === "number"
+    ? `<c r="${ref}"${a}><v>${value}</v></c>`
+    : `<c r="${ref}"${a} t="inlineStr"><is><t xml:space="preserve">${esc(value)}</t></is></c>`);
+}
+
+// 수식 칸: <f> 에 수식, <v> 에 미리 계산한 값
+export function setFormula(xml: string, ref: string, formula: string, cached: number | null): string {
+  return putCell(xml, ref, (a) => `<c r="${ref}"${a}><f>${esc(formula)}</f>${cached === null ? "" : `<v>${cached}</v>`}</c>`);
+}
+
+// prevSheet: 같은 달 바로 앞 시트 이름("09.28"), 그 달 첫 시트면 null
+export function fillSheet(tpl: string, logs: DailyLog[], log: DailyLog, prevSheet: string | null = null): string {
   let x = tpl;
   const set = (ref: string, v: string | number | null | undefined) => (x = setCell(x, ref, v));
+  const fx = (ref: string, f: string, cached: number | null) => (x = setFormula(x, ref, f, cached));
   set("L2", excelSerial(log.date));
 
   const p = log.people;
   if (p) {
     const sum = (a: number[]) => a.reduce((s, v) => s + (v || 0), 0);
     "CDEF".split("").forEach((col, i) => { set(`${col}4`, p.to[i] ?? 0); set(`${col}5`, p.actual[i] ?? 0); });
-    set("G4", sum(p.to)); set("G5", sum(p.actual)); set("C6", sum(p.actual));
-    set("I4", p.off); set("J4", sum(p.to) - sum(p.actual)); set("K4", p.leave); set("L4", p.note);
+    fx("G4", "SUM(C4:F4)", sum(p.to)); fx("G5", "SUM(C5:F5)", sum(p.actual)); fx("C6", "G5", sum(p.actual));
+    set("I4", p.off); fx("J4", "G4-G5", sum(p.to) - sum(p.actual)); set("K4", p.leave); set("L4", p.note);
   }
 
   for (const s of WORK_SLOTS) {
@@ -54,9 +66,20 @@ export function fillSheet(tpl: string, logs: DailyLog[], log: DailyLog): string 
   }
   set("B26", log.special);
 
+  const prev = prevSheet ? `'${prevSheet}'!` : null;
   meterRows(logs, log.date).forEach((m, i) => {
     const r = METER_ROW0 + i;
-    set(`E${r}`, m.prev); set(`G${r}`, m.today); set(`I${r}`, m.usage); set(`K${r}`, m.month);
+    set(`G${r}`, m.today);
+    if (m.def.daily) {
+      // 태양광: 전일 = 앞 시트 월 누계, 월 누계 = 그날 발전량 + 전일 (첫 시트는 원본처럼 =G31+I31)
+      if (prev) fx(`E${r}`, `${prev}K${r}`, m.prev); else set(`E${r}`, m.prev);
+      fx(`K${r}`, prev ? `G${r}+E${r}` : `G${r}+I${r}`, m.month);
+      return;
+    }
+    set(`E${r}`, m.prev);
+    // 지침이 빠진 날은 사용량 수식을 넣지 않는다(빈 칸이면 =(G-E) 가 음수가 됨) — 누계는 앞 시트 값 그대로
+    if (m.usage !== null) fx(`I${r}`, m.def.factor ? `(G${r}-E${r})*${m.def.factor}` : `G${r}-E${r}`, m.usage);
+    fx(`K${r}`, prev ? `${prev}K${r}+I${r}` : `I${r}`, m.month);
   });
   return x;
 }
@@ -72,13 +95,16 @@ export function buildMonthXlsx(template: ArrayBuffer | Uint8Array, logs: DailyLo
 
   zip.remove("xl/worksheets/sheet1.xml");
   days.forEach((l, i) => {
-    let sheet = fillSheet(tpl, logs, l);
+    let sheet = fillSheet(tpl, logs, l, i > 0 ? names[i - 1] : null);
     if (i > 0) sheet = sheet.replace(/ tabSelected="1"/, "");
     zip.file(`xl/worksheets/sheet${i + 1}.xml`, sheet);
   });
 
-  zip.file("xl/workbook.xml", read("xl/workbook.xml").replace(/<sheets>[\s\S]*?<\/sheets>/,
-    `<sheets>${names.map((n, i) => `<sheet name="${n}" sheetId="${i + 1}" r:id="rIdS${i + 1}"/>`).join("")}</sheets>`));
+  // 열 때 수식을 다시 계산하게 한다
+  const wbXml = read("xl/workbook.xml").replace(/<sheets>[\s\S]*?<\/sheets>/,
+    `<sheets>${names.map((n, i) => `<sheet name="${n}" sheetId="${i + 1}" r:id="rIdS${i + 1}"/>`).join("")}</sheets>`);
+  // 양식에 <calcPr calcId=…/> 가 있다 — 거기에 fullCalcOnLoad 만 붙인다
+  zip.file("xl/workbook.xml", wbXml.replace(/<calcPr([^>]*?)\s*\/>/, (_, a: string) => `<calcPr${a.replace(/ fullCalcOnLoad="[^"]*"/, "")} fullCalcOnLoad="1"/>`));
   zip.file("xl/_rels/workbook.xml.rels", read("xl/_rels/workbook.xml.rels")
     .replace(/<Relationship [^>]*Target="worksheets\/sheet1\.xml"\/>/, names.map((_, i) =>
       `<Relationship Id="rIdS${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join("")));
