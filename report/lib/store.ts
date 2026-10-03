@@ -171,37 +171,29 @@ export async function deleteMedia(id: string): Promise<void> {
   }
 }
 
-// ── 일일 기록 메모 (날짜별 · 단일 집계 JSON) ───────────────────────
-async function allDayNotes(): Promise<DayNote[]> {
-  if (USE_BLOB) return readBlobJson<DayNote[]>(DAYNOTE_PREFIX, []);
-  return readLocal<DayNote[]>(DAYNOTE_FILE, []);
-}
-async function putDayNotes(list: DayNote[]): Promise<void> {
-  if (USE_BLOB) await writeBlobJson(DAYNOTE_PREFIX, list);
-  else await writeLocal(DAYNOTE_FILE, list);
-}
-
+// ── 일일 기록 메모 (날짜별 · 업무일지와 같은 버전 저장, 아래 dayNoteStore) ──
 export async function listDayNotes(): Promise<DayNote[]> {
-  const all = await allDayNotes();
-  return all.sort((a, b) => b.date.localeCompare(a.date));
+  return (await dayNoteStore.list()).sort((a, b) => b.date.localeCompare(a.date));
 }
 
-// 날짜별 메모 upsert (내용이 비면 삭제)
-export async function saveDayNote(date: string, note: string): Promise<DayNote | null> {
-  const all = await allDayNotes();
-  const idx = all.findIndex((d) => d.date === date);
-  if (!note.trim()) {
-    if (idx >= 0) {
-      all.splice(idx, 1);
-      await putDayNotes(all);
+// 날짜별 메모 저장 (내용이 비면 삭제). base 는 편집을 시작할 때의 메모 — 주면 동시 편집을 확인한다.
+// 그 사이 다른 사람이 같은 날 메모를 고쳤으면 어느 쪽도 버리지 않고 「서버 내용 + 내 내용」으로 이어 붙인다.
+export async function saveDayNote(date: string, note: string, base?: string): Promise<{ entry: DayNote | null; joined: boolean }> {
+  return dayNoteStore.update<{ entry: DayNote | null; joined: boolean }>((all) => {
+    const cur = all.find((d) => d.date === date)?.note ?? "";
+    let text = note;
+    let joined = false;
+    if (base !== undefined && note === base) text = cur; // 나는 안 고침 → 서버 그대로
+    else if (base !== undefined && cur !== base && cur !== note) {
+      // 둘 다 고침: 한쪽이 지웠으면 남은 쪽을, 둘 다 썼으면 이어 붙인다
+      if (!note.trim()) text = cur;
+      else if (cur.trim()) { text = `${cur.trimEnd()}\n\n${note}`; joined = true; }
     }
-    return null;
-  }
-  const entry: DayNote = { date, note, updatedAt: new Date().toISOString() };
-  if (idx >= 0) all[idx] = entry;
-  else all.push(entry);
-  await putDayNotes(all);
-  return entry;
+    const rest = all.filter((d) => d.date !== date);
+    if (!text.trim()) return { all: rest, result: { entry: null, joined } };
+    const entry: DayNote = { date, note: text, updatedAt: new Date().toISOString() };
+    return { all: [...rest, entry], result: { entry, joined } };
+  });
 }
 
 // ── 일반 보고서(사고·완료·점검·보수요청 · 단일 집계 JSON) ─────────
@@ -424,56 +416,48 @@ export async function casUpdate<T, R>(prefix: string, legacy: () => Promise<T>, 
   throw new Error("동시에 저장하는 사람이 많아 저장하지 못했습니다. 잠시 후 다시 저장해 주세요.");
 }
 
-const legacyDaily = () => readBlobJson<DailyLog[]>(DAILYLOG_PREFIX, []);
+// 버전 번호 저장소 하나 — 목록 읽기와 「최신본 → 고친 목록」 저장. 로컬(.data)은 파일 하나에 그대로.
+function versionedStore<T>(vPrefix: string, legacyPrefix: string, file: string) {
+  const legacy = () => readBlobJson<T[]>(legacyPrefix, []);
+  return {
+    async list(): Promise<T[]> {
+      return USE_BLOB ? (await readVersioned(vPrefix, legacy)).data : readLocal<T[]>(file, []);
+    },
+    async update<R>(fn: (all: T[]) => { all: T[]; result: R }): Promise<R> {
+      if (!USE_BLOB) {
+        const { all, result } = fn(await readLocal<T[]>(file, []));
+        await writeLocal(file, all);
+        return result;
+      }
+      return casUpdate(vPrefix, legacy, (cur: T[]) => {
+        const { all, result } = fn(cur);
+        return { data: all, result };
+      });
+    },
+  };
+}
+
+const dailyStore = versionedStore<DailyLog>(DAILYLOG_V_PREFIX, DAILYLOG_PREFIX, DAILYLOG_FILE);
+const weeklyStore = versionedStore<WeeklyLog>("db/weeklylog-v/", WEEKLYLOG_PREFIX, WEEKLYLOG_FILE);
+const monthlyStore = versionedStore<MonthlyReport>("db/monthlyreport-v/", MONTHLY_PREFIX, MONTHLY_FILE);
+const dayNoteStore = versionedStore<DayNote>("db/daynotes-v/", DAYNOTE_PREFIX, DAYNOTE_FILE);
 
 export async function listDailyLogs(): Promise<DailyLog[]> {
-  const all = USE_BLOB ? (await readVersioned(DAILYLOG_V_PREFIX, legacyDaily)).data : await readLocal<DailyLog[]>(DAILYLOG_FILE, []);
-  return all.sort((a, b) => a.date.localeCompare(b.date));
+  return (await dailyStore.list()).sort((a, b) => a.date.localeCompare(b.date));
 }
+export const updateDailyLogs = <R>(fn: (all: DailyLog[]) => { all: DailyLog[]; result: R }) => dailyStore.update(fn);
 
-// 최신 전체 목록을 받아 고친 목록을 돌려주는 fn 으로 저장 (충돌하면 최신본으로 다시 부른다)
-export async function updateDailyLogs<R>(fn: (all: DailyLog[]) => { all: DailyLog[]; result: R }): Promise<R> {
-  if (!USE_BLOB) {
-    const { all, result } = fn(await readLocal<DailyLog[]>(DAILYLOG_FILE, []));
-    await writeLocal(DAILYLOG_FILE, all);
-    return result;
-  }
-  return casUpdate(DAILYLOG_V_PREFIX, legacyDaily, (cur) => {
-    const { all, result } = fn(cur);
-    return { data: all, result };
-  });
-}
-
-// ── 고객사 주간 업무 보고 (보고일별 · 단일 집계 JSON) ──────────────
+// ── 고객사 주간 업무 보고 (보고일별 · 위와 같은 버전 저장) ─────────
 export async function listWeeklyLogs(): Promise<WeeklyLog[]> {
-  const all = USE_BLOB
-    ? await readBlobJson<WeeklyLog[]>(WEEKLYLOG_PREFIX, [])
-    : await readLocal<WeeklyLog[]>(WEEKLYLOG_FILE, []);
-  return all.sort((a, b) => a.date.localeCompare(b.date));
+  return (await weeklyStore.list()).sort((a, b) => a.date.localeCompare(b.date));
 }
+export const updateWeeklyLogs = <R>(fn: (all: WeeklyLog[]) => { all: WeeklyLog[]; result: R }) => weeklyStore.update(fn);
 
-export async function saveWeeklyLogs(items: WeeklyLog[]): Promise<void> {
-  const byDate = new Map((await listWeeklyLogs()).map((w) => [w.date, w]));
-  for (const it of items) byDate.set(it.date, it);
-  const all = [...byDate.values()];
-  if (USE_BLOB) await writeBlobJson(WEEKLYLOG_PREFIX, all);
-  else await writeLocal(WEEKLYLOG_FILE, all);
-}
-
-// ── 고객사 월간 보고서 (보고월별 · 단일 집계 JSON) ───────────────
+// ── 고객사 월간 보고서 (보고월별 · 위와 같은 버전 저장) ───────────
 export async function listMonthlyReports(): Promise<MonthlyReport[]> {
-  const all = USE_BLOB
-    ? await readBlobJson<MonthlyReport[]>(MONTHLY_PREFIX, [])
-    : await readLocal<MonthlyReport[]>(MONTHLY_FILE, []);
-  return all.sort((a, b) => a.month.localeCompare(b.month));
+  return (await monthlyStore.list()).sort((a, b) => a.month.localeCompare(b.month));
 }
-
-export async function saveMonthlyReport(item: MonthlyReport): Promise<void> {
-  const all = (await listMonthlyReports()).filter((r) => r.month !== item.month);
-  all.push(item);
-  if (USE_BLOB) await writeBlobJson(MONTHLY_PREFIX, all);
-  else await writeLocal(MONTHLY_FILE, all);
-}
+export const updateMonthlyReports = <R>(fn: (all: MonthlyReport[]) => { all: MonthlyReport[]; result: R }) => monthlyStore.update(fn);
 
 // ── 사진 업로드 (고유 파일명 — 불변이라 덮어쓰기 문제 없음) ────────
 export async function savePhoto(buffer: Buffer, ext: string): Promise<string> {

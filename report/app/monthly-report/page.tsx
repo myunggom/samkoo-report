@@ -106,6 +106,8 @@ export default function MonthlyReportPage() {
   const [trade, setTrade] = useState<string>(TRADES[0]);
   const [preview, setPreview] = useState(false);
   const docRef = useRef<HTMLDivElement>(null);
+  // 편집을 시작할 때의 보고서 — 저장할 때 같이 보내 서버가 「내가 고친 칸만」 합치게 한다 (동시 편집 보호)
+  const baseRef = useRef<MonthlyReport | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -118,7 +120,9 @@ export default function MonthlyReportPage() {
   }, []);
   useEffect(() => {
     if (loading) return;
-    setD(structuredClone(draftMonthly(reports, month)));
+    const r = draftMonthly(reports, month);
+    baseRef.current = structuredClone(r);
+    setD(structuredClone(r));
     setDirty(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [month, loading]);
@@ -163,11 +167,24 @@ export default function MonthlyReportPage() {
   async function save(): Promise<boolean> {
     setBusy("save"); setMsg("");
     try {
-      const res = await fetch("/api/monthly-report", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ report: d }) });
+      const res = await fetch("/api/monthly-report", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ report: d, base: baseRef.current }) });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) { setMsg(j.error || "저장 실패"); return false; }
-      setReports((rs) => [...rs.filter((r) => r.month !== d!.month), d!]);
-      setDirty(false); setMsg("저장했습니다."); return true;
+      // 서버가 다른 사람 저장분과 합친 결과로 화면을 바꾼다
+      const got: MonthlyReport = j.report ?? d!;
+      setReports((rs) => [...rs.filter((r) => r.month !== got.month), got]);
+      baseRef.current = structuredClone(got);
+      setD(structuredClone(got));
+      setDirty(false);
+      const conflicts: string[] = j.conflicts ?? [];
+      setMsg(
+        conflicts.length
+          ? `저장했습니다. 다른 분이 같은 칸을 먼저 고쳐서 내 내용으로 덮었습니다: ${conflicts.join(", ")}`
+          : j.others
+            ? "저장했습니다. 그 사이 다른 분이 저장한 내용도 합쳐 두었습니다."
+            : "저장했습니다.",
+      );
+      return true;
     } catch { setMsg("네트워크 오류로 저장하지 못했습니다."); return false; } finally { setBusy(""); }
   }
   async function pdf() {

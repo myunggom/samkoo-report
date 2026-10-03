@@ -52,12 +52,17 @@ export default function LogsPage() {
   async function saveNote(date: string) {
     setSavingNote(date);
     try {
-      await fetch("/api/daynotes", {
+      const res = await fetch("/api/daynotes", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date, note: drafts[date] ?? "" }),
+        // base = 편집을 시작할 때의 메모 — 그 사이 다른 분이 고쳤으면 서버가 합친다
+        body: JSON.stringify({ date, note: drafts[date] ?? "", base: notes[date] ?? "" }),
       });
-      setNotes((prev) => ({ ...prev, [date]: drafts[date] ?? "" }));
+      const d = await res.json();
+      if (!res.ok) throw new Error();
+      setNotes((prev) => ({ ...prev, [date]: d.note }));
+      setDrafts((prev) => ({ ...prev, [date]: d.note }));
+      if (d.joined) alert("그 사이 다른 분이 이 날 메모를 고쳐서, 두 내용을 이어 붙여 저장했습니다. 확인해 주세요.");
     } catch {
       alert("메모 저장에 실패했습니다.");
     } finally {

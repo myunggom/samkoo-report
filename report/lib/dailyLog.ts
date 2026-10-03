@@ -5,6 +5,8 @@
 // 여기서 계산한다(예전 엑셀은 날짜마다 시트를 복사하고 누계를 전날 시트에 줄줄이 이어
 // 붙여서, 하루만 빠져도 그 뒤 누계가 다 틀어졌다).
 
+import { merge3 } from "./merge.ts";
+
 export type WorkSlot = {
   key: string;
   label: string;   // 보고서 왼쪽 칸 이름
@@ -240,47 +242,13 @@ export function fmt(v: number | null, digits = 2): string {
   return v.toLocaleString("ko-KR", { minimumFractionDigits: digits, maximumFractionDigits: digits });
 }
 
-// ── 동시 편집 합치기 ─────────────────────────────────────────────
-// 두 사람이 같은 날 일지를 열어 각자 다른 칸을 고쳐도 둘 다 남도록, 칸 단위 3방향 병합을 한다.
-//   base   = 내가 편집을 시작할 때 서버에 있던 그날 일지 (없으면 새 일지)
-//   server = 지금 서버에 있는 그날 일지 (그 사이 다른 사람이 저장했을 수 있음)
-//   mine   = 내가 저장하려는 일지
-// 내가 바꾼 칸만 내 값으로, 나머지는 서버 값으로. 같은 칸을 둘 다 다르게 바꿨으면 내 값으로 하고 conflicts 에 남긴다.
-type Plain = Record<string, unknown>;
-const isObj = (v: unknown): v is Plain => typeof v === "object" && v !== null && !Array.isArray(v);
-const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
-
-function merge3(s: unknown, b: unknown, m: unknown, path: string, conflicts: string[]): unknown {
-  // 객체는 키마다, 같은 길이 배열(인원·3요소)은 칸마다 내려간다
-  if ((isObj(s) || s == null) && (isObj(b) || b == null) && (isObj(m) || m == null) && (isObj(s) || isObj(b) || isObj(m))) {
-    const keys = new Set([...Object.keys((s as Plain) ?? {}), ...Object.keys((b as Plain) ?? {}), ...Object.keys((m as Plain) ?? {})]);
-    const out: Plain = {};
-    for (const k of keys) {
-      const v = merge3((s as Plain)?.[k], (b as Plain)?.[k], (m as Plain)?.[k], path ? `${path}.${k}` : k, conflicts);
-      if (v !== undefined) out[k] = v;
-    }
-    return out;
-  }
-  if (Array.isArray(s) && Array.isArray(b) && Array.isArray(m) && s.length === b.length && b.length === m.length) {
-    return m.map((_, i) => merge3(s[i], b[i], m[i], `${path}.${i}`, conflicts));
-  }
-  if (same(m, b)) {
-    if (!same(s, b)) conflicts.push("~" + path); // 남이 고친 칸을 받아 옴 (「~」 표시 — 충돌 아님)
-    return s; // 나는 안 건드림 → 서버 값
-  }
-  if (!same(s, b) && !same(s, m)) conflicts.push(path); // 둘 다 다르게 바꿈 → 내 값, 알림
-  return m;
-}
-
+// ── 동시 편집 합치기 (lib/merge.ts) ───────────────────────────────
 export function mergeLog(server: DailyLog | undefined, base: DailyLog | undefined, mine: DailyLog): { log: DailyLog; conflicts: string[]; others: number } {
   if (!server) return { log: mine, conflicts: [], others: 0 };
-  const marks: string[] = [];
-  const strip = (l: DailyLog | undefined) => (l ? { ...l, updatedAt: undefined } : undefined);
-  const raw = merge3(strip(server), strip(base), strip(mine), "", marks);
+  const m = merge3(server, base, mine);
   // 합친 뒤 다시 정리 — 3요소가 바뀌었으면 전력 지침도 다시 계산된다
-  const log = normalizeLog(raw)!;
-  const conflicts = marks.filter((c) => !c.startsWith("~") && (c !== "meters.power" || !log.powerParts));
-  return { log, conflicts, others: marks.length - marks.filter((c) => !c.startsWith("~")).length };
+  const log = normalizeLog(m.value)!;
+  return { log, conflicts: m.conflicts.filter((c) => c !== "meters.power" || !log.powerParts), others: m.others };
 }
 
 // conflicts 경로 → 화면 이름 ("work.전기.today" → "전기 금일")
