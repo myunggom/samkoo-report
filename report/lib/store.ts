@@ -371,21 +371,77 @@ export async function deleteTask(id: string): Promise<void> {
   await putTasks(all.filter((x) => x.id !== id));
 }
 
-// ── 고객사 일일 업무일지 (날짜별 · 단일 집계 JSON) ────────────────
+// ── 고객사 일일 업무일지 (날짜별 · 단일 집계 JSON, 버전 번호로 동시 저장 보호) ──
+// 여러 사람이 동시에 저장해도 하나가 사라지지 않게 「읽기→고치기→쓰기」를 비교-교환으로 한다.
+//   db/dailylog-v/000000007.json 처럼 버전 번호를 파일 이름으로 쓰고, 다음 번호 파일을 「덮어쓰기 금지」로 만든다.
+//   다른 사람이 그 번호를 먼저 만들었으면 실패하므로, 최신본을 다시 읽어 합친 뒤 다음 번호로 재시도한다.
+//   파일 내용은 한 번 쓰면 바뀌지 않으므로 CDN 캐시 때문에 옛 내용을 읽는 일도 없다.
+//   (단, 지운 파일 이름을 다시 쓰면 CDN 에 남은 옛 응답을 받는다 — 번호는 늘기만 하고 최근 5개는 늘 남겨 둔다.)
+// 예전 방식(db/dailylog/<시각>-<uuid>.json)은 새 버전이 처음 생길 때까지 읽기용으로만 쓴다.
+// 2026-10-03 프리뷰에서 10명 동시 저장 3회 — 매번 10건 모두 남음.
+const DAILYLOG_V_PREFIX = "db/dailylog-v/";
+
+async function readVersioned<T>(prefix: string, legacy: () => Promise<T>): Promise<{ data: T; ver: number; olds: string[] }> {
+  const { list } = await import("@vercel/blob");
+  // 목록을 받은 사이 다른 저장이 이어져 그 파일이 정리(삭제)됐으면 404 — 목록부터 다시 읽는다
+  for (let attempt = 0; ; attempt++) {
+    const { blobs } = await list({ prefix });
+    blobs.sort((a, b) => b.pathname.localeCompare(a.pathname));
+    if (!blobs.length) return { data: await legacy(), ver: 0, olds: [] };
+    const res = await fetch(blobs[0].url, { cache: "no-store" });
+    if (res.status === 404 && attempt < 5) {
+      await new Promise((r) => setTimeout(r, 100 + Math.random() * 200));
+      continue;
+    }
+    if (!res.ok) throw new Error(`저장된 자료를 읽지 못했습니다 (${res.status})`);
+    return {
+      data: (await res.json()) as T,
+      ver: Number(blobs[0].pathname.slice(prefix.length, prefix.length + 9)),
+      olds: blobs.slice(4).map((b) => b.url), // 최근 5개만 남긴다
+    };
+  }
+}
+
+// 최신본을 받아 고친 값을 돌려주는 fn 으로 저장. 다른 사람이 먼저 저장했으면 최신본으로 fn 을 다시 부른다.
+export async function casUpdate<T, R>(prefix: string, legacy: () => Promise<T>, fn: (cur: T) => { data: T; result: R }): Promise<R> {
+  const { put, head, del } = await import("@vercel/blob");
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const cur = await readVersioned(prefix, legacy);
+    const { data, result } = fn(cur.data);
+    const key = `${prefix}${String(cur.ver + 1).padStart(9, "0")}.json`;
+    try {
+      await put(key, JSON.stringify(data), { access: "public", contentType: "application/json; charset=utf-8", addRandomSuffix: false });
+    } catch (e) {
+      // 그 번호가 이미 있으면 = 다른 사람이 먼저 저장함 → 잠깐 쉬고 최신본으로 다시
+      const taken = await head(key).then(() => true, () => false);
+      if (!taken) throw e;
+      await new Promise((r) => setTimeout(r, 150 + Math.random() * 300 * (attempt + 1)));
+      continue;
+    }
+    if (cur.olds.length) await del(cur.olds).catch(() => {});
+    return result;
+  }
+  throw new Error("동시에 저장하는 사람이 많아 저장하지 못했습니다. 잠시 후 다시 저장해 주세요.");
+}
+
+const legacyDaily = () => readBlobJson<DailyLog[]>(DAILYLOG_PREFIX, []);
+
 export async function listDailyLogs(): Promise<DailyLog[]> {
-  const all = USE_BLOB
-    ? await readBlobJson<DailyLog[]>(DAILYLOG_PREFIX, [])
-    : await readLocal<DailyLog[]>(DAILYLOG_FILE, []);
+  const all = USE_BLOB ? (await readVersioned(DAILYLOG_V_PREFIX, legacyDaily)).data : await readLocal<DailyLog[]>(DAILYLOG_FILE, []);
   return all.sort((a, b) => a.date.localeCompare(b.date));
 }
 
-// 날짜별 upsert (여러 건 한 번에 — 가져오기에도 사용)
-export async function saveDailyLogs(items: DailyLog[]): Promise<void> {
-  const byDate = new Map((await listDailyLogs()).map((l) => [l.date, l]));
-  for (const it of items) byDate.set(it.date, it);
-  const all = [...byDate.values()];
-  if (USE_BLOB) await writeBlobJson(DAILYLOG_PREFIX, all);
-  else await writeLocal(DAILYLOG_FILE, all);
+// 최신 전체 목록을 받아 고친 목록을 돌려주는 fn 으로 저장 (충돌하면 최신본으로 다시 부른다)
+export async function updateDailyLogs<R>(fn: (all: DailyLog[]) => { all: DailyLog[]; result: R }): Promise<R> {
+  if (!USE_BLOB) {
+    const { all, result } = fn(await readLocal<DailyLog[]>(DAILYLOG_FILE, []));
+    await writeLocal(DAILYLOG_FILE, all);
+    return result;
+  }
+  return casUpdate(DAILYLOG_V_PREFIX, legacyDaily, (cur) => {
+    const { all, result } = fn(cur);
+    return { data: all, result };
+  });
 }
 
 // ── 고객사 주간 업무 보고 (보고일별 · 단일 집계 JSON) ──────────────

@@ -99,3 +99,38 @@ assert.equal(normalizeLog({ date: "2026-09-08", solarMonthMWh: "1.95" })?.solarM
 assert.equal(normalizeLog({ date: "2026-09-08", solarMonthMWh: "abc" })?.solarMonthMWh, undefined);
 
 console.log("dailyLog check ok");
+
+// ── 동시 편집 합치기 ─────────────────────────────────────────────
+{
+  const { mergeLog } = await import("./dailyLog.ts");
+  const base = log("2026-09-10", { water: 10 }, { work: { 전기: { today: "원래" } } });
+  // A가 먼저 저장: 전기 금일 + 수도
+  const server = log("2026-09-10", { water: 11 }, { work: { 전기: { today: "A가 씀" } } });
+  // B는 같은 base 에서 기계 금일 + 가스만 고침
+  const mine = log("2026-09-10", { water: 10, gas: 5 }, { work: { 전기: { today: "원래" }, 기계: { today: "B가 씀" } } });
+  let m = mergeLog(server, base, mine);
+  assert.equal(m.log.work.전기.today, "A가 씀", "남이 고친 칸은 살아남는다");
+  assert.equal(m.log.work.기계.today, "B가 씀", "내가 고친 칸도 들어간다");
+  assert.equal(m.log.meters.water, 11);
+  assert.equal(m.log.meters.gas, 5);
+  assert.deepEqual(m.conflicts, []);
+  assert.equal(m.others, 2, "남이 고친 칸 2개(전기 금일·수도)를 받아 옴");
+
+  // 같은 칸을 둘 다 고치면 내 값 + 충돌 알림
+  m = mergeLog(server, base, log("2026-09-10", { water: 10 }, { work: { 전기: { today: "B도 씀" } } }));
+  assert.equal(m.log.work.전기.today, "B도 씀");
+  assert.deepEqual(m.conflicts, ["work.전기.today"]);
+
+  // 내가 지운 칸은 지워진다 (남이 안 건드렸으면)
+  m = mergeLog(base, base, log("2026-09-10", { water: 10 }));
+  assert.equal(m.log.work.전기, undefined);
+
+  // 인원은 팀별 칸 단위
+  const p = (to: number[]) => log("2026-09-10", {}, { people: { to, actual: [0, 0, 0, 0], off: 0, leave: 0 } });
+  m = mergeLog(p([9, 1, 0, 0]), p([0, 0, 0, 0]), p([0, 0, 2, 0]));
+  assert.deepEqual(m.log.people!.to, [9, 1, 2, 0]);
+
+  // 서버에 그날 일지가 없으면 내 것 그대로
+  assert.equal(mergeLog(undefined, undefined, mine).log, mine);
+}
+console.log("merge ok");

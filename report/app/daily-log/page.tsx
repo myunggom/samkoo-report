@@ -37,15 +37,21 @@ export default function DailyLogPage() {
     load();
   }, []);
 
-  // 날짜가 바뀌면(또는 처음 불러오면) 초안을 새로 만든다
-  useEffect(() => {
-    if (loading) return;
-    const d = draftFor(logs, date);
+  // 편집을 시작할 때의 일지 — 저장할 때 같이 보내 서버가 「내가 고친 칸만」 합치게 한다 (동시 편집 보호)
+  const baseRef = useRef<DailyLog | null>(null);
+  function startFrom(d: DailyLog) {
+    baseRef.current = structuredClone(d);
     setDraft(structuredClone(d));
     setMeterText(Object.fromEntries(METERS.map((m) => [m.key, d.meters[m.key]?.toString() ?? ""])));
     setParts(d.powerParts ? d.powerParts.map(String) : ["", "", ""]);
     setSolarMwh(d.solarMonthMWh?.toString() ?? "");
     setDirty(false);
+  }
+
+  // 날짜가 바뀌면(또는 처음 불러오면) 초안을 새로 만든다
+  useEffect(() => {
+    if (loading) return;
+    startFrom(draftFor(logs, date));
     // logs 는 저장 직후에도 바뀌지만 그때 입력 중인 초안을 덮어쓰면 안 되므로 date·loading 만 본다
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date, loading]);
@@ -103,16 +109,25 @@ export default function DailyLogPage() {
       const res = await fetch("/api/daily-log", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ logs: [current] }),
+        body: JSON.stringify({ logs: [current], bases: [baseRef.current] }),
       });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) {
         setMsg(d.error || "저장에 실패했습니다.");
         return false;
       }
-      setLogs(merged);
-      setDirty(false);
-      setMsg("저장했습니다.");
+      // 서버가 다른 사람 저장분과 합친 결과로 화면을 바꾼다
+      const got: DailyLog = d.logs?.[0] ?? current;
+      setLogs((prev) => [...prev.filter((l) => l.date !== got.date), got]);
+      startFrom(got);
+      const conflicts: string[] = d.conflicts ?? [];
+      setMsg(
+        conflicts.length
+          ? `저장했습니다. 다른 분이 같은 칸을 먼저 고쳐서 내 내용으로 덮었습니다: ${conflicts.join(", ")}`
+          : d.others
+            ? "저장했습니다. 그 사이 다른 분이 저장한 내용도 합쳐 두었습니다."
+            : "저장했습니다.",
+      );
       return true;
     } catch {
       setMsg("네트워크 오류로 저장하지 못했습니다. 입력한 내용은 그대로 있습니다.");
