@@ -14,6 +14,7 @@ const TABS: { href: string; label: string; match: (p: string) => boolean }[] = [
   { href: "/daily-log", label: "업무일지", match: (p) => p.startsWith("/daily-log") },
   { href: "/weekly-log", label: "주간보고", match: (p) => p.startsWith("/weekly-log") },
   { href: "/monthly-report", label: "월간보고", match: (p) => p.startsWith("/monthly-report") },
+  { href: "/billing", label: "실비 청구", match: (p) => p.startsWith("/billing") },
 ];
 
 // 로그인한 본인에게만 보이는 탭

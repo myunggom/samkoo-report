@@ -20,6 +20,8 @@ import type { Task } from "./tasks";
 import type { DailyLog } from "./dailyLog";
 import type { WeeklyLog } from "./weeklyLog";
 import type { MonthlyReport } from "./monthlyReport";
+import { EMPTY_DOC } from "./billing";
+import type { BillingDoc } from "./billing";
 
 const BLOB_TOKEN = process.env.BLOB_READ_WRITE_TOKEN || "";
 const USE_BLOB = !!BLOB_TOKEN;
@@ -441,6 +443,8 @@ const dailyStore = versionedStore<DailyLog>(DAILYLOG_V_PREFIX, DAILYLOG_PREFIX, 
 const weeklyStore = versionedStore<WeeklyLog>("db/weeklylog-v/", WEEKLYLOG_PREFIX, WEEKLYLOG_FILE);
 const monthlyStore = versionedStore<MonthlyReport>("db/monthlyreport-v/", MONTHLY_PREFIX, MONTHLY_FILE);
 const dayNoteStore = versionedStore<DayNote>("db/daynotes-v/", DAYNOTE_PREFIX, DAYNOTE_FILE);
+// 실비 청구는 문서 하나(분담 비율·반복 점검·청구 항목)를 길이 1 배열로 둔다 — 같은 비교-교환 저장을 그대로 쓰려고
+const billingStore = versionedStore<BillingDoc>("db/billing-v/", "db/billing/", path.join(DATA_DIR, "billing.json"));
 
 export async function listDailyLogs(): Promise<DailyLog[]> {
   return (await dailyStore.list()).sort((a, b) => a.date.localeCompare(b.date));
@@ -480,3 +484,13 @@ export const storageMode = {
   data: USE_BLOB ? "cloud" : "local",
   photos: USE_BLOB ? "cloud" : "local",
 };
+
+// ── 실비 청구 (분담 비율 · 반복 점검 · 청구 항목, 문서 하나) ───────────
+export async function getBilling(): Promise<BillingDoc> {
+  return (await billingStore.list())[0] ?? EMPTY_DOC;
+}
+export const updateBilling = <R>(fn: (doc: BillingDoc) => { doc: BillingDoc; result: R }) =>
+  billingStore.update((all) => {
+    const { doc, result } = fn(all[0] ?? EMPTY_DOC);
+    return { all: [doc], result };
+  });
