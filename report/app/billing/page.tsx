@@ -12,6 +12,13 @@ const kstToday = () => new Date(Date.now() + 9 * 3600_000).toISOString().slice(0
 const num = (s: string) => Number(s.replace(/[^\d]/g, "")) || 0;
 const PRESETS: [string, number[]][] = [["매월", [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]], ["분기", [3, 6, 9, 12]], ["반기", [6, 12]], ["연 1회", [12]]];
 const input = "rounded border border-slate-300 px-2 py-1 text-sm";
+// 청구 달 짧게: 매월 / 분기(3·6·9·12월) / 반기(6·12월) / 3·7월
+function monthsLabel(ms: number[]): string {
+  const k = ms.join(",");
+  if (ms.length === 12) return "매월";
+  const list = ms.join("·") + "월";
+  return k === "3,6,9,12" ? `분기(${list})` : k === "6,12" ? `반기(${list})` : ms.length === 1 ? `연 1회(${list})` : list;
+}
 
 export default function BillingPage() {
   const [doc, setDoc] = useState<BillingDoc | null>(null);
@@ -94,7 +101,7 @@ export default function BillingPage() {
           <p className="mb-2 text-sm text-red-700">분담 비율을 먼저 맞춰 주세요(합계 100%). 아래 「분담 비율」에서 설정합니다.</p>
         ) : null}
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] border-collapse text-sm">
+          <table className="w-full min-w-[900px] border-collapse whitespace-nowrap text-sm">
             <thead><tr className="bg-slate-100 text-left">
               <th className="p-2">상태</th><th className="p-2">항목</th><th className="p-2">점검일</th><th className="p-2">세금계산서</th><th className="p-2 text-right">금액</th>
               {shares.map((s) => <th key={s.name} className="p-2 text-right">{s.name} {s.pct}%</th>)}<th className="p-2" />
@@ -109,8 +116,9 @@ export default function BillingPage() {
                         {(Object.keys(STATUS_LABEL) as BillingStatus[]).map((k) => <option key={k} value={k}>{STATUS_LABEL[k]}</option>)}
                       </select>
                     </td>
-                    <td className="p-2"><input className={input + " w-44"} defaultValue={i.name} onBlur={(e) => e.target.value !== i.name && saveItem(i, { name: e.target.value })} aria-label="항목" />
-                      {i.ruleId && <span className="ml-1 text-xs text-slate-400">반복</span>}</td>
+                    <td className="p-2"><div className="flex items-center gap-1">
+                      <input className={input + " w-44"} defaultValue={i.name} onBlur={(e) => e.target.value !== i.name && saveItem(i, { name: e.target.value })} aria-label="항목" />
+                      {i.ruleId && <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-500">반복</span>}</div></td>
                     <td className="p-2"><input type="date" className={input} defaultValue={i.inspectedOn} onBlur={(e) => e.target.value !== (i.inspectedOn ?? "") && saveItem(i, { inspectedOn: e.target.value })} aria-label="점검일" /></td>
                     <td className="p-2 whitespace-nowrap">
                       <label className="flex items-center gap-1"><input type="checkbox" checked={!!i.taxOn} disabled={i.virtual && !i.amount}
@@ -152,9 +160,12 @@ function Rules({ rules, month, put }: { rules: BillingRule[]; month: string; put
       </div>
       <ul className="divide-y text-sm">
         {rules.map((r) => (
-          <li key={r.id} className="flex flex-wrap items-center gap-2 py-1.5">
-            <span className={"mr-auto " + (r.active ? "" : "text-slate-400 line-through")}>{r.name} · {won(r.amount)}원 · {r.months.length === 12 ? "매월" : r.months.map((m) => `${m}월`).join(",")} · {r.from}부터{r.until ? ` ${r.until}까지` : ""}</span>
-            <button className="text-slate-500 underline" onClick={() => setEdit(r)}>수정</button>
+          <li key={r.id} className="flex items-center gap-2 py-1.5">
+            {/* 한 줄로 — 길면 말줄임, 마우스를 올리면 전체 */}
+            <span title={`${r.name} · ${won(r.amount)}원 · ${monthsLabel(r.months)} · ${r.from}부터${r.until ? ` ${r.until}까지` : ""}`}
+              className={"min-w-0 flex-1 truncate whitespace-nowrap " + (r.active ? "" : "text-slate-400 line-through")}>
+              <b>{r.name}</b> · {won(r.amount)}원 · {monthsLabel(r.months)} · {r.from}~{r.until ?? ""}</span>
+            <button className="shrink-0 text-slate-500 underline" onClick={() => setEdit(r)}>수정</button>
             <button className="text-slate-400 hover:text-red-600" onClick={() => confirm(`「${r.name}」 반복을 지울까요? (이미 청구한 항목은 남습니다)`) && put({ op: "deleteRule", id: r.id })} aria-label="삭제">✕</button>
           </li>
         ))}
