@@ -31,6 +31,7 @@ export type BillingItem = {
   status: BillingStatus;
   billedOn?: string;
   paidOn?: string;
+  taxOn?: string;      // 세금계산서 발행일 (없으면 미발행)
   note?: string;
   virtual?: boolean;   // 규칙에서 계산만 된 항목(아직 저장 안 됨)
   updatedAt?: string;
@@ -68,6 +69,11 @@ export function monthItems(doc: BillingDoc, month: string): BillingItem[] {
     .filter((r) => ruleHits(r, month) && !saved.some((i) => i.ruleId === r.id))
     .map((r): BillingItem => ({ id: `r-${r.id}-${month}`, month, ruleId: r.id, name: r.name, vendor: r.vendor, amount: r.amount, status: "todo", virtual: true }));
   return [...saved, ...virtual].sort((a, b) => a.name.localeCompare(b.name, "ko"));
+}
+
+/** 청구는 했는데 세금계산서를 아직 발행하지 않은 항목 */
+export function noTaxItems(doc: BillingDoc): BillingItem[] {
+  return doc.items.filter((i) => i.status !== "todo" && !i.taxOn && i.amount > 0).sort((a, b) => a.month.localeCompare(b.month));
 }
 
 /** 이번 달까지 아직 청구하지 않은 항목 (오래된 달부터) */
@@ -113,7 +119,7 @@ export function normalizeItem(v: unknown): BillingItem | null {
   const id = typeof r.ruleId === "string" ? `r-${r.ruleId}-${month}` : text(r.id, 80) ?? crypto.randomUUID();
   return {
     id, month, ruleId: text(r.ruleId, 60), name, vendor: text(r.vendor), amount: money(r.amount),
-    inspectedOn: date(r.inspectedOn), status, billedOn: date(r.billedOn), paidOn: date(r.paidOn), note: text(r.note, 500),
+    inspectedOn: date(r.inspectedOn), status, billedOn: date(r.billedOn), paidOn: date(r.paidOn), taxOn: date(r.taxOn), note: text(r.note, 500),
     updatedAt: new Date().toISOString(),
   };
 }

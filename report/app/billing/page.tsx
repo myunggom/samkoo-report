@@ -4,7 +4,7 @@
 // 놓친 청구(지난달 이전 「청구 전」)는 맨 위에 빨갛게, 아침 텔레그램 브리핑에도 뜬다. 계산은 lib/billing.ts.
 
 import { useEffect, useMemo, useState } from "react";
-import { STATUS_LABEL, addMonth, monthItems, pendingItems, splitAmount } from "@/lib/billing";
+import { STATUS_LABEL, addMonth, monthItems, noTaxItems, pendingItems, splitAmount } from "@/lib/billing";
 import type { BillingDoc, BillingItem, BillingRule, BillingStatus, Share } from "@/lib/billing";
 
 const won = (n: number) => n.toLocaleString("ko-KR");
@@ -32,6 +32,7 @@ export default function BillingPage() {
 
   const items = useMemo(() => (doc ? monthItems(doc, month) : []), [doc, month]);
   const pending = useMemo(() => (doc ? pendingItems(doc, kstToday().slice(0, 7)).filter((i) => i.month < kstToday().slice(0, 7)) : []), [doc]);
+  const noTax = useMemo(() => (doc ? noTaxItems(doc) : []), [doc]);
   if (!doc) return <p className="text-sm text-slate-400">{msg || "불러오는 중…"}</p>;
   const shares = doc.shares;
   const pctSum = shares.reduce((a, s) => a + s.pct, 0);
@@ -62,6 +63,16 @@ export default function BillingPage() {
       </div>
       {msg && <p className="rounded bg-amber-50 px-3 py-2 text-sm text-amber-800">{msg}</p>}
 
+      {noTax.length > 0 && (
+        <div className="rounded-lg border border-orange-200 bg-orange-50 p-3 text-sm text-orange-800">
+          <b>세금계산서 미발행 {noTax.length}건</b> — 청구는 했지만 세금계산서 체크가 안 된 항목
+          <ul className="mt-1 space-y-0.5">
+            {noTax.map((i) => (
+              <li key={i.id}><button className="underline" onClick={() => setMonth(i.month)}>{i.month}</button> {i.name} · {won(i.amount)}원</li>
+            ))}
+          </ul>
+        </div>
+      )}
       {pending.length > 0 && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
           <b>놓친 청구 {pending.length}건</b> — 지난달 이전에 「청구 전」으로 남은 항목
@@ -85,7 +96,7 @@ export default function BillingPage() {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[720px] border-collapse text-sm">
             <thead><tr className="bg-slate-100 text-left">
-              <th className="p-2">상태</th><th className="p-2">항목</th><th className="p-2">점검일</th><th className="p-2 text-right">금액</th>
+              <th className="p-2">상태</th><th className="p-2">항목</th><th className="p-2">점검일</th><th className="p-2">세금계산서</th><th className="p-2 text-right">금액</th>
               {shares.map((s) => <th key={s.name} className="p-2 text-right">{s.name} {s.pct}%</th>)}<th className="p-2" />
             </tr></thead>
             <tbody>
@@ -101,16 +112,21 @@ export default function BillingPage() {
                     <td className="p-2"><input className={input + " w-44"} defaultValue={i.name} onBlur={(e) => e.target.value !== i.name && saveItem(i, { name: e.target.value })} aria-label="항목" />
                       {i.ruleId && <span className="ml-1 text-xs text-slate-400">반복</span>}</td>
                     <td className="p-2"><input type="date" className={input} defaultValue={i.inspectedOn} onBlur={(e) => e.target.value !== (i.inspectedOn ?? "") && saveItem(i, { inspectedOn: e.target.value })} aria-label="점검일" /></td>
+                    <td className="p-2 whitespace-nowrap">
+                      <label className="flex items-center gap-1"><input type="checkbox" checked={!!i.taxOn} disabled={i.virtual && !i.amount}
+                        onChange={(e) => saveItem(i, { taxOn: e.target.checked ? kstToday() : undefined })} aria-label="세금계산서 발행" />
+                        <span className="text-xs text-slate-500">{i.taxOn ?? "미발행"}</span></label>
+                    </td>
                     <td className="p-2 text-right"><input className={input + " w-28 text-right"} inputMode="numeric" defaultValue={won(i.amount)} onBlur={(e) => num(e.target.value) !== i.amount && saveItem(i, { amount: num(e.target.value) })} aria-label="금액" /></td>
                     {parts.map((v, k) => <td key={k} className="p-2 text-right tabular-nums">{won(v)}</td>)}
                     <td className="p-2 text-right">{!i.virtual && !i.ruleId && <button className="text-slate-400 hover:text-red-600" onClick={() => confirm("이 항목을 지울까요?") && put({ op: "deleteItem", id: i.id })} aria-label="삭제">✕</button>}</td>
                   </tr>
                 );
               })}
-              {!items.length && <tr><td colSpan={5 + shares.length} className="p-3 text-center text-slate-400">이 달 청구 항목이 없습니다.</td></tr>}
+              {!items.length && <tr><td colSpan={6 + shares.length} className="p-3 text-center text-slate-400">이 달 청구 항목이 없습니다.</td></tr>}
               {items.length > 0 && (
                 <tr className="border-t bg-slate-50 font-semibold">
-                  <td className="p-2" colSpan={3}>합계</td><td className="p-2 text-right tabular-nums">{won(sum)}</td>
+                  <td className="p-2" colSpan={4}>합계</td><td className="p-2 text-right tabular-nums">{won(sum)}</td>
                   {totals.map((t, k) => <td key={k} className="p-2 text-right tabular-nums">{won(t)}</td>)}<td />
                 </tr>
               )}

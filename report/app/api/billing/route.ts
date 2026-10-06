@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBilling, updateBilling } from "@/lib/store";
-import { normalizeItem, normalizeRule, normalizeShares, pendingItems, splitAmount } from "@/lib/billing";
+import { noTaxItems, normalizeItem, normalizeRule, normalizeShares, pendingItems, splitAmount } from "@/lib/billing";
 import type { BillingDoc } from "@/lib/billing";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +16,8 @@ export async function GET(req: NextRequest) {
       month: i.month, name: i.name, amount: i.amount, overdue: i.month < month,
       split: doc.shares.map((s, k) => ({ name: s.name, amount: splitAmount(i.amount, doc.shares)[k] })),
     }));
-    return NextResponse.json({ month, pending });
+    const noTax = noTaxItems(doc).map((i) => ({ month: i.month, name: i.name, amount: i.amount }));
+    return NextResponse.json({ month, pending, noTax });
   }
   return NextResponse.json(doc);
 }

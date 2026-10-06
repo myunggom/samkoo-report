@@ -1,7 +1,7 @@
 // lib/billing.ts 자체점검 — node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON lib/billing.check.mts
 // 저장소가 공개라 실제 입주사·금액이 아닌 가짜 값만 쓴다.
 import assert from "node:assert/strict";
-import { monthItems, pendingItems, splitAmount, addMonth } from "./billing.ts";
+import { monthItems, noTaxItems, pendingItems, splitAmount, addMonth } from "./billing.ts";
 import type { BillingDoc } from "./billing.ts";
 
 const shares = [{ name: "A", pct: 50 }, { name: "B", pct: 28 }, { name: "C", pct: 22 }];
@@ -26,4 +26,6 @@ assert.deepEqual(monthItems(doc, "2026-09").map((i) => [i.name, i.status, !!i.vi
 assert.deepEqual(monthItems(doc, "2026-10").map((i) => i.name), ["월 점검", "임시 수리"], "분기 규칙은 10월에 없고, 끈 규칙도 없다");
 const p = pendingItems(doc, "2026-10").map((i) => `${i.month} ${i.name}`);
 assert.deepEqual(p, ["2026-09 분기 점검", "2026-10 월 점검", "2026-10 임시 수리"], "청구 완료한 9월 월 점검은 빠진다");
+assert.deepEqual(noTaxItems(doc).map((i) => i.id), ["r-m-2026-09"], "청구 완료인데 세금계산서 없는 건");
+assert.deepEqual(noTaxItems({ ...doc, items: doc.items.map((i) => ({ ...i, taxOn: "2026-09-30" })) }), []);
 console.log("billing check ok");
