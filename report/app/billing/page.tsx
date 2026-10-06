@@ -127,7 +127,12 @@ export default function BillingPage() {
                     </td>
                     <td className="p-2 text-right"><input className={input + " w-28 text-right"} inputMode="numeric" defaultValue={won(i.amount)} onBlur={(e) => num(e.target.value) !== i.amount && saveItem(i, { amount: num(e.target.value) })} aria-label="금액" /></td>
                     {parts.map((v, k) => <td key={k} className="p-2 text-right tabular-nums">{won(v)}</td>)}
-                    <td className="p-2 text-right">{!i.virtual && !i.ruleId && <button className="text-slate-400 hover:text-red-600" onClick={() => confirm("이 항목을 지울까요?") && put({ op: "deleteItem", id: i.id })} aria-label="삭제">✕</button>}</td>
+                    <td className="p-2 text-right">
+                      <button className="rounded border border-red-200 px-2 py-0.5 text-xs text-red-600 hover:bg-red-50"
+                        onClick={() => i.ruleId
+                          ? confirm(`${i.month} 「${i.name}」을 이 달 청구에서 뺄까요? (반복 점검은 그대로, 다음 달부터 계속 생깁니다)`) && saveItem(i, { skip: true })
+                          : confirm(`「${i.name}」 항목을 삭제할까요?`) && put({ op: "deleteItem", id: i.id })}>삭제</button>
+                    </td>
                   </tr>
                 );
               })}
@@ -166,7 +171,7 @@ function Rules({ rules, month, put }: { rules: BillingRule[]; month: string; put
               className={"min-w-0 flex-1 truncate whitespace-nowrap " + (r.active ? "" : "text-slate-400 line-through")}>
               <b>{r.name}</b> · {won(r.amount)}원 · {monthsLabel(r.months)} · {r.from}~{r.until ?? ""}</span>
             <button className="shrink-0 text-slate-500 underline" onClick={() => setEdit(r)}>수정</button>
-            <button className="text-slate-400 hover:text-red-600" onClick={() => confirm(`「${r.name}」 반복을 지울까요? (이미 청구한 항목은 남습니다)`) && put({ op: "deleteRule", id: r.id })} aria-label="삭제">✕</button>
+            <button className="shrink-0 rounded border border-red-200 px-2 py-0.5 text-xs text-red-600 hover:bg-red-50" onClick={() => confirm(`「${r.name}」 반복 점검을 삭제할까요? (이미 저장된 달의 청구 항목은 남습니다)`) && put({ op: "deleteRule", id: r.id })}>삭제</button>
           </li>
         ))}
         {!rules.length && <li className="py-2 text-slate-400">아직 없습니다. 승강기·저수조·소독처럼 정기적으로 청구하는 점검을 등록하세요.</li>}

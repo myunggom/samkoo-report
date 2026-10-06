@@ -28,4 +28,7 @@ const p = pendingItems(doc, "2026-10").map((i) => `${i.month} ${i.name}`);
 assert.deepEqual(p, ["2026-09 분기 점검", "2026-10 월 점검", "2026-10 임시 수리"], "청구 완료한 9월 월 점검은 빠진다");
 assert.deepEqual(noTaxItems(doc).map((i) => i.id), ["r-m-2026-09"], "청구 완료인데 세금계산서 없는 건");
 assert.deepEqual(noTaxItems({ ...doc, items: doc.items.map((i) => ({ ...i, taxOn: "2026-09-30" })) }), []);
+const skipped: BillingDoc = { ...doc, items: [...doc.items, { id: "r-q-2026-09", month: "2026-09", ruleId: "q", name: "분기 점검", amount: 300000, status: "todo", skip: true }] };
+assert.deepEqual(monthItems(skipped, "2026-09").map((i) => i.name), ["월 점검"], "이 달만 뺀 반복 항목은 다시 생기지 않는다");
+assert.ok(!pendingItems(skipped, "2026-10").some((i) => i.name === "분기 점검" && i.month === "2026-09"));
 console.log("billing check ok");
