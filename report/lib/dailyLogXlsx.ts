@@ -8,6 +8,7 @@
 import PizZip from "pizzip";
 import type { DailyLog } from "./dailyLog.ts";
 import { meterRows, WORK_SLOTS } from "./dailyLog.ts";
+import { holidaysOf, weekday } from "./monthlyReport.ts";
 
 // 구분 → 양식의 행 (금일 C, 명일 I, 비고 N, 두 번째 줄은 다음 행 C)
 const WORK_ROW: Record<string, number> = { 민원: 9, 행정: 10, 전기: 11, 기계: 13, 소방: 15, 건축: 17, 보안: 19 };
@@ -87,8 +88,27 @@ export function fillSheet(tpl: string, logs: DailyLog[], log: DailyLog, prevShee
 // 제출 파일 이름 (예전 엑셀과 같은 형식)
 export const xlsxFileName = (date: string) => `[일일업무일지] 바이오 이노베이션 허브_${date.replace(/-/g, ".")}.xlsx`;
 
-// date "2026-09-29" 기준: 그 달 1일부터 그날까지 일지마다 시트 하나, 그날 시트가 맨 뒤이고 열면 그 시트가 보인다.
-export function buildDayXlsx(template: ArrayBuffer | Uint8Array, logs: DailyLog[], date: string): Uint8Array {
+// 그 달 주말(토·일)·공휴일 — 제출 엑셀에 시트를 만들지 않는다 (내보내는 그날은 예외)
+export const isOffDay = (date: string) => [0, 6].includes(weekday(date)) || holidaysOf(date.slice(0, 7)).includes(date);
+
+// 쉬는 날 일지를 빼되 그날 사용량은 다음 시트로 넘긴다 — 지침 계량기는 다음 날 「전일 지침」이 앞 시트 지침이 되어 저절로 넘어가고,
+// 태양광(그날 발전량)만 다음 시트 발전량에 더한다. 그래서 시트 사이 누계 수식과 월 누계가 그대로 맞는다.
+export function dropOffDays(logs: DailyLog[], date: string): DailyLog[] {
+  const month = date.slice(0, 8);
+  const out: DailyLog[] = [];
+  let carry = 0;
+  for (const l of [...logs].sort((a, b) => a.date.localeCompare(b.date))) {
+    const solar = Number(l.meters.solar);
+    if (l.date.startsWith(month) && l.date !== date && isOffDay(l.date)) { if (Number.isFinite(solar)) carry += solar; continue; }
+    if (carry && l.date.startsWith(month)) { out.push({ ...l, meters: { ...l.meters, solar: (Number.isFinite(solar) ? solar : 0) + carry } }); carry = 0; }
+    else out.push(l);
+  }
+  return out;
+}
+
+// date "2026-09-29" 기준: 그 달 1일부터 그날까지 평일 일지마다 시트 하나, 그날 시트가 맨 뒤이고 열면 그 시트가 보인다.
+export function buildDayXlsx(template: ArrayBuffer | Uint8Array, all: DailyLog[], date: string): Uint8Array {
+  const logs = dropOffDays(all, date);
   const days = logs.filter((l) => l.date.startsWith(date.slice(0, 8)) && l.date <= date).sort((a, b) => a.date.localeCompare(b.date));
   if (days.at(-1)?.date !== date) throw new Error("이 날 업무일지가 저장되어 있지 않습니다");
   const names = days.map((l) => `${l.date.slice(5, 7)}.${l.date.slice(8, 10)}`);

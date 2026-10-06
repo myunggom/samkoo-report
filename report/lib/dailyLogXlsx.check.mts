@@ -49,5 +49,15 @@ assert.deepEqual(wb.match(/<calcPr[^>]*>/g), ['<calcPr calcId="191029" fullCalcO
 assert.ok(s2.includes('tabSelected="1"')); assert.ok(!s1.includes('tabSelected="1"'));
 assert.ok(wb.includes('<workbookView activeTab="1"'));
 assert.ok(!z.file("xl/worksheets/sheet3.xml"));
+// 주말·공휴일 시트는 빼고(2026-10-03 토·04 일·05 대체공휴일), 그 사이 사용량은 다음 평일 시트로 넘어가 월 누계가 그대로 맞는다
+const oct: DailyLog[] = ["01", "02", "03", "04", "05", "06"].map((d, i) => ({ date: `2026-10-${d}`, work: {}, meters: { power: 200 + i, solar: 10 }, updatedAt: "" }));
+const zo = new PizZip(buildDayXlsx(tplBytes, [log("2026-09-30", 199), ...oct], "2026-10-06"));
+assert.deepEqual([...zo.file("xl/workbook.xml")!.asText().matchAll(/<sheet name="([^"]+)"/g)].map((m) => m[1]), ["10.01", "10.02", "10.06"]);
+const o3 = zo.file("xl/worksheets/sheet3.xml")!.asText();
+assert.equal(v(o3, "E30"), "201"); assert.equal(v(o3, "I30"), String(4 * 3600)); assert.equal(v(o3, "K30"), String(6 * 3600)); // 전일 지침 = 10/02
+assert.equal(v(o3, "G31"), "40"); assert.equal(v(o3, "K31"), "60"); // 태양광 10/03~06 합쳐서, 월 누계 60
+assert.equal(f(o3, "K30"), "'10.02'!K30+I30");
+// 쉬는 날 그날 내보내면 그 시트는 만든다
+assert.deepEqual([...new PizZip(buildDayXlsx(tplBytes, oct, "2026-10-04")).file("xl/workbook.xml")!.asText().matchAll(/<sheet name="([^"]+)"/g)].map((m) => m[1]), ["10.01", "10.02", "10.04"]);
 if (process.argv[2]) writeFileSync(process.argv[2], out); // 엑셀로 열어 보려면 경로를 넘긴다
 console.log("dailyLogXlsx check ok");
