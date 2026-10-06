@@ -12,6 +12,7 @@ const kstToday = () => new Date(Date.now() + 9 * 3600_000).toISOString().slice(0
 const num = (s: string) => Number(s.replace(/[^\d]/g, "")) || 0;
 const PRESETS: [string, number[]][] = [["매월", [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]], ["분기", [3, 6, 9, 12]], ["반기", [6, 12]], ["연 1회", [12]]];
 const input = "rounded border border-slate-300 px-2 py-1 text-sm";
+const cell = "rounded border border-slate-300 px-1.5 py-0.5 text-xs"; // 청구 표 안 입력칸 — 한 화면에 들어오게 작게
 // 청구 달 짧게: 매월 / 분기(3·6·9·12월) / 반기(6·12월) / 3·7월
 function monthsLabel(ms: number[]): string {
   const k = ms.join(",");
@@ -101,33 +102,33 @@ export default function BillingPage() {
           <p className="mb-2 text-sm text-red-700">분담 비율을 먼저 맞춰 주세요(합계 100%). 아래 「분담 비율」에서 설정합니다.</p>
         ) : null}
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[900px] border-collapse whitespace-nowrap text-sm">
+          <table className="w-full min-w-[720px] border-collapse whitespace-nowrap text-xs">
             <thead><tr className="bg-slate-100 text-left">
-              <th className="p-2">상태</th><th className="p-2">항목</th><th className="p-2">점검일</th><th className="p-2">세금계산서</th><th className="p-2 text-right">금액</th>
-              {shares.map((s) => <th key={s.name} className="p-2 text-right">{s.name} {s.pct}%</th>)}<th className="p-2" />
+              <th className="px-1.5 py-1">상태</th><th className="px-1.5 py-1">항목</th><th className="px-1.5 py-1">점검일</th><th className="px-1.5 py-1">세금계산서</th><th className="px-1.5 py-1 text-right">금액</th>
+              {shares.map((s) => <th key={s.name} className="px-1.5 py-1 text-right">{s.name} {s.pct}%</th>)}<th className="px-1.5 py-1" />
             </tr></thead>
             <tbody>
               {items.map((i) => {
                 const parts = splitAmount(i.amount, shares);
                 return (
                   <tr key={i.id} className={"border-t " + (i.status === "todo" ? "bg-amber-50/40" : "")}>
-                    <td className="p-2">
-                      <select className={input} value={i.status} onChange={(e) => saveItem(i, { status: e.target.value as BillingStatus })} aria-label="상태">
+                    <td className="px-1.5 py-1">
+                      <select className={cell} value={i.status} onChange={(e) => saveItem(i, { status: e.target.value as BillingStatus })} aria-label="상태">
                         {(Object.keys(STATUS_LABEL) as BillingStatus[]).map((k) => <option key={k} value={k}>{STATUS_LABEL[k]}</option>)}
                       </select>
                     </td>
-                    <td className="p-2"><div className="flex items-center gap-1">
-                      <input className={input + " w-44"} defaultValue={i.name} onBlur={(e) => e.target.value !== i.name && saveItem(i, { name: e.target.value })} aria-label="항목" />
+                    <td className="px-1.5 py-1"><div className="flex items-center gap-1">
+                      <input className={cell + " w-36"} defaultValue={i.name} onBlur={(e) => e.target.value !== i.name && saveItem(i, { name: e.target.value })} aria-label="항목" />
                       {i.ruleId && <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-500">반복</span>}</div></td>
-                    <td className="p-2"><input type="date" className={input} defaultValue={i.inspectedOn} onBlur={(e) => e.target.value !== (i.inspectedOn ?? "") && saveItem(i, { inspectedOn: e.target.value })} aria-label="점검일" /></td>
-                    <td className="p-2 whitespace-nowrap">
+                    <td className="px-1.5 py-1"><input type="date" className={cell} defaultValue={i.inspectedOn} onBlur={(e) => e.target.value !== (i.inspectedOn ?? "") && saveItem(i, { inspectedOn: e.target.value })} aria-label="점검일" /></td>
+                    <td className="px-1.5 py-1 whitespace-nowrap">
                       <label className="flex items-center gap-1"><input type="checkbox" checked={!!i.taxOn} disabled={i.virtual && !i.amount}
                         onChange={(e) => saveItem(i, { taxOn: e.target.checked ? kstToday() : undefined })} aria-label="세금계산서 발행" />
                         <span className="text-xs text-slate-500">{i.taxOn ?? "미발행"}</span></label>
                     </td>
-                    <td className="p-2 text-right"><input className={input + " w-28 text-right"} inputMode="numeric" defaultValue={won(i.amount)} onBlur={(e) => num(e.target.value) !== i.amount && saveItem(i, { amount: num(e.target.value) })} aria-label="금액" /></td>
-                    {parts.map((v, k) => <td key={k} className="p-2 text-right tabular-nums">{won(v)}</td>)}
-                    <td className="p-2 text-right">
+                    <td className="px-1.5 py-1 text-right"><input className={cell + " w-24 text-right"} inputMode="numeric" defaultValue={won(i.amount)} onBlur={(e) => num(e.target.value) !== i.amount && saveItem(i, { amount: num(e.target.value) })} aria-label="금액" /></td>
+                    {parts.map((v, k) => <td key={k} className="px-1.5 py-1 text-right tabular-nums">{won(v)}</td>)}
+                    <td className="px-1.5 py-1 text-right">
                       <button className="rounded border border-red-200 px-2 py-0.5 text-xs text-red-600 hover:bg-red-50"
                         onClick={() => i.ruleId
                           ? confirm(`${i.month} 「${i.name}」을 이 달 청구에서 뺄까요? (반복 점검은 그대로, 다음 달부터 계속 생깁니다)`) && saveItem(i, { skip: true })
@@ -139,8 +140,8 @@ export default function BillingPage() {
               {!items.length && <tr><td colSpan={6 + shares.length} className="p-3 text-center text-slate-400">이 달 청구 항목이 없습니다.</td></tr>}
               {items.length > 0 && (
                 <tr className="border-t bg-slate-50 font-semibold">
-                  <td className="p-2" colSpan={4}>합계</td><td className="p-2 text-right tabular-nums">{won(sum)}</td>
-                  {totals.map((t, k) => <td key={k} className="p-2 text-right tabular-nums">{won(t)}</td>)}<td />
+                  <td className="px-1.5 py-1" colSpan={4}>합계</td><td className="px-1.5 py-1 text-right tabular-nums">{won(sum)}</td>
+                  {totals.map((t, k) => <td key={k} className="px-1.5 py-1 text-right tabular-nums">{won(t)}</td>)}<td />
                 </tr>
               )}
             </tbody>
