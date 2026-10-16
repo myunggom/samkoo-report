@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f2544">
+<title>작업 안내 | 안전 표준운영절차</title>
+<link rel="icon" href="favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/inline.css">
+</head>
+<body>
+<div id="app"></div>
+
+<script src="assets/data.js"></script>
+<script src="assets/imglist.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/inline.js"></script>
+<script>
+(function () {
+  var t = currentTask(); if (!t) return;
+  var B = 'TASKS.' + t.id;
+  document.title = t.name + ' | 안전 표준운영절차';
+
+  var h = topbar(t.name, t.sop, 'index.html');
+  h += '<div class="wrap narrow">';
+  h += '<div class="phead"><span class="eyebrow" style="color:' + t.color + ';background:' + t.color + '18">' +
+       esc(t.no) + '. 표준작업</span>' +
+       '<h2' + EA(B + '.name') + '>' + esc(t.name) + '</h2>' +
+       '<p>아래 4개 항목을 순서대로 확인한 뒤 작업에 착수하십시오.</p>' +
+       '<div class="docline"><span' + EA(B + '.sop') + '>' + esc(t.sop) + '</span> ｜ 문서번호 <span' +
+       EA(B + '.docNo') + '>' + esc(t.docNo) + '</span> ｜ 장소 : <span' + EA(B + '.place') + '>' + esc(t.place) + '</span></div></div>';
+
+  var menu = [
+    ['1', '각부 명칭 및 점검 포인트', '장비 각부 ①~' + (t.parts.items.length === 4 ? '④' : '⑥') + ' 확인 항목', 'parts.html'],
+    ['2', '안전작업 지침 · 교육자료', 'TBM 교육용 12개 조치사항', 'guide.html'],
+    ['3', '위험성평가표', '빈도 × 강도 자동계산 · 조치여부 Y/N', 'risk.html'],
+    ['4', '작업 완료보고서', '사진 4종 첨부 · PDF 출력', 'report.html']
+  ];
+  h += '<div class="menugrid">';
+  menu.forEach(function (m) {
+    h += '<a class="menucard" href="' + m[3] + '?id=' + t.id + '">' +
+      '<div class="ic" style="background:' + t.color + '18;color:' + t.color + '">' + m[0] + '</div>' +
+      '<div><strong>' + esc(m[1]) + '</strong><span>' + esc(m[2]) + '</span></div></a>';
+  });
+  h += '</div>';
+
+  h += '<div class="card" style="margin-top:16px"><div class="card-h">⛑ 작업별 필수 개인보호구</div><div class="card-b">';
+  h += '<div class="ppe">';
+  t.ppe.forEach(function (p, i) {
+    h += '<div class="it"><img src="' + imgSrc(p.img) + '" alt=""' + EI(B + '.ppe.' + i + '.img') + '>' +
+      '<span' + EA(B + '.ppe.' + i + '.name') + '>' + esc(p.name) + '</span></div>';
+  });
+  h += '</div>';
+  if (t.ppeNote) h += '<p class="hint"' + EA(B + '.ppeNote') + '>' + esc(t.ppeNote) + '</p>';
+  h += '</div></div>';
+
+  h += '<div class="notebox nb-red" style="margin-top:14px"><h4>🚫 작업 중 금지 사항</h4><ul>' +
+    t.parts.ban.map(function (b, i) { return '<li' + EA(B + '.parts.ban.' + i) + '>' + esc(b) + '</li>'; }).join('') + '</ul></div>';
+
+  h += '<div class="btnbar"><a class="btn" href="qr.html?id=' + t.id + '">이 작업 QR코드 보기</a>' +
+       '<a class="btn ghost" href="index.html">전체 작업 목록</a></div>';
+  h += '</div>';
+  document.getElementById('app').innerHTML = h;
+  initInline();
+})();
+</script>
+</body>
+</html>

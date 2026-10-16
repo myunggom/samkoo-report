@@ -1,0 +1,24 @@
+/* 공기구 추가 화면 */
+.nf { margin: 0 0 14px }
+.nf label { display: block; font-size: 13px; font-weight: 800; color: var(--ink); margin: 0 0 5px }
+.nf input[type=text], .nf select {
+  width: 100%; box-sizing: border-box; padding: 10px 12px; font-size: 14px;
+  border: 1px solid var(--line-strong, #c3d0de); border-radius: 10px;
+  background: var(--surface, #fff); font-family: inherit;
+}
+.nf input[type=file] { font-size: 13px }
+.nf .hint { margin: 5px 0 0 }
+.phv { max-width: 240px; max-height: 180px; border-radius: 10px; margin-top: 8px;
+       border: 1px solid var(--line, #dde5ee) }
+
+.nh { margin: 18px 0 8px; font-size: 14px; font-weight: 800; color: var(--ink);
+      display: flex; align-items: center; gap: 8px }
+.nh::before { content: ''; width: 4px; height: 15px; border-radius: 2px; background: var(--accent, #1d4ed8) }
+.nsec { margin: 12px 0 6px; font-size: 12.5px; font-weight: 800; color: var(--ink-2, #475569) }
+.nmust { font-size: 10.5px; font-weight: 800; color: #fff; background: #c0271c;
+         border-radius: 4px; padding: 1px 6px; margin-left: 4px }
+.nwarn { font-size: 11.5px; color: #b45309 }
+
+#out table.grid-t { margin-bottom: 6px }
+#out table.grid-t th { background: #eef2f7; font-size: 12px }
+#out table.grid-t td { font-size: 12.5px; vertical-align: top }

@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0f2544">
+<title>내용 수정 — 안전 표준운영절차</title>
+<link rel="icon" href="favicon.svg">
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  background:#eef1f5;color:#1f2937;font-size:14px}
+.bar{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  padding:10px 14px;background:#0f2544;color:#fff}
+.bar h1{font-size:15px;margin:0;font-weight:800}
+.bar .sp{flex:1}
+.bar a{color:#cfe0ff;text-decoration:none;font-size:13px}
+.bar button,.bar label.fbtn{background:rgba(255,255,255,.14);color:#fff;border:1px solid rgba(255,255,255,.3);
+  border-radius:7px;padding:6px 12px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
+.bar button:hover,.bar label.fbtn:hover{background:rgba(255,255,255,.26)}
+.bar button.pri{background:#2563eb;border-color:#2563eb}
+.bar button.pri:hover{background:#1d4ed8}
+.bar button.hot{background:#b45309;border-color:#b45309}
+#status{padding:8px 16px;background:#dbeafe;color:#1e3a6e;font-size:12.5px;min-height:32px;
+  border-bottom:1px solid #bfdbfe}
+.taskbar{display:flex;gap:6px;flex-wrap:wrap;padding:10px 14px;background:#fff;border-bottom:1px solid #dfe5ec}
+.tk{border:1px solid #d5dce5;background:#fff;border-radius:20px;padding:6px 14px;font-size:13px;
+  font-weight:700;color:#475569;cursor:pointer;font-family:inherit}
+.tk.on{background:#1e3a6e;border-color:#1e3a6e;color:#fff}
+.tabbar{display:flex;gap:2px;flex-wrap:wrap;padding:0 14px;background:#fff;border-bottom:1px solid #dfe5ec}
+.tb{border:0;border-bottom:3px solid transparent;background:none;padding:11px 14px;font-size:13.5px;
+  font-weight:700;color:#64748b;cursor:pointer;font-family:inherit}
+.tb.on{color:#1e3a6e;border-bottom-color:#1e3a6e}
+#form{max-width:1080px;margin:0 auto;padding:18px 14px 80px}
+.ftitle{font-size:19px;font-weight:800;color:#1e3a6e;margin:4px 0 16px}
+.ftitle span{font-size:13px;font-weight:700;color:#64748b;background:#e7ebf1;border-radius:20px;padding:3px 11px;margin-left:6px}
+.sec{background:#fff;border:1px solid #dfe5ec;border-radius:10px;padding:14px 16px;margin-bottom:14px}
+.sec.sub{background:#f8fafc}
+.sec h4{margin:0 0 12px;font-size:14.5px;font-weight:800;color:#1e3a6e}
+.sec h4 em{font-style:normal;font-weight:600;font-size:12px;color:#94a3b8;margin-left:6px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px 12px}
+.grid.nums{grid-template-columns:repeat(6,minmax(70px,1fr))}
+.fld{display:flex;flex-direction:column;gap:4px;min-width:0}
+.fld.w{grid-column:1/-1}
+.fld.n{max-width:120px}
+.fld label{font-size:12px;font-weight:700;color:#64748b}
+.fld label em{font-style:normal;font-weight:600;color:#94a3b8}
+.fld input,.fld textarea{border:1px solid #d5dce5;border-radius:7px;padding:8px 10px;font:inherit;
+  font-size:13.5px;background:#fff;color:#1f2937;width:100%}
+.fld input:focus,.fld textarea:focus{outline:0;border-color:#2563eb;box-shadow:0 0 0 3px #2563eb22}
+.fld textarea{resize:vertical;line-height:1.6}
+.imgrow{display:flex;gap:8px;align-items:center}
+.imgrow img{width:44px;height:44px;object-fit:contain;border:1px solid #e2e8f0;border-radius:6px;background:#f8fafc;flex:0 0 auto}
+.imgrow .noimg{width:44px;height:44px;display:grid;place-items:center;font-size:10px;color:#94a3b8;
+  border:1px dashed #cbd5e1;border-radius:6px;flex:0 0 auto}
+.row{border:1px solid #e5eaf0;border-radius:9px;padding:12px 13px;margin-bottom:10px;background:#fcfdfe}
+.rh{display:flex;align-items:center;gap:5px;margin-bottom:10px}
+.rh b{font-size:13.5px;color:#1e3a6e}
+.rh .sp{flex:1}
+.mini{border:1px solid #d5dce5;background:#fff;border-radius:6px;padding:3px 9px;font-size:12px;
+  color:#475569;cursor:pointer;font-family:inherit;font-weight:700}
+.mini:hover:not(:disabled){background:#f1f5f9}
+.mini:disabled{opacity:.35;cursor:default}
+.mini.del{color:#b91c1c;border-color:#fecaca}
+.mini.del:hover{background:#fef2f2}
+.add{border:1px dashed #93b4e6;background:#f5f9ff;color:#1d4ed8;border-radius:8px;padding:9px 16px;
+  font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;width:100%}
+.add:hover{background:#eaf2fd}
+.chkrow{margin:8px 0}
+.chk{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:#475569;cursor:pointer}
+.calc{border:1px solid #e2e8f0;border-radius:7px;padding:8px;text-align:center;font-weight:800;font-size:15px}
+.calc.hi{background:#fce4e4;color:#c62828}
+.calc.md{background:#fef1dc;color:#b45309}
+.calc.lo{background:#e7f4ec;color:#1f7a4c}
+.markbox{background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:10px;display:flex;justify-content:center}
+.mkwrap{position:relative;display:inline-block;max-width:100%;cursor:crosshair}
+.mkwrap img{max-width:100%;max-height:340px;display:block;-webkit-user-drag:none;user-select:none}
+.mk{position:absolute;width:24px;height:24px;border-radius:50%;background:#1e3a6e;color:#fff;border:2px solid #fff;
+  display:grid;place-items:center;font-size:12px;font-weight:800;transform:translate(-50%,-50%);
+  box-shadow:0 1px 4px rgba(0,0,0,.35);cursor:grab;user-select:none}
+.mk:active{cursor:grabbing}
+.mkbar{display:flex;gap:10px;align-items:center;margin-top:8px}
+.help{max-width:1080px;margin:0 auto;padding:0 14px 20px}
+.help ol{background:#fff;border:1px solid #dfe5ec;border-radius:10px;padding:14px 16px 14px 34px;
+  font-size:13px;line-height:1.85;color:#334155;margin:0}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <h1>✎ 내용 수정</h1>
+  <a href="index.html">← 사이트로</a>
+  <span class="sp"></span>
+  <button type="button" id="btnPreview">미리보기</button>
+  <label class="fbtn">data.js 불러오기<input type="file" id="fileIn" accept=".js" hidden></label>
+  <button type="button" id="btnRevert">원본으로 되돌리기</button>
+  <button type="button" id="btnSave">저장</button>
+  <button type="button" class="pri" id="btnExport">⤓ data.js 내려받기</button>
+</div>
+<div id="status">내용을 고친 뒤 [저장]을 누르면 이 브라우저의 사이트에 바로 반영됩니다.</div>
+<div class="taskbar" id="taskbar"></div>
+<div class="tabbar" id="tabbar"></div>
+<div id="form"></div>
+<datalist id="imgnames"></datalist>
+
+<div class="help">
+  <ol>
+    <li><b>저장</b> — 수정한 내용을 이 브라우저에 저장합니다. 사이트 페이지를 열면 바로 반영됩니다. (다른 사람에게는 아직 안 보입니다)</li>
+    <li><b>⤓ data.js 내려받기</b> — 수정본을 <code>data.js</code> 파일로 내려받습니다.</li>
+    <li><b>Vercel_배포.bat 실행</b> — 다운로드 폴더의 <code>data.js</code> 를 자동으로 찾아 반영할지 물어본 뒤 배포합니다. 그때부터 모두에게 반영됩니다.</li>
+    <li><b>원본으로 되돌리기</b> — 이 브라우저의 편집본을 지우고 현재 배포된 내용으로 돌아갑니다.</li>
+  </ol>
+</div>
+
+<script src="assets/imglist.js"></script>
+<script src="assets/data.js"></script>
+<script>var __OS = window.SITE, __OT = window.TASKS;</script>
+<script src="assets/app.js"></script>
+<script src="assets/edit.js"></script>
+<script>
+(function(){var d=document.getElementById("imgnames");
+(window.IMGLIST||[]).forEach(function(f){var o=document.createElement("option");o.value=f;d.appendChild(o);});})();
+startEditor(__OS, __OT);
+</script>
+</body>
+</html>

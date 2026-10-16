@@ -18,3 +18,8 @@ env/
 .DS_Store
 .vercel
 .env*
+gmail_oauth.json
+gmail_token.json
+
+# 안전SOP 사이트 — 원본 사진 백업은 올리지 않는다 (2.4GB)
+sop/assets/img_원본/

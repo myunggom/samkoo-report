@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f2544">
+<title>사전작업 허가 · 위험성평가 교육 확인 서명부</title>
+<link rel="icon" href="favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/slide.css">
+<link rel="stylesheet" href="assets/inline.css">
+<link rel="stylesheet" href="assets/export.css">
+<link rel="stylesheet" href="assets/sign.css">
+</head>
+<body>
+<div id="app"></div>
+
+<script src="assets/data.js"></script>
+<script src="assets/imglist.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/inline.js"></script>
+<script src="assets/html-to-image.js"></script>
+<script src="assets/export.js"></script>
+<script src="assets/sign.js"></script>
+<script>
+(function () {
+  var t = currentTask(); if (!t) return;
+  var KEY = 'report:' + t.id, LKEY = 'report:saved';
+  var B = 'TASKS.' + t.id, R = SITE.report;
+  document.title = t.name + ' 사전작업 허가 서명부';
+
+  var data = store.get(KEY) || {};
+  data.f = data.f || {}; data.photos = data.photos || {};
+  data.sigs = data.sigs || {};      /* 확인란 서명 : 0 작성자 / 1 승인자 */
+  data.crewSigs = data.crewSigs || {};  /* 참여자 서명 */
+  data.chk = data.chk || {};
+
+  function save() {
+    var ok = store.set(KEY, data);
+    var el = document.getElementById('savedAt');
+    if (el) el.textContent = ok ? '· 자동 저장됨' : '⚠ 용량이 커서 자동 저장 실패 — [파일로 저장] 을 사용하세요';
+  }
+  function cell(k, ph) { return '<td><input data-f="' + k + '" placeholder="' + esc(ph || '') + '"></td>'; }
+  function lab(k, txt) { return '<th' + EA('SITE.report.' + k) + '>' + esc(txt) + '</th>'; }
+
+  var h = snav(t.no + '. ' + t.name + ' — 사전작업 허가 서명부', 'work.html?id=' + t.id);
+  h += '<div class="stage"><div class="slide dense">';
+  h += sHead('<span' + EA('SITE.report.title') + '>' + esc(R.title) + '</span>',
+             '<span' + EA('SITE.report.subtitle') + '>' + esc(R.subtitle) + '</span>', true);
+  h += '<div class="s-body">';
+
+  /* ── 상단 정보 ── */
+  h += '<div class="thint noprint">표를 옆으로 밀어서 보세요</div>' +
+    '<div class="tblscroll"><table class="rp-info">' +
+    '<tr>' + lab('fields.0', R.fields[0]) + cell('name', t.name) +
+             lab('fields.1', R.fields[1]) + cell('date', todayStr()) +
+             lab('fields.2', R.fields[2]) + cell('place', t.place) + '</tr>' +
+    '<tr>' + lab('fields.3', R.fields[3]) + cell('leader') +
+             lab('fields.4', R.fields[4]) + cell('crew') +
+             lab('fields.5', R.fields[5]) + cell('sitename') + '</tr></table></div>';
+
+  h += '<div class="rp-main">';
+
+  /* ── 왼쪽 : 사진 4종 + 서약문 ── */
+  h += '<div class="rp-left"><div class="rp-photos">';
+  R.slots.forEach(function (s, i) {
+    h += '<div class="rp-slot">' +
+      '<div class="rp-sh"><span class="sq">' + s.n + '</span>' +
+      '<b' + EA('SITE.report.slots.' + i + '.name') + '>' + esc(s.name) + '</b>' +
+      '<em' + EA('SITE.report.slots.' + i + '.desc') + '>' + esc(s.desc) + '</em></div>' +
+      '<label class="rp-drop" data-slot="' + s.n + '">' +
+        '<input type="file" accept="image/*" hidden data-slot="' + s.n + '">' +
+        '<span class="txt"><b class="noprint">+ 사진 추가</b>' + s.n + '. ' + esc(s.name) + '</span>' +
+      '</label>' +
+      '<div class="noprint" style="display:flex;gap:6px;margin-top:4px">' +
+        '<button type="button" class="sfbtn" data-act="change" data-slot="' + s.n + '">사진 변경</button>' +
+        '<button type="button" class="sfbtn" data-act="clear" data-slot="' + s.n + '">삭제</button></div>' +
+      '</div>';
+  });
+  h += '</div>';
+
+  h += '<div class="rp-pledge">' +
+    '<p' + EA('SITE.report.pledge', 'multi') + '>' + esc(R.pledge).replace(/\n/g, '<br>') + '</p>' +
+    '<div class="rp-opin">' +
+    '<label class="rp-cb"><input type="checkbox" data-f="opinChk"><i class="cbx"></i><span' + EA('SITE.report.opinion') + '>' +
+      esc(R.opinion) + '</span></label>' +
+    '<input class="rp-opin-in" data-f="opinion">' +
+    '<label class="rp-cb"><input type="checkbox" data-f="opinNone"><i class="cbx"></i><span' + EA('SITE.report.opinionNone') + '>' +
+      esc(R.opinionNone) + '</span></label>' +
+    '</div></div>';
+  h += '</div>';
+
+  /* ── 오른쪽 : 교육 체크 · 참여자 서명부 · 확인 ── */
+  h += '<div class="rp-side">';
+  h += '<div class="pnl"><div class="pnl-h">' +
+    '<span' + EA('SITE.report.checkTitle') + '>' + esc(R.checkTitle) + '</span>' +
+    '<em' + EA('SITE.report.checkNote') + '>' + esc(R.checkNote) + '</em></div>' +
+    '<div class="pnl-b rp-chk">' +
+    R.checks.map(function (c, i) {
+      return '<label class="rp-chkrow"><input type="checkbox" data-chk="' + i + '"><i class="cbx"></i>' +
+        '<span' + EA('SITE.report.checks.' + i) + '>' + esc(c) + '</span></label>';
+    }).join('') + '</div></div>';
+
+  h += '<div class="pnl"><div class="pnl-h">' +
+    '<span' + EA('SITE.report.crewTitle') + '>' + esc(R.crewTitle) + '</span>' +
+    '<em' + EA('SITE.report.crewNote') + '>' + esc(R.crewNote) + '</em></div>' +
+    '<div class="pnl-b" style="padding:.5em">' +
+    '<table class="rp-crew"><tr>' +
+    R.crewHead.map(function (x, i) { return '<th' + EA('SITE.report.crewHead.' + i) + '>' + esc(x) + '</th>'; }).join('') +
+    '</tr>';
+  for (var i = 0; i < R.crewRows; i++) {
+    h += '<tr><th>' + (i + 1) + '</th>' +
+      '<td><input data-f="cw_org_' + i + '"></td>' +
+      '<td><input data-f="cw_nm_' + i + '"></td>' +
+      '<td style="padding:.15em"><div class="sigbox sm" data-csig="' + i + '"><span class="ph">서명</span></div></td></tr>';
+  }
+  h += '</table></div></div>';
+
+  h += '<div class="pnl"><div class="pnl-h"' + EA('SITE.report.signTitle') + '>' + esc(R.signTitle) + '</div>' +
+    '<div class="pnl-b" style="padding:.5em">' +
+    '<table class="rp-sign"><tr>' +
+    R.signHead.map(function (x, i) { return '<th' + EA('SITE.report.signHead.' + i) + '>' + esc(x) + '</th>'; }).join('') +
+    '</tr>' +
+    R.signs.map(function (nm, i) {
+      return '<tr><th' + EA('SITE.report.signs.' + i) + '>' + esc(nm) + '</th>' +
+        '<td><input data-f="sign_' + i + '" placeholder="성명"></td>' +
+        '<td style="padding:.15em"><div class="sigbox" data-sig="' + i + '"><span class="ph">눌러서 서명</span></div></td></tr>';
+    }).join('') + '</table></div></div>';
+  h += '</div></div>';
+
+  h += '<p class="rp-note"><span' + EA('SITE.report.legal', 'multi') + '>' +
+    esc(R.legal).replace(/\n/g, '<br>') + '</span>' +
+    '<span id="savedAt" class="noprint" style="color:#94a3b8">　</span></p>';
+  h += '</div><div class="s-foot"><span' + EA('SITE.report.foot') + '>' + esc(R.foot) + '</span></div></div>';
+
+  h += '<div class="btnbar noprint" style="max-width:1180px;margin:0 auto 8px;padding:0 12px">' +
+    '<button class="btn primary" id="btnSaveRec">💾 이 보고서 저장</button>' +
+    '<button class="btn" id="btnOpenRec">📂 저장된 보고서</button>' +
+    '<button class="btn" id="btnFileSave">⤓ 파일로 저장</button>' +
+    '<label class="btn" style="cursor:pointer">📁 파일 열기<input type="file" accept=".json" hidden id="fileRec"></label>' +
+    '</div>';
+  h += '<div class="btnbar noprint" style="max-width:1180px;margin:0 auto 30px;padding:0 12px">' +
+    '<a class="btn" href="risk.html?id=' + t.id + '">‹ 위험성평가표</a>' +
+    '<button class="btn ghost" id="btnReset">새로 작성 (전체 지우기)</button>' +
+    '<a class="btn primary" href="work.html?id=' + t.id + '">작업 메뉴 ›</a></div>';
+  h += '</div>';
+
+  document.getElementById('app').innerHTML = h;
+  initInline();
+
+  /* ── 입력값 복원 ── */
+  document.querySelectorAll('[data-f]').forEach(function (el) {
+    var k = el.dataset.f;
+    if (el.type === 'checkbox') {
+      if (data.f[k]) el.checked = true;
+      el.addEventListener('change', function () { data.f[k] = el.checked; save(); });
+    } else {
+      if (data.f[k] != null) el.value = data.f[k];
+      el.addEventListener('input', function () { data.f[k] = el.value; save(); });
+    }
+  });
+  document.querySelectorAll('[data-chk]').forEach(function (el) {
+    var k = el.dataset.chk;
+    if (data.chk[k]) el.checked = true;
+    el.addEventListener('change', function () { data.chk[k] = el.checked; save(); });
+  });
+
+  /* ── 현장 사진 ── */
+  function renderPhoto(n) {
+    var d = document.querySelector('.rp-drop[data-slot="' + n + '"]');
+    if (!d) return;
+    var old = d.querySelector('img'); if (old) old.remove();
+    var txt = d.querySelector('.txt');
+    if (data.photos[n]) {
+      var img = new Image(); img.src = data.photos[n]; img.alt = '';
+      d.appendChild(img); txt.style.display = 'none';
+    } else txt.style.display = '';
+  }
+  document.querySelectorAll('input[type=file][data-slot]').forEach(function (inp) {
+    inp.addEventListener('change', function () {
+      var f = inp.files && inp.files[0]; if (!f) return;
+      fileToDataURL(f, function (url) {
+        data.photos[inp.dataset.slot] = url; renderPhoto(inp.dataset.slot); save();
+      });
+    });
+  });
+  document.querySelectorAll('.rp-drop').forEach(function (d) {
+    ['dragenter', 'dragover'].forEach(function (e) {
+      d.addEventListener(e, function (ev) { ev.preventDefault(); d.classList.add('dragover'); });
+    });
+    ['dragleave', 'drop'].forEach(function (e) {
+      d.addEventListener(e, function (ev) { ev.preventDefault(); d.classList.remove('dragover'); });
+    });
+    d.addEventListener('drop', function (ev) {
+      var f = ev.dataTransfer.files && ev.dataTransfer.files[0];
+      if (!f || !/^image\//.test(f.type)) return;
+      fileToDataURL(f, function (url) { data.photos[d.dataset.slot] = url; renderPhoto(d.dataset.slot); save(); });
+    });
+  });
+  document.querySelectorAll('.sfbtn').forEach(function (b) {
+    b.addEventListener('click', function (ev) {
+      ev.preventDefault();
+      var n = b.dataset.slot;
+      if (b.dataset.act === 'clear') { delete data.photos[n]; renderPhoto(n); save(); }
+      else document.querySelector('input[type=file][data-slot="' + n + '"]').click();
+    });
+  });
+
+  /* ── 손글씨 서명 (확인란 · 참여자) ── */
+  function paintSig(box, val, ph) {
+    if (val) { box.classList.add('has'); box.innerHTML = '<img src="' + val + '" alt="서명">'; }
+    else { box.classList.remove('has'); box.innerHTML = '<span class="ph">' + ph + '</span>'; }
+  }
+  function renderSig(i) {
+    var box = document.querySelector('.sigbox[data-sig="' + i + '"]');
+    if (box) paintSig(box, data.sigs[i], '눌러서 서명');
+  }
+  function renderCrewSig(i) {
+    var box = document.querySelector('.sigbox[data-csig="' + i + '"]');
+    if (box) paintSig(box, data.crewSigs[i], '서명');
+  }
+  document.querySelectorAll('.sigbox').forEach(function (box) {
+    box.addEventListener('click', function () {
+      if (document.body.classList.contains('edit-on')) return;
+      var isCrew = box.dataset.csig != null;
+      var i = isCrew ? box.dataset.csig : box.dataset.sig;
+      var cur = isCrew ? data.crewSigs[i] : data.sigs[i];
+      var title = isCrew ? ('참여자 ' + (+i + 1) + ' 확인 서명') : ((R.signs[i] || '') + ' 확인 서명');
+      signPad(title, cur, function (v) {
+        if (v === undefined) return;
+        if (isCrew) { if (v === null) delete data.crewSigs[i]; else data.crewSigs[i] = v; renderCrewSig(i); }
+        else { if (v === null) delete data.sigs[i]; else data.sigs[i] = v; renderSig(i); }
+        save();
+      });
+    });
+  });
+
+  /* ── 저장 / 불러오기 ── */
+  function snapshot() {
+    return {
+      v: 2, task: t.id, taskName: t.name,
+      title: (data.f.name || t.name) + ' · ' + (data.f.date || todayStr()),
+      at: new Date().toISOString(),
+      data: JSON.parse(JSON.stringify(data))
+    };
+  }
+  function recs() { return store.get(LKEY) || []; }
+  function setRecs(a) { return store.set(LKEY, a); }
+
+  document.getElementById('btnSaveRec').addEventListener('click', function () {
+    var rec = snapshot();
+    var name = prompt('저장할 이름을 확인하세요.', rec.title);
+    if (name === null) return;
+    rec.title = name.trim() || rec.title;
+    rec.id = 'r' + Date.now();
+    var a = recs(); a.unshift(rec);
+    if (!setRecs(a)) {
+      alert('브라우저 저장 공간이 부족합니다.\n\n오래된 보고서를 [저장된 보고서] 에서 지우거나,\n' +
+            '[⤓ 파일로 저장] 으로 파일에 보관하세요.');
+      return;
+    }
+    toast('보고서를 저장했습니다 — ' + rec.title);
+  });
+
+  document.getElementById('btnOpenRec').addEventListener('click', function () {
+    var a = recs();
+    var mask = document.createElement('div');
+    mask.className = 'rec-mask';
+    mask.innerHTML = '<div class="rec"><div class="rec-h"><b>저장된 보고서</b>' +
+      '<button type="button" class="sg-btn" id="recX">닫기</button></div>' +
+      '<div class="rec-b">' + (a.length ? a.map(function (r, i) {
+        return '<div class="rec-i"><div class="t"><b>' + esc(r.title) + '</b>' +
+          '<span>' + esc(r.taskName || '') + ' · 저장 ' + esc(new Date(r.at).toLocaleString('ko-KR')) + '</span></div>' +
+          '<button type="button" class="sg-btn pri" data-load="' + i + '">불러오기</button>' +
+          '<button type="button" class="sg-btn del" data-del="' + i + '">삭제</button></div>';
+      }).join('') : '<div class="rec-empty">저장된 보고서가 없습니다.</div>') + '</div>' +
+      '<div class="rec-f"><span class="rec-note">이 브라우저에만 저장됩니다. ' +
+      '다른 PC 에서도 쓰려면 [⤓ 파일로 저장] 을 이용하세요.</span></div></div>';
+    document.body.appendChild(mask);
+    function close() { mask.remove(); }
+    mask.addEventListener('click', function (e) { if (e.target === mask || e.target.closest('#recX')) close(); });
+    mask.querySelectorAll('[data-load]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var r = recs()[+b.dataset.load]; if (!r) return;
+        if (!confirm('현재 작성 중인 내용을 덮어씁니다. 불러올까요?')) return;
+        store.set(KEY, r.data); close(); location.reload();
+      });
+    });
+    mask.querySelectorAll('[data-del]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        if (!confirm('이 보고서를 삭제합니다.')) return;
+        var a2 = recs(); a2.splice(+b.dataset.del, 1); setRecs(a2); close();
+        document.getElementById('btnOpenRec').click();
+      });
+    });
+  });
+
+  document.getElementById('btnFileSave').addEventListener('click', function () {
+    var rec = snapshot();
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(rec)], { type: 'application/json' }));
+    a.download = '서명부_' + (data.f.name || t.name).replace(/[\\/:*?"<>|]/g, '_') +
+      '_' + (data.f.date || todayStr()).replace(/[^0-9]/g, '') + '.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+    toast('파일로 저장했습니다');
+  });
+  document.getElementById('fileRec').addEventListener('change', function () {
+    var f = this.files && this.files[0]; this.value = '';
+    if (!f) return;
+    var fr = new FileReader();
+    fr.onload = function () {
+      try {
+        var r = JSON.parse(fr.result);
+        if (!r || !r.data) throw new Error('보고서 파일이 아닙니다');
+        if (!confirm('현재 작성 중인 내용을 덮어씁니다. 불러올까요?\n\n' + (r.title || ''))) return;
+        store.set(KEY, r.data); location.reload();
+      } catch (e) { alert('파일을 읽지 못했습니다 : ' + e.message); }
+    };
+    fr.readAsText(f, 'utf-8');
+  });
+  document.getElementById('btnReset').addEventListener('click', function () {
+    if (!confirm('작성 중인 내용과 사진 · 서명을 모두 지우고 새로 작성합니다.\n저장해 둔 보고서는 지워지지 않습니다.')) return;
+    store.del(KEY); location.reload();
+  });
+
+  R.slots.forEach(function (s) { renderPhoto(s.n); });
+  R.signs.forEach(function (_, i) { renderSig(i); });
+  for (var ci = 0; ci < R.crewRows; ci++) renderCrewSig(ci);
+  if (store.get(KEY)) document.getElementById('savedAt').textContent = '· 이 브라우저에 저장된 내용을 불러왔습니다';
+})();
+</script>
+<style>
+.sfbtn{border:1px solid #d5dce5;background:#fff;border-radius:6px;padding:3px 9px;font-size:11.5px;
+  color:#475569;cursor:pointer;font-family:inherit;font-weight:600}
+.sfbtn:hover{background:#f1f5f9}
+</style>
+</body>
+</html>

@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f2544">
+<title>작업별 QR코드 생성기</title>
+<link rel="icon" href="favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div id="app"></div>
+
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/qr.js"></script>
+<script>
+(function () {
+  var PAGES = [
+    { v: 'work', label: '작업 안내 (전체 메뉴)', file: 'work.html' },
+    { v: 'parts', label: '각부 명칭 · 점검 포인트', file: 'parts.html' },
+    { v: 'guide', label: '안전작업 지침 · 교육자료', file: 'guide.html' },
+    { v: 'risk', label: '위험성평가표', file: 'risk.html' },
+    { v: 'report', label: '작업 완료보고서', file: 'report.html' }
+  ];
+
+  /* 부문 · 챕터 범위 선택 */
+  var GS = taskGroups();
+  function scopeOptions() {
+    var all = 0; GS.forEach(function (g) { g.chapters.forEach(function (c) { all += c.tasks.length; }); });
+    var o = '<option value="all">전체 작업 (' + all + '건)</option>';
+    GS.forEach(function (g, gi) {
+      var n = 0; g.chapters.forEach(function (c) { n += c.tasks.length; });
+      o += '<option value="g:' + gi + '">■ ' + esc(g.title) + ' 전체 (' + n + '건)</option>';
+      if (g.chapters.length > 1) g.chapters.forEach(function (c, ci) {
+        o += '<option value="c:' + gi + ':' + ci + '">　└ ' + esc(c.title) + ' (' + c.tasks.length + '건)</option>';
+      });
+    });
+    return o;
+  }
+  function scopeIds() {
+    var el = document.getElementById('scope'), v = el ? el.value : 'all', r = [];
+    if (v === 'all') { GS.forEach(function (g) { g.chapters.forEach(function (c) { r = r.concat(c.tasks); }); }); return r; }
+    var a = v.split(':');
+    if (a[0] === 'g') { GS[+a[1]].chapters.forEach(function (c) { r = r.concat(c.tasks); }); return r; }
+    return GS[+a[1]].chapters[+a[2]].tasks.slice();
+  }
+
+  function defaultBase() {
+    var u = location.href.replace(/[?#].*$/, '').replace(/\/[^\/]*$/, '/');
+    return u;
+  }
+
+  var h = topbar('작업별 QR코드 생성기', '현장 부착용', 'index.html');
+  h += '<div class="wrap">';
+  h += '<div class="phead"><span class="eyebrow">QR CODE</span>' +
+    '<h2>작업별 QR코드 생성기</h2>' +
+    '<p>QR코드를 인쇄해 실제 작업 위치(사다리 보관함 · 고소작업대 · 전기실 판넬 · 계단 입구)에 부착하면, ' +
+    '작업자가 휴대폰으로 스캔해 해당 작업의 안전자료를 바로 열 수 있습니다.</p></div>';
+
+  h += '<div class="card noprint"><div class="card-h">⚙ 설정</div><div class="card-b">' +
+    '<div class="field"><label>웹사이트 주소 (배포 주소)</label>' +
+    '<input id="base" value="' + esc(defaultBase()) + '"></div>' +
+    '<p class="hint">배포 후 주소가 바뀌면 위 칸에 새 주소를 붙여넣고 [QR 다시 만들기]를 누르세요. ' +
+    '예) https://내사이트.vercel.app/</p>' +
+    '<p class="hint" id="urlWarn" style="display:none;color:#b45309;font-weight:700"></p>' +
+    '<div class="field" style="margin-top:10px"><label>대상 작업 (부문 · 챕터)</label><select id="scope" class="num-in" style="width:100%;text-align:left;padding:8px 10px;font-weight:400">' +
+    scopeOptions() + '</select></div>' +
+    '<div class="fieldrow" style="margin-top:10px">' +
+    '<div class="field"><label>연결할 페이지</label><select id="page" class="num-in" style="width:100%;text-align:left;padding:8px 10px;font-weight:400">' +
+    PAGES.map(function (p) { return '<option value="' + p.v + '">' + esc(p.label) + '</option>'; }).join('') +
+    '</select></div>' +
+    '<div class="field"><label>오류복원 수준</label><select id="ec" class="num-in" style="width:100%;text-align:left;padding:8px 10px;font-weight:400">' +
+    '<option value="M">M — 보통 (권장)</option><option value="Q">Q — 높음 (오염·훼손 우려 시)</option>' +
+    '<option value="H">H — 매우 높음</option><option value="L">L — 낮음</option></select></div>' +
+    '</div>' +
+    '<div class="btnbar" style="margin-bottom:0"><button class="btn primary" id="btnGen">QR 다시 만들기</button>' +
+    '<button class="btn" onclick="window.print()">🖨 라벨 인쇄 (A4)</button>' +
+    '<button class="btn" id="btnAll">⤓ QR 이미지 전체 저장</button></div>' +
+    '</div></div>';
+
+  h += '<div class="card noprint" style="margin-top:14px"><div class="card-h">🔳 QR코드</div>' +
+    '<div class="card-b"><div class="qrgrid" id="grid"></div></div></div>';
+
+  h += '<div class="card noprint" style="margin-top:14px"><div class="card-h">🔗 직접 링크로 QR 만들기</div>' +
+    '<div class="card-b">' +
+    '<p class="hint" style="margin:0 0 10px">이 사이트가 아닌 다른 인터넷 주소도 QR코드로 만들 수 있습니다. ' +
+    '한 줄에 하나씩 넣으세요. <b>이름 | 주소</b> 형식으로 쓰면 라벨에 이름이 함께 인쇄됩니다. ' +
+    'http:// 를 빼고 적어도 됩니다.</p>' +
+    '<div class="field"><label>링크 목록</label>' +
+    '<textarea id="freeIn" rows="4" placeholder="안전보건공단 | www.kosha.or.kr&#10;고용노동부 | www.moel.go.kr&#10;https://example.com/manual.pdf"></textarea></div>' +
+    '<div class="btnbar" style="margin-bottom:0"><button class="btn primary" id="btnFree">QR 만들기</button>' +
+    '<button class="btn" id="btnFreeAll">⤓ QR 이미지 전체 저장</button>' +
+    '<button class="btn ghost" id="btnFreeClear">비우기</button></div>' +
+    '<div class="qrgrid" id="freeGrid" style="margin-top:12px"></div>' +
+    '</div></div>';
+
+  h += '<h3 style="margin:22px 0 6px;font-size:15px">현장 부착용 라벨 (A4 인쇄)</h3>' +
+    '<p class="hint noprint" style="margin-top:0">아래 라벨을 그대로 인쇄해 코팅 후 부착하세요. ' +
+    '[🖨 라벨 인쇄] 버튼을 누르면 라벨만 인쇄됩니다.</p>' +
+    '<div class="labels" id="labels"></div>' +
+    '<div class="labels" id="freeLabels"></div>';
+
+  h += '</div>';
+  document.getElementById('app').innerHTML = h;
+
+  function urlFor(base, page, id) {
+    var p = PAGES.filter(function (x) { return x.v === page; })[0];
+    if (!base.endsWith('/')) base += '/';
+    return base + p.file + '?id=' + id;
+  }
+
+  function render() {
+    var base = document.getElementById('base').value.trim();
+    var page = document.getElementById('page').value;
+    var ec = document.getElementById('ec').value;
+    var grid = document.getElementById('grid'), labels = document.getElementById('labels');
+    grid.innerHTML = ''; labels.innerHTML = '';
+
+    scopeIds().forEach(function (id) {
+      var t = TASKS[id], url = urlFor(base, page, id);
+
+      var card = document.createElement('div');
+      card.className = 'qrcard';
+      card.innerHTML = '<canvas></canvas><h4>' + esc(t.no + '. ' + t.name) + '</h4>' +
+        '<div class="u">' + esc(url) + '</div>' +
+        '<div class="row"><button class="btn" data-dl="' + id + '">PNG 저장</button>' +
+        '<a class="btn" href="' + esc(url) + '" target="_blank" rel="noopener">열어보기</a></div>';
+      grid.appendChild(card);
+      try {
+        QRLite.toCanvas(card.querySelector('canvas'), url, { ec: ec, size: 560, quiet: 4 });
+      } catch (e) {
+        card.querySelector('.u').textContent = '오류: ' + e.message;
+      }
+
+      var lab = document.createElement('div');
+      lab.className = 'label';
+      lab.innerHTML = '<div class="lt">안전 표준운영절차 · ' + esc(t.place) + '</div>' +
+        '<canvas></canvas>' +
+        '<div class="ln">' + esc(t.name) + '</div>' +
+        '<div class="ls">' + esc(t.sop) + '<br>문서번호 ' + esc(t.docNo) + '</div>' +
+        '<div class="scan">📱 작업 전 스캔 — 점검 포인트 · 안전지침 · 위험성평가 · 완료보고서</div>';
+      labels.appendChild(lab);
+      try { QRLite.toCanvas(lab.querySelector('canvas'), url, { ec: ec, size: 620, quiet: 4 }); } catch (e) { }
+    });
+
+    grid.querySelectorAll('[data-dl]').forEach(function (b) {
+      b.addEventListener('click', function () { download(b.dataset.dl); });
+    });
+  }
+
+  function download(id) {
+    var idx = scopeIds().indexOf(id);
+    var cv = document.querySelectorAll('#grid canvas')[idx];
+    var a = document.createElement('a');
+    a.href = cv.toDataURL('image/png');
+    a.download = 'QR_' + TASKS[id].no + '_' + TASKS[id].name.replace(/\s/g, '') + '.png';
+    a.click();
+  }
+
+  document.getElementById('btnGen').addEventListener('click', function () { render(); toast('QR코드를 새로 만들었습니다'); });
+  document.getElementById('page').addEventListener('change', render);
+  document.getElementById('scope').addEventListener('change', render);
+  document.getElementById('ec').addEventListener('change', function () { render(); renderFree(); });
+  document.getElementById('btnAll').addEventListener('click', function () {
+    var L = scopeIds();
+    L.forEach(function (id, i) { setTimeout(function () { download(id); }, i * 350); });
+    toast('QR 이미지 ' + L.length + '개를 저장합니다');
+  });
+
+  /* ── 직접 링크 QR ── */
+  var FKEY = 'qr:free';
+  function normUrl(u) {
+    u = u.trim();
+    if (!u) return '';
+    if (!/^[a-z][a-z0-9+.-]*:/i.test(u)) u = 'https://' + u;
+    return u;
+  }
+  function parseFree(txt) {
+    return txt.split('\n').map(function (line) {
+      line = line.trim(); if (!line) return null;
+      var i = line.indexOf('|');
+      var name = '', url = line;
+      if (i >= 0) { name = line.slice(0, i).trim(); url = line.slice(i + 1).trim(); }
+      url = normUrl(url); if (!url) return null;
+      if (!name) { try { name = new URL(url).hostname.replace(/^www\./, ''); } catch (e) { name = url; } }
+      return { name: name, url: url };
+    }).filter(Boolean);
+  }
+  function renderFree() {
+    var txt = document.getElementById('freeIn').value;
+    try { localStorage.setItem(FKEY, txt); } catch (e) { }
+    var list = parseFree(txt);
+    var ec = document.getElementById('ec').value;
+    var grid = document.getElementById('freeGrid'), labels = document.getElementById('freeLabels');
+    grid.innerHTML = ''; labels.innerHTML = '';
+    if (!list.length) return;
+    list.forEach(function (it, i) {
+      var card = document.createElement('div');
+      card.className = 'qrcard';
+      card.innerHTML = '<canvas></canvas><h4>' + esc(it.name) + '</h4>' +
+        '<div class="u">' + esc(it.url) + '</div>' +
+        '<div class="row"><button class="btn" data-fdl="' + i + '">PNG 저장</button>' +
+        '<a class="btn" href="' + esc(it.url) + '" target="_blank" rel="noopener">열어보기</a></div>';
+      grid.appendChild(card);
+      try { QRLite.toCanvas(card.querySelector('canvas'), it.url, { ec: ec, size: 560, quiet: 4 }); }
+      catch (e) { card.querySelector('.u').textContent = '오류: ' + e.message; }
+
+      var lab = document.createElement('div');
+      lab.className = 'label';
+      lab.innerHTML = '<div class="lt">안전 표준운영절차 · 링크</div><canvas></canvas>' +
+        '<div class="ln">' + esc(it.name) + '</div>' +
+        '<div class="ls">' + esc(it.url) + '</div>' +
+        '<div class="scan">📱 스캔하면 위 주소가 열립니다</div>';
+      labels.appendChild(lab);
+      try { QRLite.toCanvas(lab.querySelector('canvas'), it.url, { ec: ec, size: 620, quiet: 4 }); } catch (e) { }
+    });
+    grid.querySelectorAll('[data-fdl]').forEach(function (b) {
+      b.addEventListener('click', function () { dlFree(+b.dataset.fdl, list[+b.dataset.fdl].name); });
+    });
+  }
+  function dlFree(idx, name) {
+    var cv = document.querySelectorAll('#freeGrid canvas')[idx];
+    if (!cv) return;
+    var a = document.createElement('a');
+    a.href = cv.toDataURL('image/png');
+    a.download = 'QR_' + String(name).replace(/[\\/:*?"<>|]/g, '_').replace(/\s/g, '') + '.png';
+    a.click();
+  }
+  document.getElementById('btnFree').addEventListener('click', function () {
+    renderFree(); toast('직접 링크 QR코드를 만들었습니다');
+  });
+  document.getElementById('btnFreeAll').addEventListener('click', function () {
+    var list = parseFree(document.getElementById('freeIn').value);
+    if (!list.length) { toast('먼저 링크를 넣고 [QR 만들기] 를 누르세요'); return; }
+    list.forEach(function (it, i) { setTimeout(function () { dlFree(i, it.name); }, i * 350); });
+    toast('QR 이미지 ' + list.length + '개를 저장합니다');
+  });
+  document.getElementById('btnFreeClear').addEventListener('click', function () {
+    document.getElementById('freeIn').value = '';
+    renderFree();
+  });
+  document.getElementById('freeIn').addEventListener('input', function () {
+    try { localStorage.setItem(FKEY, this.value); } catch (e) { }
+  });
+  try {
+    var savedFree = localStorage.getItem(FKEY);
+    if (savedFree) { document.getElementById('freeIn').value = savedFree; }
+  } catch (e) { }
+
+  /* 배포별 임시 주소로 들어온 경우 경고 — 그 주소는 Vercel 로그인 화면이 뜰 수 있음 */
+  (function () {
+    var host = location.hostname;
+    if (!/\.vercel\.app$/i.test(host)) return;
+    var hy = (host.split('.')[0].match(/-/g) || []).length;
+    if (hy < 2) return;
+    var w = document.getElementById('urlWarn');
+    w.style.display = '';
+    w.innerHTML = '⚠ 지금 보고 있는 주소(' + esc(host) + ')는 <b>배포별 임시 주소</b>일 수 있습니다. ' +
+      '이 주소로 만든 QR은 다른 사람이 열 때 Vercel 로그인 화면이 뜰 수 있습니다.<br>' +
+      '배포 창에 표시된 <b>공개 주소</b>(예 : https://safety-sop.vercel.app/)를 위 칸에 붙여넣고 ' +
+      '[QR 다시 만들기]를 누르세요.';
+  })();
+
+  var pre = qs('id');
+  if (pre && TASKS[pre]) {  /* 작업 화면에서 들어오면 그 작업의 챕터만 */
+    GS.forEach(function (g, gi) { g.chapters.forEach(function (c, ci) {
+      if (c.tasks.indexOf(pre) >= 0) document.getElementById('scope').value = g.chapters.length > 1 ? 'c:' + gi + ':' + ci : 'g:' + gi;
+    }); });
+  }
+  render();
+  if (document.getElementById('freeIn').value.trim()) renderFree();
+  if (pre && TASKS[pre]) {
+    setTimeout(function () {
+      var el = document.querySelectorAll('#grid .qrcard')[scopeIds().indexOf(pre)];
+      if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.style.outline = '3px solid ' + TASKS[pre].color; }
+    }, 200);
+  }
+})();
+</script>
+</body>
+</html>

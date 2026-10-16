@@ -1,0 +1,380 @@
+/* ============================================================
+   slide.css — 발표용 PPT(A4 가로) 레이아웃 스킨
+   화면에서는 반응형, 인쇄하면 PPT 슬라이드와 동일한 A4 가로
+   ============================================================ */
+:root{
+  --nv:#1E3A6E; --nv2:#2B4C86;
+  --ink2:#1F2937; --mut:#6B7280; --fnt:#9AA7B6;
+  --ln2:#D5DCE5; --ph:#E7EBF1; --phb:#CBD4DF;
+  --gn:#1F7A4C; --rd:#C62828; --am:#B45309;
+  --hi:#FCE4E4; --md:#FEF1DC; --lo:#E7F4EC;
+}
+
+/* ── 상단 내비게이션 (인쇄 제외) ── */
+.snav{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:10px;
+  padding:9px 14px;background:#0f2544;color:#fff;font-size:13.5px}
+.snav a{color:#fff;text-decoration:none;opacity:.88}
+.snav a:hover{opacity:1;text-decoration:underline}
+.snav .back{font-size:19px;line-height:1;padding:0 4px}
+.snav .grow{flex:1;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.snav button{background:rgba(255,255,255,.14);color:#fff;border:1px solid rgba(255,255,255,.3);
+  border-radius:7px;padding:5px 11px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}
+.snav button:hover{background:rgba(255,255,255,.26)}
+
+.stage{padding:14px 12px 40px;background:#eef1f5}
+
+/* ── 슬라이드 본체 ── */
+.slide{
+  --fs-sm:.727em;      /* 8pt  */
+  --fs-xs:.773em;      /* 8.5pt */
+  font-size:clamp(12.5px,1.34vw,15.4px);   /* 1em = 11pt */
+  width:min(1180px,100%);margin:0 auto;background:#fff;color:var(--ink2);
+  border:1px solid var(--ln2);border-radius:6px;box-shadow:0 2px 14px rgba(15,37,68,.08);
+  padding:1.9em 2.1em 1.5em;display:flex;flex-direction:column;
+  font-family:inherit;line-height:1.45;
+}
+.s-head{display:grid;grid-template-columns:1fr auto;align-items:start;gap:1.2em}
+.s-title{font-size:2.05em;font-weight:800;color:var(--nv);line-height:1.18;letter-spacing:-.02em;margin:0}
+.s-title .no{margin-right:.45em}
+.s-sub{font-size:1em;color:var(--mut);margin:.5em 0 0}
+.s-logo{height:4.2em;width:auto;object-fit:contain}
+.s-body{flex:1;margin-top:1.35em;display:flex;flex-direction:column;min-width:0}
+.s-foot{margin-top:1.4em;font-size:var(--fs-xs);color:var(--fnt)}
+
+/* ── 공용 패널 ── */
+.pnl{background:#fff;border:1px solid var(--ln2);border-radius:.3em;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+.pnl-h{background:var(--ph);border-bottom:1px solid var(--phb);padding:.55em .85em;
+  font-size:1.14em;font-weight:800;color:var(--nv)}
+.pnl-b{padding:.95em 1em;flex:1;min-width:0}
+
+.badge{flex:0 0 auto;width:1.72em;height:1.72em;border-radius:50%;background:var(--nv);color:#fff;
+  display:grid;place-items:center;font-size:.87em;font-weight:800;line-height:1}
+.sq{flex:0 0 auto;width:1.7em;height:1.7em;border-radius:.18em;background:var(--nv);color:#fff;
+  display:grid;place-items:center;font-size:.9em;font-weight:800;line-height:1}
+
+/* ── 1) 각부 명칭 페이지 ── */
+.pt-main{display:grid;grid-template-columns:52.86fr 37.68fr;gap:1.9%;align-items:stretch}
+.pt-fig{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1em .8em .6em}
+.pt-figwrap{position:relative;display:inline-block;max-width:100%}
+.pt-fig img{max-width:100%;max-height:26em;object-fit:contain;display:block}
+.pt-grid{display:grid;grid-template-columns:1fr 1fr;gap:1em;width:100%}
+.pt-grid figure{margin:0;position:relative;text-align:center}
+.pt-grid img{max-height:12em}
+.pt-grid figcaption{font-size:var(--fs-sm);color:var(--ink2);font-weight:700;margin-top:.4em}
+.pt-cap{font-size:var(--fs-sm);color:var(--mut);text-align:center;margin-top:.7em}
+.mark{position:absolute;width:1.5em;height:1.5em;border-radius:50%;background:var(--nv);color:#fff;
+  border:1.5px solid #fff;display:grid;place-items:center;font-size:.87em;font-weight:800;line-height:1;
+  transform:translate(-50%,-50%);box-shadow:0 1px 3px rgba(0,0,0,.3);cursor:default}
+.pt-item{display:flex;gap:.65em;margin-bottom:.85em}
+.pt-item:last-child{margin-bottom:0}
+.pt-item>div>b{font-size:1em;font-weight:800;color:var(--ink2);display:block;line-height:1.3}
+.pt-item>div>span{font-size:var(--fs-sm);color:var(--mut);display:block;margin-top:.22em;line-height:1.45}
+.pt-notes{display:grid;grid-template-columns:repeat(3,1fr);gap:1.7%;margin-top:1.4em}
+.nb{border:1px solid;border-radius:.3em;padding:.9em 1em;background:#fff}
+.nb h4{font-size:1.14em;font-weight:800;margin:0 0 .6em}
+.nb p{font-size:var(--fs-xs);color:var(--ink2);margin:.25em 0;line-height:1.55}
+.nb.b{border-color:var(--nv)}  .nb.b h4{color:var(--nv)}
+.nb.g{border-color:var(--gn)}  .nb.g h4{color:var(--gn)}
+.nb.r{border-color:var(--rd)}  .nb.r h4{color:var(--rd)}
+
+/* ── 2) 교육자료 페이지 ── */
+.gd-top{display:grid;grid-template-columns:31fr 34fr 31fr;gap:1.8%;align-items:stretch}
+.gd-items{display:flex;flex-direction:column;gap:.85em}
+.gi{display:grid;grid-template-columns:1fr 36%;gap:.6em;align-items:start}
+.gi.noimg{grid-template-columns:1fr}
+.gi-h{display:flex;align-items:center;gap:.45em}
+.gi-nm{font-size:1.02em;font-weight:800;color:var(--nv);line-height:1.25}
+.tags{display:flex;gap:.3em;margin:.35em 0 .3em;flex-wrap:wrap}
+.tag{font-size:.68em;font-weight:800;border-radius:1em;padding:.2em .65em;border:1px solid;white-space:nowrap}
+.tag.must{color:#fff;background:var(--rd);border-color:var(--rd)}
+.tag.warn{color:var(--rd);background:#FDECEC;border-color:#F1C7C7}
+.gi ul{margin:0;padding-left:.9em;font-size:var(--fs-sm);color:var(--ink2);line-height:1.6}
+.gi ul li{margin:.1em 0}
+.gi .shot{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:.2em;border:1px solid var(--ln2);background:#f1f5f9}
+.gd-mid{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:1em .8em}
+.gd-fig{flex:1;display:grid;place-items:center;width:100%}
+.gd-fig img{max-width:100%;max-height:17em;object-fit:contain}
+.ppe-h{width:100%;font-size:.95em;font-weight:800;color:var(--nv);border-top:1px solid var(--ln2);
+  padding-top:.7em;margin-top:.7em}
+.ppe-note{width:100%;font-size:.68em;color:var(--rd);font-weight:700;margin-top:.3em}
+.slide .ppe{display:flex;gap:1.1em;justify-content:center;margin-top:.6em;flex-wrap:nowrap}
+.slide .ppe .it{text-align:center;flex:0 0 auto;min-width:0;background:none;border:0;box-shadow:none;padding:0;border-radius:0}
+.slide .ppe .it img{height:3.3em;width:3.6em;object-fit:contain;margin:0 auto}
+.slide .ppe .it span{display:block;font-size:var(--fs-sm);color:var(--ink2);margin-top:.3em;font-weight:700;white-space:nowrap}
+.gd-hint{width:100%;text-align:center;font-size:var(--fs-sm);color:var(--mut);margin-top:.7em}
+.gd-bot{margin-top:1.3em}
+.gd-row4{display:grid;grid-template-columns:repeat(4,1fr);gap:1.6%}
+
+/* ── 3) 위험성평가표 ── */
+.rk-info{width:100%;border-collapse:collapse;font-size:var(--fs-xs);margin-bottom:.8em}
+.rk-info th{background:#fff;color:var(--nv);font-weight:800;border:1px solid var(--nv);padding:.5em .6em;
+  text-align:center;white-space:nowrap}
+.rk-info td{border:1px solid var(--nv);padding:.4em .6em;text-align:center}
+.rk-info input{width:100%;border:0;background:transparent;font:inherit;text-align:center;color:var(--ink2)}
+.rk-info input:focus{outline:2px solid #93b4e6;border-radius:3px}
+.rk-t{width:100%;border-collapse:collapse;font-size:.68em;table-layout:fixed}
+.rk-t th{background:var(--nv);color:#fff;font-weight:700;border:1px solid #fff;padding:.55em .3em;
+  text-align:center;line-height:1.3}
+.rk-t td{border:1px solid var(--ln2);padding:.45em .4em;vertical-align:middle;line-height:1.45;word-break:keep-all;overflow:hidden}
+.rk-t td.c{text-align:center}
+.rk-t .no{font-weight:800;color:var(--nv);text-align:center}
+.rk-t .step{font-weight:800;color:var(--nv);text-align:center}
+.rk-t ol{margin:0;padding-left:1.15em}
+.rk-t ol li{margin:.08em 0}
+.v{font-weight:800;text-align:center;font-size:1.15em}
+.v-hi{background:var(--hi);color:var(--rd)}
+.v-md{background:var(--md);color:var(--am)}
+.v-lo{background:var(--lo);color:var(--gn)}
+.rk-t input.n{width:100%;max-width:2.3em;border:1px solid transparent;background:transparent;font:inherit;
+  font-weight:700;text-align:center;color:var(--ink2);border-radius:3px;padding:.1em 0}
+.rk-t input.n:hover{border-color:var(--ln2);background:#fff}
+.rk-t input.n:focus{outline:0;border-color:#93b4e6;background:#fff}
+.yn{display:inline-flex;gap:2px}
+.yn button{border:1px solid var(--ln2);background:#fff;border-radius:4px;width:1.6em;padding:.15em 0;
+  font:inherit;font-weight:800;color:var(--mut);cursor:pointer}
+.yn button.on{background:var(--nv);border-color:var(--nv);color:#fff}
+.rk-legend{font-size:.68em;color:var(--mut);margin-top:.7em}
+
+/* ── 4) 작업 완료보고서 ── */
+.rp-info{width:100%;border-collapse:collapse;font-size:var(--fs-xs)}
+.rp-info th{background:#EFF3F8;color:var(--nv);font-weight:800;border:1px solid var(--nv);
+  padding:.5em .5em;text-align:center;width:11%;white-space:nowrap}
+.rp-info td{border:1px solid var(--nv);padding:.3em .5em}
+.rp-info input{width:100%;border:0;background:transparent;font:inherit;color:var(--ink2)}
+.rp-info input:focus{outline:2px solid #93b4e6;border-radius:3px}
+.rp-main{display:grid;grid-template-columns:67.6fr 25.6fr;gap:1.9%;margin-top:.9em;flex:1;align-items:start}
+.rp-photos{display:grid;grid-template-columns:1fr 1fr;gap:.9em;align-content:start}
+.rp-slot{display:flex;flex-direction:column}
+.rp-sh{display:flex;align-items:center;gap:.45em;background:#EFF3F8;border:1px solid var(--phb);
+  border-bottom:0;border-radius:.25em .25em 0 0;padding:.35em .5em}
+.rp-sh .sq{width:1.45em;height:1.45em;font-size:.8em}
+.rp-sh b{font-size:.85em;font-weight:800;color:var(--nv)}
+.rp-sh em{margin-left:auto;font-style:normal;font-size:.66em;color:var(--mut)}
+.rp-drop{position:relative;border:1.5px dashed #B9C6D6;border-top:0;border-radius:0 0 .25em .25em;
+  aspect-ratio:16/10;display:grid;place-items:center;background:#FAFCFE;cursor:pointer;overflow:hidden}
+.rp-drop.dragover{background:#EAF2FD;border-color:var(--nv2)}
+.rp-drop img{width:100%;height:100%;object-fit:cover}
+.rp-drop .txt{text-align:center;color:#9FB0C4;font-size:.8em;line-height:1.7}
+.rp-drop .txt b{display:block;color:var(--nv2);font-size:1.05em}
+.rp-cap{display:grid;grid-template-columns:1fr 1fr;gap:.5em;margin-top:.35em}
+.rp-cap input{border:0;border-bottom:1px solid var(--ln2);font:inherit;font-size:.7em;
+  padding:.15em .1em;background:transparent;color:var(--ink2);width:100%}
+.rp-cap input:focus{outline:0;border-bottom-color:var(--nv2)}
+.rp-side{display:flex;flex-direction:column;gap:.9em}
+.rp-memo{flex:1;display:flex;flex-direction:column}
+.rp-memo .pnl-b{display:flex;flex-direction:column;gap:.5em}
+.rp-memo textarea{border:0;border-bottom:1px dotted var(--ln2);font:inherit;font-size:.75em;resize:vertical;
+  min-height:3.2em;background:transparent;color:var(--ink2);padding:.2em 0;width:100%}
+.rp-memo textarea:focus{outline:0;border-bottom-color:var(--nv2)}
+.rp-memo label{font-size:.72em;color:var(--mut);font-weight:700}
+.rp-sign{width:100%;border-collapse:collapse;font-size:var(--fs-xs)}
+.rp-sign th{background:#fff;color:var(--nv);font-weight:800;border:1px solid var(--nv);padding:.45em;text-align:center}
+.rp-sign td{border:1px solid var(--nv);padding:.3em .4em}
+.rp-sign input{width:100%;border:0;background:transparent;font:inherit;color:var(--ink2)}
+.rp-sign input:focus{outline:2px solid #93b4e6;border-radius:3px}
+.rp-note{font-size:.68em;color:var(--mut);margin-top:.8em}
+
+/* ── 5) 위험도 매트릭스 ── */
+.mx{width:100%;border-collapse:collapse;font-size:var(--fs-xs)}
+.mx th{background:var(--nv);color:#fff;font-weight:700;border:1px solid #fff;padding:.6em;text-align:center}
+.mx td{border:1px solid var(--ln2);padding:.6em;text-align:center;font-weight:800;font-size:1.15em}
+.mx td.lbl{background:#F4F7FA;color:var(--nv);font-weight:700;font-size:1em}
+.mx-lv{display:flex;align-items:center;gap:1.4em;border-radius:.3em;padding:.9em 1.2em;margin-top:.7em}
+.mx-lv b{font-size:1.15em;font-weight:800;white-space:nowrap}
+.mx-lv span{font-size:var(--fs-xs);color:var(--ink2)}
+
+/* ── 반응형 (모바일) ── */
+@media (max-width:860px){
+  .stage{padding:10px 8px 32px}
+  .slide{font-size:15px;--fs-sm:.85em;--fs-xs:.88em;padding:1.4em 1.2em;border-radius:0;border-left:0;border-right:0}
+  .s-head{grid-template-columns:1fr}
+  .s-logo{display:none}
+  .s-title{font-size:1.6em}
+  .pt-main,.gd-top,.rp-main{grid-template-columns:1fr;gap:1em}
+  /* 모바일 순서 : 장비사진·개인보호구 -> 설치 전 조치 -> 설치 및 사용 조치 */
+  .gd-mid{order:-1}
+  .pt-notes,.gd-row4{grid-template-columns:1fr;gap:.8em}
+  .rp-photos{grid-template-columns:1fr}
+  .gi{grid-template-columns:1fr}
+  .gi .shot{max-height:18em}
+  .slide .ppe{flex-wrap:wrap}
+  .rk-t{font-size:.8em;table-layout:auto}
+  .tblscroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .tblscroll .rk-t{min-width:1000px}
+}
+
+/* ── 인쇄 : PPT 슬라이드와 동일한 A4 가로 ── */
+@media print{
+  @page{size:A4 landscape;margin:0}
+  html,body{background:#fff!important;margin:0!important;padding:0!important}
+  .snav,.noprint,.savebar{display:none!important}
+  .stage{padding:0!important;background:#fff!important}
+  .slide{
+    font-size:11pt;--fs-sm:.727em;--fs-xs:.773em;
+    width:297mm;min-height:206mm;margin:0;border:0;border-radius:0;box-shadow:none;
+    padding:9mm 11mm 7mm;page-break-after:always;break-after:page;
+  }
+  .slide:last-child{page-break-after:auto;break-after:auto}
+  .s-logo{display:block}
+  .pt-main{grid-template-columns:52.86fr 37.68fr}
+  .gd-top{grid-template-columns:31fr 34fr 31fr}
+  .pt-notes{grid-template-columns:repeat(3,1fr)}
+  .gd-row4{grid-template-columns:repeat(4,1fr)}
+  .rp-main{grid-template-columns:67.6fr 25.6fr}
+  .rp-photos{grid-template-columns:1fr 1fr}
+  .gi{grid-template-columns:1fr 36%}
+  .rk-t{font-size:6.6pt;table-layout:fixed}
+  .tblscroll{overflow:visible!important}
+  .tblscroll .rk-t{min-width:0!important}
+  .rk-t input.n,.rk-info input,.rp-info input,.rp-sign input,.rp-cap input{border-color:transparent!important;background:transparent!important}
+  .yn button{border-color:#D5DCE5!important}
+  .rp-drop{cursor:default}
+  .rp-memo textarea{min-height:2.4em}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+
+/* 위험성평가표 : ① ② 형태 목록 */
+.rk-t .cl{margin:.1em 0;padding-left:1.1em;text-indent:-1.1em}
+
+/* 인쇄 전용 : 입력칸 대신 값 출력 + 교육자료 1장 맞춤 */
+.rk-t .pv{display:none}
+@media print{
+  .rk-t input.n{display:none}
+  .rk-t .yn{display:none}
+  .rk-t .pv{display:block;font-weight:800;font-size:1.5em;color:#1F2937;line-height:1.2}
+  .slide.dense{font-size:9.3pt}
+  .slide.dense .s-body{margin-top:1em}
+  .slide.dense .gi .shot{aspect-ratio:3/2}
+  .slide.dense .gd-items{gap:.62em}
+  .slide.dense .gd-bot{margin-top:.9em}
+  .slide.dense .gd-fig img{max-height:14em}
+  .slide.dense .ppe .it img{height:2.9em}
+}
+
+/* 인쇄 : 작업 완료보고서 1장 맞춤 */
+@media print{
+  .slide .rp-drop{aspect-ratio:16/9}
+  .slide .rp-photos{gap:.7em}
+  .slide .rp-main{margin-top:.7em}
+  .slide .rp-note{margin-top:.5em}
+}
+
+/* 인쇄 미세 조정 : 1장 맞춤 */
+@media print{
+  .slide .rp-drop{aspect-ratio:2/1}
+  .slide .rp-memo textarea{min-height:2em}
+  .slide.dense{font-size:9pt}
+  .slide.dense .gd-fig .pt-grid img{max-height:8.5em}
+  .slide.dense .gd-fig .pt-grid{gap:.6em}
+  .slide.dense .gi ul{line-height:1.5}
+}
+
+/* 인쇄 : 위험성평가표 행 높이를 PPT처럼 넉넉하게 */
+@media print{
+  .rk-t td{padding:.95em .4em}
+}
+
+/* 한글 줄바꿈 : 어절 단위 유지 */
+.slide,.slide *{word-break:keep-all;overflow-wrap:break-word}
+.slide .gi ul li,.slide .pt-item>div>span,.slide .nb p,.slide .rk-t td,.slide .gi-nm{text-wrap:pretty}
+.slide .s-title,.slide .pnl-h,.slide .nb h4,.slide .pt-item>div>b{text-wrap:balance}
+
+/* ── 모바일 : 표는 옆으로 밀어서 보기 ── */
+.thint{display:none}
+@media (max-width:860px){
+  .tblscroll{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--ln2);
+    border-radius:.3em;background:#fff}
+  .tblscroll > table{margin:0}
+  .tblscroll .rk-t{min-width:1020px;font-size:.72em;table-layout:fixed}
+  .tblscroll .rk-info{min-width:640px}
+  .tblscroll .mx{min-width:600px}
+  .tblscroll .rp-info{min-width:660px}
+  .tblscroll .rp-sign{min-width:420px}
+  .thint{display:flex;align-items:center;gap:.4em;font-size:.72em;color:var(--mut);
+    font-weight:700;margin:0 0 .35em}
+  .thint:before{content:'↔';font-size:1.25em;color:var(--nv2)}
+}
+@media print{.thint{display:none!important}}
+
+/* 모바일 : 격자 칸이 내용 때문에 늘어나 가로로 넘치는 것 방지 */
+@media (max-width:860px){
+  .rp-main > *,.gd-top > *,.pt-main > *,.rp-side > *,.pnl,.pnl-b{min-width:0}
+}
+
+/* 위험성 수준별 조치 기준 — 모바일 가로 스크롤 */
+@media (max-width:860px){
+  .tblscroll.plain{border:0;background:none}
+  .tblscroll .mx-lvs{min-width:620px}
+  .mx-lv{flex-wrap:nowrap}
+  .mx-lv b{white-space:nowrap}
+}
+
+/* ============================================================
+   사전작업 허가 · 위험성평가 교육 확인 서명부 (report)
+   ============================================================ */
+.rp-left{display:flex;flex-direction:column;min-width:0}
+.pnl-h{display:flex;align-items:baseline;gap:.6em}
+.pnl-h em{margin-left:auto;font-style:normal;font-size:.62em;font-weight:700;color:var(--mut)}
+
+/* 서약문 */
+.rp-pledge{border:1px solid var(--nv);border-radius:.25em;padding:.7em .9em;margin-top:.9em}
+.rp-pledge p{margin:0;font-size:.7em;line-height:1.75;color:var(--ink2)}
+.rp-opin{display:flex;align-items:center;gap:.6em;margin-top:.6em;flex-wrap:nowrap}
+.rp-cb{display:inline-flex;align-items:center;gap:.35em;font-size:.7em;color:var(--ink2);
+  white-space:nowrap;cursor:pointer}
+
+.rp-opin-in{flex:1;min-width:0;border:0;border-bottom:1px solid var(--ln2);background:transparent;
+  font:inherit;font-size:.7em;padding:.1em .2em;color:var(--ink2)}
+.rp-opin-in:focus{outline:0;border-bottom-color:var(--nv2)}
+
+/* 교육 및 평가 실시 내용 */
+.rp-chk{padding:.5em .7em!important}
+.rp-chkrow{display:flex;align-items:flex-start;gap:.5em;padding:.42em .2em;font-size:.7em;
+  line-height:1.5;color:var(--ink2);cursor:pointer;border-bottom:1px solid #EEF2F7}
+.rp-chkrow:last-child{border-bottom:0}
+.rp-chkrow:nth-child(even){background:#F7F9FC}
+
+
+/* 작업 참여자 확인 서명부 */
+.rp-crew{width:100%;border-collapse:collapse;font-size:.68em;table-layout:fixed}
+.rp-crew th{background:#EFF3F8;color:var(--nv);font-weight:800;border:1px solid var(--nv);
+  padding:.4em .2em;text-align:center}
+.rp-crew tr>th:first-child{width:16%}
+.rp-crew tr>th:nth-child(2){width:30%}
+.rp-crew tr>th:nth-child(3){width:24%}
+.rp-crew tbody th,.rp-crew tr>th:only-of-type{background:#fff}
+.rp-crew td{border:1px solid var(--nv);padding:.25em .3em;height:2.1em}
+.rp-crew tr:not(:first-child)>th{background:#fff;font-weight:700;color:var(--ink2)}
+.rp-crew input{width:100%;border:0;background:transparent;font:inherit;color:var(--ink2)}
+.rp-crew input:focus{outline:2px solid #93b4e6;border-radius:3px}
+.sigbox.sm{min-height:1.9em}
+.sigbox.sm img{max-height:2.2em}
+.sigbox.sm .ph{font-size:.62em}
+
+/* 확인란 : 구분 / 성명 / 확인 서명 */
+.rp-sign tr>th:first-child{width:30%}
+.rp-sign tr>th:nth-child(2){width:32%}
+
+@media (max-width:860px){
+  .rp-main{grid-template-columns:1fr;gap:1em}
+  .rp-opin{flex-wrap:wrap}
+  .rp-opin-in{flex:1 0 100%;order:3}
+  .tblscroll .rp-crew{min-width:400px}
+}
+@media print{
+  .rp-pledge{margin-top:.7em}
+  .rp-crew td{height:1.9em}
+  .rp-side{display:flex;flex-direction:column;gap:.7em}
+}
+
+/* 체크박스 : 브라우저 기본 위젯 대신 직접 그림
+   (이미지 · PDF 로 내보낼 때 네이티브 위젯은 체크가 사라지므로) */
+.rp-chkrow input[type=checkbox],.rp-cb input[type=checkbox]{
+  position:absolute;opacity:0;width:1px;height:1px;margin:0;pointer-events:none}
+.cbx{flex:0 0 auto;display:inline-block;width:1.05em;height:1.05em;border:1.2px solid var(--nv);
+  border-radius:.15em;background:#fff;position:relative;margin-top:.12em}
+.rp-cb .cbx{margin-top:0;width:1em;height:1em}
+input[type=checkbox]:checked + .cbx{background:var(--nv);border-color:var(--nv)}
+input[type=checkbox]:checked + .cbx::after{content:"";position:absolute;left:31%;top:9%;
+  width:26%;height:52%;border:solid #fff;border-width:0 .13em .13em 0;transform:rotate(45deg)}
+input[type=checkbox]:focus-visible + .cbx{outline:2px solid #2563eb;outline-offset:1px}

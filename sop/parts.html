@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f2544">
+<title>각부 명칭 및 점검 포인트</title>
+<link rel="icon" href="favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/slide.css">
+<link rel="stylesheet" href="assets/inline.css">
+<link rel="stylesheet" href="assets/export.css">
+</head>
+<body>
+<div id="app"></div>
+
+<script src="assets/data.js"></script>
+<script src="assets/imglist.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/inline.js"></script>
+<script src="assets/html-to-image.js"></script>
+<script src="assets/export.js"></script>
+<script>
+(function () {
+  var t = currentTask(); if (!t) return;
+  var p = t.parts, B = 'TASKS.' + t.id, P = B + '.parts';
+  document.title = t.name + ' 각부 명칭 | 안전 표준운영절차';
+
+  var h = snav(t.no + '. ' + t.name + ' — 각부 명칭 및 점검 포인트', 'work.html?id=' + t.id);
+  h += '<div class="stage"><div class="slide">';
+  h += sHead('<span class="no"><span' + EA(B + '.no') + '>' + esc(t.no) + '</span>.</span>' +
+             '<span' + EA(P + '.title') + '>' + esc(p.title) + '</span>',
+             '<span' + EA(P + '.subtitle') + '>' + esc(p.subtitle) + '</span>', true);
+
+  h += '<div class="s-body"><div class="pt-main">';
+
+  h += '<div class="pnl pt-fig">';
+  if (p.figures && p.figures.length) {
+    h += '<div class="pt-grid">' + p.figures.map(function (f, i) {
+      var mk = (p.marks || []).filter(function (m) { return m.i === i; });
+      var inner = '<img src="' + imgSrc(f) + '" alt=""' + EI(P + '.figures.' + i) + '>';
+      if (mk.length) {
+        inner = '<span class="pt-figwrap">' + inner + mk.map(function (m) {
+          return '<span class="mark" style="left:' + m.x + '%;top:' + m.y + '%">' + m.n + '</span>';
+        }).join('') + '</span>';
+      }
+      return '<figure>' + inner + '<figcaption><span' + EA(P + '.items.' + i + '.name') + '>' +
+        esc((p.items[i] && p.items[i].name) || '') + '</span></figcaption></figure>';
+    }).join('') + '</div>';
+  } else {
+    h += '<div class="pt-figwrap"><img src="' + imgSrc(p.figure) + '" alt=""' + EI(P + '.figure') + '>' +
+      (p.marks || []).map(function (m) {
+        return '<span class="mark" style="left:' + m.x + '%;top:' + m.y + '%">' + m.n + '</span>';
+      }).join('') + '</div>';
+  }
+  h += '<div class="pt-cap"' + EA(P + '.figureCaption') + '>' + esc(p.figureCaption) + '</div></div>';
+
+  h += '<div class="pnl"><div class="pnl-h"' + EA('SITE.labels.partsPanel') + '>' + esc(SITE.labels.partsPanel) +
+    '</div><div class="pnl-b">';
+  p.items.forEach(function (it, i) {
+    h += '<div class="pt-item"><span class="badge"' + EA(P + '.items.' + i + '.n', 'num') + '>' + it.n + '</span>' +
+      '<div><b' + EA(P + '.items.' + i + '.name') + '>' + esc(it.name) + '</b>' +
+      '<span' + EA(P + '.items.' + i + '.desc') + '>' + esc(it.desc) + '</span></div></div>';
+  });
+  h += '</div></div></div>';
+
+  function nb(cls, labKey, arrKey) {
+    return '<div class="nb ' + cls + '"><h4' + EA('SITE.labels.' + labKey) + '>' + esc(SITE.labels[labKey]) + '</h4>' +
+      (p[arrKey] || []).map(function (x, i) {
+        return '<p' + EA(P + '.' + arrKey + '.' + i) + '>' + esc(x) + '</p>';
+      }).join('') + '</div>';
+  }
+  h += '<div class="pt-notes">' + nb('b', 'notePre', 'pre') + nb('g', 'noteUse', 'use') + nb('r', 'noteBan', 'ban') + '</div>';
+
+  h += '</div>' + sFootE(t, B) + '</div></div>';
+
+  h += '<div class="btnbar noprint" style="max-width:1180px;margin:0 auto 30px;padding:0 12px">' +
+    '<a class="btn" href="work.html?id=' + t.id + '">‹ 작업 메뉴</a>' +
+    '<a class="btn primary" href="guide.html?id=' + t.id + '">다음 : 안전작업 지침 ›</a></div>';
+
+  document.getElementById('app').innerHTML = h;
+  initInline();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+{
+  "name": "safety-sop",
+  "private": true,
+  "type": "module",
+  "description": "안전 표준운영절차 웹사이트. 화면은 정적 HTML 이고, api/ 폴더만 서버에서 돈다.",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
+    "zod": "^4.6.5"
+  }
+}

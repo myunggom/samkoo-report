@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f2544">
+<title>안전 표준운영절차</title>
+<link rel="icon" href="favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/inline.css">
+</head>
+<body>
+<div id="app"></div>
+
+<script src="assets/data.js"></script>
+<script src="assets/imglist.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/inline.js"></script>
+<script>
+(function () {
+  document.title = '안전 표준운영절차 | ' + SITE.org;
+  if (!SITE.qrText) SITE.qrText = '작업별 QR코드를 만들어 인쇄한 뒤, 실제 작업 위치에 부착하세요.';
+  if (!SITE.footNote) SITE.footNote = '※ 본 자료는 2026년 FM1 사업부 품질혁신 아이디어 경진대회 제출자료를 기반으로 제작되었습니다.';
+
+  var GS = taskGroups();
+  var total = 0;
+  GS.forEach(function (g) { g.chapters.forEach(function (c) { total += c.tasks.length; }); });
+
+  function count(g) { var n = 0; g.chapters.forEach(function (c) { n += c.tasks.length; }); return n; }
+
+  /* 부문 이름을 탭에 짧게 — "5. 건축부문" → "건축" */
+  function shortName(t) {
+    return String(t).replace(/^\s*\d+\.\s*/, '').replace(/부문$/, '').trim() || t;
+  }
+
+  function card(id, color) {
+    var t = TASKS[id]; if (!t) return '';
+    var b = 'TASKS.' + id;
+    return '<a class="taskcard tc-sm" style="--tc:' + (t.color || color || '#1d4ed8') + '" href="work.html?id=' + t.id + '"' +
+      ' data-q="' + esc((t.no + ' ' + t.name + ' ' + t.docNo + ' ' + t.place + ' ' + t.sop).toLowerCase()) + '">' +
+      '<div class="no"><span' + EA(b + '.no') + '>' + esc(t.no) + '</span>. 표준작업 · <span' + EA(b + '.docNo') + '>' + esc(t.docNo) + '</span></div>' +
+      '<h3' + EA(b + '.name') + '>' + esc(t.name) + '</h3>' +
+      '<div class="meta">장소 : <span' + EA(b + '.place') + '>' + esc(t.place) + '</span></div></a>';
+  }
+
+  /* ───────── 화면 뼈대 ───────── */
+  var h = topbar('안전 표준운영절차', SITE.org);
+  h += '<div class="wrap">';
+  h += '<div class="hero"><h2' + EA('SITE.hero.title') + '>' + esc(SITE.hero.title) + '</h2>' +
+       '<p' + EA('SITE.hero.text') + '>' + esc(SITE.hero.text) + '</p></div>';
+
+  h += '<div class="navbox noprint">' +
+    '<div class="tsearch"><input id="tq" type="search" autocomplete="off"' +
+    ' placeholder="작업명 · 문서번호 · 장소로 찾기 (전체 ' + total + '건)">' +
+    '<button id="tqx" type="button" title="지우기" hidden>✕</button>' +
+    '<span id="tqn"></span></div>' +
+    '<nav class="sectabs" id="sectabs">' + GS.map(function (g, i) {
+      return '<button type="button" data-s="' + i + '">' + esc(shortName(g.title)) +
+             '<em>' + count(g) + '</em></button>';
+    }).join('') + '</nav>' +
+    '<nav class="chaptabs" id="chaptabs"></nav>' +
+    '</div>';
+
+  h += '<div id="tbody"></div>';
+
+  h += '<div class="card" style="margin-top:16px"><div class="card-h">＋ 공기구 추가</div>' +
+    '<div class="card-b"><p style="margin:0 0 12px;font-size:13.5px;color:var(--ink-2)">' +
+    '공기구 이름을 적거나 사진을 올리면 각부 명칭 · 안전조치 12개 · 위험성평가를 ' +
+    '기존 자료와 같은 형식으로 만들어 드립니다.</p>' +
+    '<a class="btn primary" href="new.html">공기구 추가하기</a></div></div>';
+
+  h += '<div class="card" style="margin-top:16px"><div class="card-h">🔳 현장 부착용 QR코드</div>' +
+    '<div class="card-b"><p style="margin:0 0 12px;font-size:13.5px;color:var(--ink-2)"' + EA('SITE.qrText') + '>' +
+    esc(SITE.qrText) + '</p>' +
+    '<a class="btn primary" href="qr.html">QR코드 생성기 열기</a>' +
+    ' <a class="btn" href="edit.html">✎ 전체 편집기</a></div></div>';
+
+  if (window.isDraft) h += '<div class="card" style="border-color:#b45309;background:#fffbeb">' +
+    '<div class="card-b" style="font-size:13px;color:#92400e">● 이 브라우저에 저장된 <b>편집본</b>을 보고 있습니다. ' +
+    '아직 다른 사람에게는 반영되지 않습니다. 반영하려면 편집 모드에서 [⤓ data.js 내려받기] 후 ' +
+    'Vercel_배포.bat 을 실행하세요.</div></div>';
+
+  h += '<div class="card"><div class="card-h">📄 페이지 구성</div><div class="card-b">' +
+    '<div class="menugrid">' +
+    '<div class="menucard"><div class="ic">1</div><div><strong>각부 명칭 · 점검 포인트</strong><span>장비 각부 명칭과 작업 전 확인 항목</span></div></div>' +
+    '<div class="menucard"><div class="ic">2</div><div><strong>안전지침 · 교육자료</strong><span>TBM용 12개 조치사항</span></div></div>' +
+    '<div class="menucard"><div class="ic">3</div><div><strong>위험성평가표</strong><span>빈도 × 강도 자동계산 · 조치여부 Y/N</span></div></div>' +
+    '<div class="menucard"><div class="ic">4</div><div><strong>작업 완료보고서</strong><span>사진 4종 업로드 · PDF 출력</span></div></div>' +
+    '</div></div></div>';
+
+  h += '<p class="hint"' + EA('SITE.footNote') + '>' + esc(SITE.footNote) + '</p>';
+  h += '</div>';
+  document.getElementById('app').innerHTML = h;
+  initInline();
+
+  /* ───────── 탭 · 검색 ───────── */
+  var secTabs = document.getElementById('sectabs');
+  var chapTabs = document.getElementById('chaptabs');
+  var bodyEl = document.getElementById('tbody');
+  var q = document.getElementById('tq'), qn = document.getElementById('tqn'), qx = document.getElementById('tqx');
+
+  /* 처음 열릴 부문 — 예시는 건너뛰고 내용이 있는 첫 부문 */
+  var state = { s: Math.min(1, GS.length - 1), c: -1 };
+
+  function readHash() {
+    var m = /^#([a-z0-9_]+)(?:\/(\d+|all))?$/i.exec(location.hash || '');
+    if (!m) return;
+    var i = GS.findIndex(function (g) { return g.id === m[1]; });
+    if (i < 0) return;
+    state.s = i;
+    state.c = (!m[2] || m[2] === 'all') ? -1 : Math.min(parseInt(m[2], 10), GS[i].chapters.length - 1);
+  }
+  function writeHash() {
+    var g = GS[state.s];
+    var want = '#' + g.id + (state.c < 0 ? '' : '/' + state.c);
+    if (location.hash !== want) history.replaceState(null, '', want);
+  }
+
+  function chapHTML() {
+    var g = GS[state.s];
+    var usable = g.chapters.filter(function (c) { return c.tasks.length; });
+    if (usable.length < 2) return '';            /* 묶음이 하나뿐이면 숨긴다 */
+    var out = '<button type="button" data-c="-1"' + (state.c < 0 ? ' class="on"' : '') +
+              '>전체<em>' + count(g) + '</em></button>';
+    g.chapters.forEach(function (c, i) {
+      if (!c.tasks.length) return;
+      out += '<button type="button" data-c="' + i + '"' + (state.c === i ? ' class="on"' : '') +
+             ' style="--tc:' + (c.color || '#0f2544') + '">' + esc(c.title) +
+             '<em>' + c.tasks.length + '</em></button>';
+    });
+    return out;
+  }
+
+  function renderTabs() {
+    Array.prototype.forEach.call(secTabs.children, function (b, i) {
+      b.classList.toggle('on', i === state.s);
+    });
+    chapTabs.innerHTML = chapHTML();
+    chapTabs.style.display = chapTabs.innerHTML ? '' : 'none';
+  }
+
+  function renderList() {
+    var g = GS[state.s], out = '';
+    g.chapters.forEach(function (c, i) {
+      if (!c.tasks.length) return;
+      if (state.c >= 0 && state.c !== i) return;
+      out += '<section class="tchap" style="--tc:' + (c.color || '#0f2544') + '">';
+      if (c.title && g.id !== 'ex' && state.c < 0)
+        out += '<h4><span>' + esc(c.title) + '</span><em>' + c.tasks.length + '건</em></h4>';
+      out += '<div class="grid four">' + c.tasks.map(function (id) { return card(id, c.color); }).join('') + '</div></section>';
+    });
+    bodyEl.innerHTML = out || '<p class="hint">등록된 작업이 없습니다.</p>';
+  }
+
+  function renderSearch(v) {
+    var out = '', hit = 0;
+    GS.forEach(function (g) {
+      var ids = [];
+      g.chapters.forEach(function (c) {
+        c.tasks.forEach(function (id) {
+          var t = TASKS[id]; if (!t) return;
+          var hay = (t.no + ' ' + t.name + ' ' + t.docNo + ' ' + t.place + ' ' + t.sop).toLowerCase();
+          if (hay.indexOf(v) >= 0) ids.push([id, c.color]);
+        });
+      });
+      if (!ids.length) return;
+      hit += ids.length;
+      out += '<section class="tchap"><h4><span>' + esc(g.title) + '</span><em>' + ids.length + '건</em></h4>' +
+        '<div class="grid four">' + ids.map(function (p) { return card(p[0], p[1]); }).join('') + '</div></section>';
+    });
+    bodyEl.innerHTML = out || '<p class="hint tqnone">‘' + esc(q.value) + '’ 에 해당하는 작업이 없습니다.</p>';
+    qn.textContent = hit + '건';
+  }
+
+  function render() {
+    var v = q.value.trim().toLowerCase();
+    qx.hidden = !v;
+    if (v) {
+      document.querySelector('.navbox').classList.add('searching');
+      renderSearch(v);
+    } else {
+      document.querySelector('.navbox').classList.remove('searching');
+      qn.textContent = '';
+      renderTabs();
+      renderList();
+      writeHash();
+    }
+    initInline();
+  }
+
+  secTabs.addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-s]'); if (!b) return;
+    state.s = +b.dataset.s; state.c = -1;
+    q.value = ''; render();
+    /* 탭이 화면 위에 붙어 있으므로 목록 머리로만 살짝 올린다 */
+    var top = document.querySelector('.navbox').offsetTop - 8;
+    if (window.scrollY > top) window.scrollTo({ top: top, behavior: 'smooth' });
+  });
+  chapTabs.addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-c]'); if (!b) return;
+    state.c = +b.dataset.c; render();
+  });
+  q.addEventListener('input', render);
+  qx.addEventListener('click', function () { q.value = ''; q.focus(); render(); });
+  window.addEventListener('hashchange', function () { if (!q.value.trim()) { readHash(); render(); } });
+
+  readHash();
+  render();
+})();
+</script>
+</body>
+</html>

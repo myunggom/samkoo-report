@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f2544">
+<title>위험성평가표</title>
+<link rel="icon" href="favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/slide.css">
+<link rel="stylesheet" href="assets/inline.css">
+<link rel="stylesheet" href="assets/export.css">
+</head>
+<body>
+<div id="app"></div>
+
+<script src="assets/data.js"></script>
+<script src="assets/imglist.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/inline.js"></script>
+<script src="assets/html-to-image.js"></script>
+<script src="assets/export.js"></script>
+<script>
+(function () {
+  var t = currentTask(); if (!t) return;
+  var KEY = 'risk:' + t.id, B = 'TASKS.' + t.id, RP = B + '.risk';
+  document.title = t.name + ' 위험성평가표';
+
+  var saved = store.get(KEY) || {};
+  var head = { date: saved.date != null ? saved.date : t.risk.date,
+               assessor: saved.assessor != null ? saved.assessor : t.risk.assessor };
+  var rows = t.risk.rows.map(function (r, i) {
+    var s = (saved.rows && saved.rows[i]) || {};
+    return { f: s.f != null ? s.f : r.f, s: s.s != null ? s.s : r.s,
+             f2: s.f2 != null ? s.f2 : r.f2, s2: s.s2 != null ? s.s2 : r.s2,
+             done: s.done != null ? s.done : r.done };
+  });
+  function save() { store.set(KEY, { date: head.date, assessor: head.assessor, rows: rows }); }
+  var CN = '①②③④⑤⑥⑦⑧⑨⑩';
+  function ol(a, q) {
+    return (a || []).map(function (x, i) {
+      return '<div class="cl"><span class="cn">' + (CN[i] || (i + 1) + '.') + '</span> ' +
+        '<span' + EA(q + '.' + i) + '>' + esc(x) + '</span></div>';
+    }).join('');
+  }
+
+  var h = snav(t.no + '. ' + t.name + ' — 위험성평가표', 'work.html?id=' + t.id);
+  h += '<div class="stage"><div class="slide">';
+  h += sHead('위험성평가표 — <span' + EA(B + '.name') + '>' + esc(t.name) + '</span>',
+             '<span' + EA('SITE.labels.riskSub') + '>' + esc(SITE.labels.riskSub) + '</span>', true);
+  h += '<div class="s-body">';
+
+  h += '<div class="thint noprint">표를 옆으로 밀어서 보세요</div>' +
+    '<div class="tblscroll" style="margin-bottom:.8em"><table class="rk-info"><tr>' +
+    '<th>공정 / 작업명</th><td><span' + EA(B + '.name') + '>' + esc(t.name) + '</span></td>' +
+    '<th>평가대상</th><td><span' + EA(RP + '.target') + '>' + esc(t.risk.target) + '</span></td>' +
+    '<th>평가일자</th><td style="width:13%"><input id="fDate" placeholder="2026.00.00" value="' + esc(head.date) + '"></td>' +
+    '<th>평가자</th><td style="width:11%"><input id="fAssessor" placeholder="성명" value="' + esc(head.assessor) + '"></td>' +
+    '</tr></table></div>';
+
+  h += '<div class="thint noprint">표를 옆으로 밀어서 보세요</div>' +
+    '<div class="tblscroll"><table class="rk-t"><colgroup>' +
+    '<col style="width:3%"><col style="width:7.5%"><col style="width:16%"><col style="width:14.5%">' +
+    '<col style="width:3.5%"><col style="width:3.5%"><col style="width:4.5%">' +
+    '<col style="width:18.5%"><col style="width:5%"><col style="width:6%"><col style="width:6.5%">' +
+    '<col style="width:3.5%"><col style="width:3.5%"><col style="width:4.5%"></colgroup><thead>' +
+    '<tr><th rowspan="2">NO</th><th rowspan="2">작업단계</th><th rowspan="2">유해 · 위험요인</th>' +
+    '<th rowspan="2">위험 발생 상황 및 결과</th><th colspan="3">현재 위험도</th>' +
+    '<th rowspan="2">위험성 감소대책 (개선 조치사항)</th><th rowspan="2">조치<br>기한</th>' +
+    '<th rowspan="2">담당자</th><th rowspan="2">조치<br>여부</th><th colspan="3">개선 후 위험도</th></tr>' +
+    '<tr><th>빈도</th><th>강도</th><th>위험도</th><th>빈도</th><th>강도</th><th>위험도</th></tr>' +
+    '</thead><tbody>';
+
+  function nin(i, k) {
+    return '<td class="c"><input class="n" type="number" min="1" max="5" data-i="' + i + '" data-k="' + k +
+      '" data-ed="' + RP + '.rows.' + i + '.' + k + '" value="' + rows[i][k] + '">' +
+      '<b class="pv" id="pv-' + k + '-' + i + '"></b></td>';
+  }
+  t.risk.rows.forEach(function (r, i) {
+    var q = RP + '.rows.' + i;
+    h += '<tr><td class="no">' + (i + 1) + '</td>' +
+      '<td class="step"' + EA(q + '.step') + '>' + esc(r.step) + '</td>' +
+      '<td>' + ol(r.hazards, q + '.hazards') + '</td><td>' + ol(r.results, q + '.results') + '</td>' +
+      nin(i, 'f') + nin(i, 's') + '<td class="v" id="rk-' + i + '"></td>' +
+      '<td>' + ol(r.measures, q + '.measures') + '</td>' +
+      '<td class="c"' + EA(q + '.due') + '>' + esc(r.due) + '</td>' +
+      '<td class="c"' + EA(q + '.owner') + '>' + esc(r.owner) + '</td>' +
+      '<td class="c"><span class="yn" data-i="' + i + '"><button type="button" data-v="Y">Y</button>' +
+      '<button type="button" data-v="N">N</button></span><b class="pv" id="pv-yn-' + i + '"></b></td>' +
+      nin(i, 'f2') + nin(i, 's2') + '<td class="v" id="rk2-' + i + '"></td></tr>';
+  });
+  h += '</tbody></table></div>';
+
+  h += '<p class="rk-legend">※ 위험도 색상 : 15~25 고위험(적색) · 8~14 중위험(황색) · 1~7 저위험(녹색)　　' +
+    '※ 평가일자 · 평가자 · 조치여부는 실제 평가 시행 시 기입　　' +
+    '<span id="savedAt" class="noprint" style="color:#94a3b8"></span></p>';
+  h += '</div>' + sFootE(t, B) + '</div>';
+
+  var MX = [5, 4, 3, 2, 1], LB = { 5: '5 ( 치명적 / 사망 )', 4: '4 ( 중상 / 장해 )', 3: '3 ( 경상 / 휴업 )', 2: '2 ( 경미 / 비휴업 )', 1: '1 ( 극히 경미 )' };
+  var HD = ['1 ( 매우 낮음 )', '2 ( 낮음 )', '3 ( 보통 )', '4 ( 높음 )', '5 ( 매우 높음 )'];
+  h += '<div class="slide">' + sHead('위험도 산정 및 평가 매트릭스 기준', '위험도 = 빈도(Possibility) × 강도(Severity) — 5 × 5 Matrix');
+  h += '<div class="s-body"><div class="thint noprint">표를 옆으로 밀어서 보세요</div>' +
+    '<div class="tblscroll"><table class="mx"><tr><th>빈도 x 강도</th>' +
+    HD.map(function (x) { return '<th>' + x + '</th>'; }).join('') + '</tr>';
+  MX.forEach(function (s) {
+    h += '<tr><td class="lbl">' + LB[s] + '</td>';
+    [1, 2, 3, 4, 5].forEach(function (f) {
+      var v = f * s;
+      h += '<td class="' + (v >= 15 ? 'v-hi' : v >= 8 ? 'v-md' : 'v-lo') + '">' + v + '</td>';
+    });
+    h += '</tr>';
+  });
+  h += '</table></div>';
+  h += '<h3 style="font-size:1.14em;font-weight:800;color:#1E3A6E;margin:1.2em 0 .2em">위험성 수준별 조치 기준</h3>';
+  h += '<div class="thint noprint">표를 옆으로 밀어서 보세요</div>' +
+    '<div class="tblscroll plain"><div class="mx-lvs">';
+  [['15 ~ 25', '고위험 (High)', '즉시 작업을 중단하고 개선 대책 수립 및 위험요인 제거 후 작업 재개', '#FCE4E4', '#C62828'],
+   ['8 ~ 14', '중위험 (Medium)', '계획된 기한 내 개선 대책을 시행하고 안전수칙 준수 철저 관리', '#FEF1DC', '#B45309'],
+   ['1 ~ 7', '저위험 (Low)', '현재의 안전상태 유지 및 지속적인 작업자 교육 · 점검 실시', '#E7F4EC', '#1F7A4C']
+  ].forEach(function (r) {
+    h += '<div class="mx-lv" style="background:' + r[3] + '">' +
+      '<b style="color:' + r[4] + '">' + r[0] + '</b><b style="color:' + r[4] + '">' + r[1] + '</b>' +
+      '<span>' + r[2] + '</span></div>';
+  });
+  h += '</div></div>';
+  h += '</div><div class="s-foot">안전 표준운영절차 ｜ 위험도 산정 및 평가 매트릭스 기준 (공통)</div></div>';
+
+  h += '<div class="btnbar noprint" style="max-width:1180px;margin:0 auto 30px;padding:0 12px">' +
+    '<a class="btn" href="guide.html?id=' + t.id + '">‹ 교육자료</a>' +
+    '<button class="btn" id="btnCsv">⤓ 엑셀(CSV) 저장</button>' +
+    '<button class="btn ghost" id="btnReset">입력 초기화</button>' +
+    '<a class="btn primary" href="report.html?id=' + t.id + '">다음 : 작업 완료보고서 ›</a></div>';
+  h += '</div>';
+  document.getElementById('app').innerHTML = h;
+  initInline();
+
+  function paint(i) {
+    var a = rows[i], v1 = a.f * a.s, v2 = a.f2 * a.s2;
+    var e1 = document.getElementById('rk-' + i), e2 = document.getElementById('rk2-' + i);
+    e1.textContent = v1; e1.className = 'v ' + (v1 >= 15 ? 'v-hi' : v1 >= 8 ? 'v-md' : 'v-lo');
+    e2.textContent = v2; e2.className = 'v ' + (v2 >= 15 ? 'v-hi' : v2 >= 8 ? 'v-md' : 'v-lo');
+    document.querySelector('.yn[data-i="' + i + '"]').querySelectorAll('button').forEach(function (b) {
+      b.classList.toggle('on', b.dataset.v === a.done);
+    });
+    ['f', 's', 'f2', 's2'].forEach(function (k) {
+      var e = document.getElementById('pv-' + k + '-' + i); if (e) e.textContent = a[k];
+    });
+    var ey = document.getElementById('pv-yn-' + i); if (ey) ey.textContent = a.done || '';
+  }
+  document.querySelectorAll('.rk-t input.n').forEach(function (inp) {
+    inp.addEventListener('input', function () {
+      var v = parseInt(inp.value, 10); if (isNaN(v)) return;
+      v = Math.max(1, Math.min(5, v)); inp.value = v;
+      rows[+inp.dataset.i][inp.dataset.k] = v; paint(+inp.dataset.i); save();
+      document.getElementById('savedAt').textContent = '· 이 브라우저에 자동 저장됨';
+    });
+  });
+  document.querySelectorAll('.yn button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var i = +b.parentNode.dataset.i;
+      rows[i].done = (rows[i].done === b.dataset.v) ? '' : b.dataset.v;
+      paint(i); save();
+    });
+  });
+  document.getElementById('fDate').addEventListener('input', function () { head.date = this.value; save(); });
+  document.getElementById('fAssessor').addEventListener('input', function () { head.assessor = this.value; save(); });
+  document.getElementById('btnReset').addEventListener('click', function () {
+    if (!confirm('입력한 숫자와 조치여부를 원본값으로 되돌립니다.')) return;
+    store.del(KEY); location.reload();
+  });
+  document.getElementById('btnCsv').addEventListener('click', function () {
+    var L = [['NO', '작업단계', '유해·위험요인', '위험 발생 상황 및 결과', '빈도', '강도', '현재 위험도',
+      '위험성 감소대책', '조치 기한', '담당자', '조치 여부', '개선 후 빈도', '개선 후 강도', '개선 후 위험도']];
+    t.risk.rows.forEach(function (r, i) {
+      var a = rows[i];
+      L.push([i + 1, r.step, r.hazards.join(' / '), r.results.join(' / '), a.f, a.s, a.f * a.s,
+        r.measures.join(' / '), r.due, r.owner, a.done, a.f2, a.s2, a.f2 * a.s2]);
+    });
+    var csv = '﻿' + L.map(function (l) {
+      return l.map(function (c) { return '"' + String(c).replace(/"/g, '""') + '"'; }).join(',');
+    }).join('\r\n');
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    a.download = '위험성평가표_' + t.name + '_' + todayStr() + '.csv';
+    a.click(); URL.revokeObjectURL(a.href);
+  });
+  rows.forEach(function (_, i) { paint(i); });
+  if (store.get(KEY)) document.getElementById('savedAt').textContent = '· 이 브라우저에 저장된 내용을 불러왔습니다';
+})();
+</script>
+</body>
+</html>
