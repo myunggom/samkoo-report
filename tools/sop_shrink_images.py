@@ -48,17 +48,47 @@ def limit_of(name):
     return 1024
 
 
+def has_alpha(im):
+    """배경이 비어 있는(투명한) 그림인지 본다.
+
+    로고·보호구 아이콘이 여기 해당한다. 이런 그림을 JPEG 로 바꾸면
+    투명한 자리가 까맣게 칠해지므로 반드시 PNG 로 남겨야 한다."""
+    if im.mode in ("RGBA", "LA", "PA"):
+        pass
+    elif im.mode == "P" and "transparency" in im.info:
+        pass
+    else:
+        return False
+    lo, _hi = im.convert("RGBA").getchannel("A").getextrema()
+    return lo < 250
+
+
 def shrink(path, px):
-    """줄인 결과를 바이트로 돌려준다. 줄일 필요가 없으면 None."""
+    """줄인 결과를 (바이트, 확장자) 로 돌려준다. 줄일 필요가 없으면 None."""
     im = Image.open(path)
     w, h = im.size
-    if im.mode in ("RGBA", "LA", "P"):
+    keep_alpha = has_alpha(im)
+
+    if keep_alpha:
+        im = im.convert("RGBA")
+    elif im.mode != "RGB":
         im = im.convert("RGB")
+
     if max(w, h) > px:
         s = px / max(w, h)
         im = im.resize((max(1, round(w * s)), max(1, round(h * s))), Image.LANCZOS)
+
     buf = io.BytesIO()
-    im.save(buf, "JPEG", quality=QUALITY, optimize=True, progressive=True)
+    if keep_alpha:
+        # 색 수를 줄여 용량을 낮추되 투명도는 그대로 둔다
+        # 투명도가 있는 그림은 FASTOCTREE 만 쓸 수 있다
+        try:
+            q = im.quantize(colors=256, method=Image.FASTOCTREE)
+            q.save(buf, "PNG", optimize=True)
+        except Exception:
+            im.save(buf, "PNG", optimize=True)
+    else:
+        im.save(buf, "JPEG", quality=QUALITY, optimize=True, progressive=True)
     data = buf.getvalue()
     if len(data) >= os.path.getsize(path):
         return None           # 오히려 커지면 그대로 둔다
