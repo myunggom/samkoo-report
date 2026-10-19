@@ -249,3 +249,46 @@
   if (!L.guideHint) L.guideHint = '▲ 장비 상세설명도 — 번호를 짚어가며 좌 · 우 · 하단 항목을 설명하십시오';
   if (!L.riskSub) L.riskSub = '위험도평가 기준 : 빈도강도법 ｜ 빈도 (1~5) x 강도 (1~5)';
 })();
+
+/* ── 짧은 라벨 한 줄 유지 ───────────────────────────────────────────
+   작업명 · 메뉴 설명 · 보호구 이름처럼 한 줄로 보여야 하는 글이
+   칸보다 길면 글씨를 조금만 줄여 한 줄에 맞춘다. (최대 22% 축소)   */
+(function oneLine() {
+  var SEL = '.taskcard h3,.taskcard .no,.taskcard .meta,' +
+            '.menucard strong,.menucard span,.ppe .it span';
+  var MIN = 0.78;
+
+  function fit(el) {
+    var base = parseFloat(el.getAttribute('data-fs0'));
+    if (!base) {
+      base = parseFloat(getComputedStyle(el).fontSize);
+      el.setAttribute('data-fs0', base);
+    }
+    el.style.fontSize = base + 'px';
+    var room = el.clientWidth, need = el.scrollWidth;
+    if (!room || need <= room + 0.5) return;
+    var size = Math.max(base * MIN, base * (room / need) - 0.2);
+    el.style.fontSize = size.toFixed(2) + 'px';
+    if (el.scrollWidth > el.clientWidth + 0.5) {
+      el.style.fontSize = (base * MIN).toFixed(2) + 'px';
+    }
+  }
+
+  function run() {
+    var ns = document.querySelectorAll(SEL);
+    for (var i = 0; i < ns.length; i++) fit(ns[i]);
+  }
+
+  var timer;
+  function later() { clearTimeout(timer); timer = setTimeout(run, 60); }
+
+  if (document.readyState === 'complete') later();
+  else window.addEventListener('load', later);
+  window.addEventListener('resize', later);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(later);
+  if (window.MutationObserver) {
+    new MutationObserver(later).observe(document.documentElement,
+      { childList: true, subtree: true });
+  }
+  window.fitOneLine = run;
+})();
