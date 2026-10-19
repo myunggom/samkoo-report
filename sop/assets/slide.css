@@ -82,8 +82,10 @@
 .gd-items{display:flex;flex-direction:column;gap:.85em}
 .gi{display:grid;grid-template-columns:1fr 36%;gap:.6em;align-items:start}
 /* 화면이 넓을수록 사진 칸을 키운다 — 잘리지 않고 크게 보이도록 */
-@media (min-width:1200px){.gi{grid-template-columns:1fr 42%}}
-@media (min-width:1600px){.gi{grid-template-columns:1fr 46%}}
+/* 사진 칸을 너무 넓히면 설명 글이 두 줄로 밀려난다. 슬라이드 자체가
+   넓어지므로 비율은 조금만 올린다. */
+@media (min-width:1320px){.gi{grid-template-columns:1fr 38%}}
+@media (min-width:1800px){.gi{grid-template-columns:1fr 40%}}
 .gi.noimg{grid-template-columns:1fr}
 .gi-h{display:flex;align-items:center;gap:.45em}
 .gi-nm{font-size:1.02em;font-weight:800;color:var(--nv);line-height:1.25}
@@ -391,3 +393,16 @@ input[type=checkbox]:focus-visible + .cbx{outline:2px solid #2563eb;outline-offs
 .shotzoom .cap{position:absolute;left:0;right:0;bottom:18px;text-align:center;
   color:#fff;font-size:15px;font-weight:700;text-shadow:0 1px 4px rgba(0,0,0,.6)}
 @media print{.shotzoom{display:none!important}}
+
+/* ── 넓은 화면에서 슬라이드를 넓힌다 ──────────────────────────
+   폭이 1180px 로 고정이라 모니터를 키워도 칸이 좁아, 각부 명칭·점검
+   포인트 같은 짧은 글이 두 줄로 밀려 내려갔다. 화면에서만 넓힌다
+   (인쇄는 한 장에 맞춰야 하므로 그대로 둔다). */
+@media screen and (min-width:1320px){ .slide{width:min(1320px,100%)} }
+@media screen and (min-width:1560px){ .slide{width:min(1460px,100%)} }
+@media screen and (min-width:1800px){ .slide{width:min(1560px,100%)} }
+
+/* 글이 한 줄에 들어가도록 다듬는다 */
+.slide .pt-item>div>b{letter-spacing:-.01em}
+.slide .pt-item>div>span{letter-spacing:-.01em}
+.slide .gi ul li{letter-spacing:-.01em}
