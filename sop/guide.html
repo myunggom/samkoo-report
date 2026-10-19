@@ -95,6 +95,31 @@
 
   document.getElementById('app').innerHTML = h;
   initInline();
+
+  /* 사진을 누르면 원본 크기로 크게 본다.
+     카드 안에서는 글과 나란히 놓느라 작게 보일 수밖에 없어,
+     자세히 볼 일이 있을 때 쓰도록 한다. 다시 누르거나 Esc 로 닫는다. */
+  (function zoom() {
+    var box = document.createElement('div');
+    box.className = 'shotzoom noprint';
+    box.innerHTML = '<img alt=""><span class="cap"></span>';
+    box.addEventListener('click', close);
+    document.body.appendChild(box);
+
+    function close() { box.classList.remove('on'); }
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') close();
+    });
+    document.addEventListener('click', function (e) {
+      var im = e.target.closest ? e.target.closest('img.shot') : null;
+      if (!im || document.body.classList.contains('edit-on')) return;
+      box.querySelector('img').src = im.src;
+      var card = im.closest('.gi');
+      var nm = card ? card.querySelector('.gi-nm') : null;
+      box.querySelector('.cap').textContent = nm ? nm.textContent : '';
+      box.classList.add('on');
+    });
+  })();
 })();
 </script>
 </body>
