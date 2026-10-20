@@ -99,11 +99,13 @@ export function billFields(book: Book): BillField[] {
     const text = (col: number, row: number) => cs.find((c) => c.col === col && c.row === row && c.text && !c.formula)?.text?.trim();
     for (const c of cs) {
       if (c.formula || c.num === undefined || c.col < minCol || c.col > maxCol) continue;
-      const left = Array.from({ length: c.col - 2 }, (_, i) => text(c.col - 1 - i, c.row)).filter(Boolean).slice(0, 2).reverse() as string[];
+      // 왼쪽 이름표는 입력 영역 안에서만 (작성방법은 I열부터 — B열의 긴 안내문을 집지 않게)
+      const from = sheet === "작성방법" ? minCol : 2;
+      const left = Array.from({ length: c.col - from }, (_, i) => text(c.col - 1 - i, c.row)).filter(Boolean).slice(0, 2).reverse() as string[];
       let up: string | undefined;
       for (let r = c.row - 1; r >= Math.max(1, c.row - 8) && !up; r--) up = text(c.col, r);
       const label = [...left, up].filter((x, i, a) => x && a.indexOf(x) === i).join(" · ").replace(/\s+/g, " ") || c.ref;
-      out.push({ key: `${sheet}!${c.ref}`, label, last: c.num, date: /일자|납부/.test(label) });
+      out.push({ key: `${sheet}!${c.ref}`, label, last: c.num, date: /일자|납부일/.test(label) && c.num > 30000 }); // 엑셀 날짜 일련번호
     }
   }
   return out;

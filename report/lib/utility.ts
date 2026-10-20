@@ -193,7 +193,8 @@ export function runChecks(x: CheckInput): Check[] {
   const total = meterTotal(kind, x.meters, x.tpl);
   const bill = billUsage(kind, x.bill);
   if (total === null) out.push({ level: "확인", kind, text: "미검침분은 회입분 엑셀(작성방법!J9)에서 확인하세요 — 공용부를 미검침분으로 두는 방식이라 화면에서 계산하지 않습니다." });
-  else if (bill > 0) {
+  else if (bill <= 0) out.push({ level: "확인", kind, text: "③에 이번 달 고지서 사용량(지침)을 넣으면 미검침분을 계산합니다." });
+  else {
     const solar = kind === "전기" ? x.bill("작성방법!J18") : 0;
     const miss = round2(bill + solar - total);
     const rate = miss / (bill + solar);
