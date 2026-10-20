@@ -1,6 +1,8 @@
 // lib/utility.ts 자체점검 — node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON lib/utility.check.mts
 // 공개 저장소라 가짜 계량기·가짜 값만 쓴다. 실제 8월 자료 전수 대조는 2026-10-20 로컬에서 함(전기·열 0칸 차이).
 import assert from "node:assert/strict";
+import PizZip from "pizzip";
+import { cells, fillSummary, openBook } from "./utilityXlsx.ts";
 import { applyFixes, classify, expectedPeriod, meterTotal, parseFeed, parseFixText, runChecks, usageMonth } from "./utility.ts";
 
 const row = (cells: string[]) => `<Row>${cells.map((c, i) => (c === "" ? "" : `<Cell ss:Index="${i + 1}"><Data ss:Type="String">${c}</Data></Cell>`)).join("")}</Row>`;
@@ -31,4 +33,20 @@ const jung = parseFeed(water("2026.07.01.00 ∼ 2026.08.31.24", [m(4, "다", "1"
 const checks = runChecks({ kind: "중수", month: "2026-08", feed: jung, meters: jung.meters, tpl: [{ no: 4, name: "다", tag: "[중수]" }], bill: (k) => (k === "고지서!K15" ? 27 : 0) });
 assert.ok(checks.some((c) => c.level === "오류" && c.text.includes("-33")));
 assert.ok(runChecks({ kind: "수도", month: "2026-08", feed: sudo, meters: sudo.meters, tpl: [], bill: () => 0 }).some((c) => c.level === "오류" && c.text.includes("거꾸로")));
+// 종합표: 엑셀이 저장해 둔 「각 사」 값·(총합계 G − H) 고지서 금액·기간을 옮긴다. 엑셀에서 저장 안 한 파일은 거부
+const c = (ref: string, v: number | string, f = false) => typeof v === "number" ? `<c r="${ref}">${f ? "<f>1</f>" : ""}<v>${v}</v></c>` : `<c r="${ref}" t="inlineStr"><is><t>${v}</t></is></c>`;
+const sheetXml = (cs: string[]) => `<worksheet><sheetData>${[...new Set(cs.map((x) => +x.match(/r="[A-Z]+(\d+)"/)![1]))].map((r) => `<row r="${r}">${cs.filter((x) => x.includes(`r="${x.match(/r="([A-Z]+)/)![1]}${r}"`)).join("")}</row>`).join("")}</sheetData></worksheet>`;
+const xlsx = (sheets: Record<string, string[]>, calc = "") => {
+  const z = new PizZip(), names = Object.keys(sheets);
+  z.file("xl/workbook.xml", `<workbook><sheets>${names.map((n, i) => `<sheet name="${n}" sheetId="${i + 1}" r:id="r${i}"/>`).join("")}</sheets><calcPr${calc}/></workbook>`);
+  z.file("xl/_rels/workbook.xml.rels", `<Relationships>${names.map((_, i) => `<Relationship Target="worksheets/s${i}.xml" Id="r${i}"/>`).join("")}</Relationships>`);
+  names.forEach((n, i) => z.file(`xl/worksheets/s${i}.xml`, sheetXml(sheets[n])));
+  return z.generate({ type: "uint8array" });
+};
+const sumTpl = xlsx({ Sheet1: [c("H2", "99.01.01 ~ 99.01.31"), c("E3", "중수도요금"), c("C4", "공용부"), c("D4", 0), c("E4", 0), c("C5", "합계"), c("D5", 0), c("E5", 0), c("G7", 0, true), c("G8", 1)] });
+const each = { "작성방법": [c("B7", 46235)], "각 사 중수사용량 및 요금": [c("E4", "중수도요금"), c("C5", "공용부"), c("D5", 2.5, true), c("E5", 300, true), c("C6", "합계"), c("D6", 2.5, true), c("E6", 300, true), c("B8", "총 합계"), c("G8", 300.4, true), c("H8", 0.4, true)] };
+const out = cells(openBook(fillSummary(sumTpl, [xlsx(each)], "2026-08", (k) => expectedPeriod(k, "2026-08")).bytes), "Sheet1");
+const at = (ref: string) => out.find((x) => x.ref === ref);
+assert.equal(at("D4")?.num, 2.5); assert.equal(at("E5")?.num, 300); assert.equal(at("G8")?.num, 300); assert.equal(at("H2")?.text, "26.07.01 ~ 26.08.31");
+assert.throws(() => fillSummary(sumTpl, [xlsx(each, ' fullCalcOnLoad="1"')], "2026-08", (k) => expectedPeriod(k, "2026-08")), /엑셀에서 저장/);
 console.log("utility check ok");

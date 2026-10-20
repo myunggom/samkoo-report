@@ -11,12 +11,13 @@ import type { Feed, Fix, Group, Kind, Meter, TplMeter } from "./utility.ts";
 type Sheet = { path: string; xml: string };
 export type Book = { zip: PizZip; sheets: Map<string, Sheet>; shared: string[] };
 
-const unesc = (s: string) => s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, "&");
+const unesc = (s: string) => s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&#(x?)([\da-f]+);/gi, (_, x: string, n: string) => String.fromCodePoint(parseInt(n, x ? 16 : 10))).replace(/&amp;/g, "&");
 
 export function openBook(bytes: ArrayBuffer | Uint8Array): Book {
   const zip = new PizZip(bytes);
   const read = (p: string) => zip.file(p)?.asText() ?? "";
-  const rels = new Map([...read("xl/_rels/workbook.xml.rels").matchAll(/<Relationship\b[^>]*?Id="([^"]+)"[^>]*?Target="([^"]+)"/g)].map((m) => [m[1], m[2]]));
+  // 속성 순서는 만든 프로그램마다 다르다 (엑셀은 Id 먼저, openpyxl 은 Target 먼저)
+  const rels = new Map([...read("xl/_rels/workbook.xml.rels").matchAll(/<Relationship\b[^>]*>/g)].map((m) => [m[0].match(/ Id="([^"]+)"/)?.[1], m[0].match(/ Target="([^"]+)"/)?.[1] ?? ""]));
   const sheets = new Map<string, Sheet>();
   for (const m of read("xl/workbook.xml").matchAll(/<sheet\b[^>]*?name="([^"]+)"[^>]*?r:id="([^"]+)"/g)) {
     const t = rels.get(m[2]) ?? "";
@@ -193,12 +194,95 @@ export function fillBook(template: ArrayBuffer | Uint8Array, kind: Kind, month: 
     edit(sheet, (x) => upsertCell(x, ref, v));
   }
 
+  return { bytes: save(book), filled, missing, applied };
+}
+
+/** 고친 시트를 zip 에 다시 넣고, 열 때 엑셀이 수식을 다시 계산하게 한다 */
+function save(book: Book): Uint8Array {
   for (const s of book.sheets.values()) book.zip.file(s.path, s.xml);
   const wb = book.zip.file("xl/workbook.xml")!.asText();
   book.zip.file("xl/workbook.xml", /<calcPr\b/.test(wb)
     ? wb.replace(/<calcPr([^>]*?)\s*\/>/, (_, a: string) => `<calcPr${a.replace(/ fullCalcOnLoad="[^"]*"/, "")} fullCalcOnLoad="1"/>`)
     : wb.replace("</workbook>", '<calcPr fullCalcOnLoad="1"/></workbook>'));
-  return { bytes: book.zip.generate({ type: "uint8array", compression: "DEFLATE" }), filled, missing, applied };
+  return book.zip.generate({ type: "uint8array", compression: "DEFLATE" });
+}
+
+// ── 종합표 ─────────────────────────────────────────────────────────
+// 종합표 값은 회입분 「각 사 … 사용량 및 요금」 시트의 계산 결과(수천 개 수식)라 브라우저에서 다시 계산할 수 없다.
+// 그래서 엑셀에서 한 번 열어 저장한 회입분(엑셀이 계산해 둔 값이 들어 있음)을 받아 그 값을 옮긴다.
+// 엑셀은 저장할 때 fullCalcOnLoad 를 지우므로, 이 표시가 남아 있으면 아직 엑셀에서 저장하지 않은 파일이다.
+const yymmdd = (d: string) => d.slice(2).replace(/-/g, ".");
+type Line = { row: number; label: string; d?: number; e?: number };
+
+/** C열에 항목명이 있는 줄들 (기본요금·전력기금·전용부·공용부·합계) */
+function lines(cs: CellInfo[], from = 0, to = Infinity): Line[] {
+  const byRow = new Map<number, Line>();
+  for (const c of cs) if (c.row >= from && c.row < to && c.col === 3 && c.text) byRow.set(c.row, { row: c.row, label: c.text.trim() });
+  for (const c of cs) {
+    const l = byRow.get(c.row);
+    if (l && c.num !== undefined && (c.col === 4 || c.col === 5)) l[c.col === 4 ? "d" : "e"] = c.num;
+  }
+  return [...byRow.values()].sort((a, b) => a.row - b.row);
+}
+
+export type SummaryResult = { bytes: Uint8Array; notes: string[] };
+
+/**
+ * 종합표를 이번 달로 채운다.
+ *  - 항목마다 사용량(D)·요금(E) = 회입분 「각 사」 시트의 같은 순서 줄 (항목명이 같은지 확인)
+ *  - 고지서 요금(G) = 회입분 총합계 G − 차이 H (H 가 "총합계 − 고지서 금액" 수식)
+ *  - 기간(H) = 그 항목 고지서 기간
+ * 종합표 구역은 요금 머리글(전기요금·냉난방요금…)이 회입분 「각 사」 시트 머리글과 같은 것으로 짝짓는다.
+ */
+export function fillSummary(template: ArrayBuffer | Uint8Array, saved: (ArrayBuffer | Uint8Array)[], month: string, period: (k: Kind) => { from: string; to: string }): SummaryResult {
+  const book = openBook(template);
+  const [name, sheet] = [...book.sheets.entries()][0];
+  const cs = cells(book, name);
+  const starts = cs.filter((c) => c.col === 8 && c.text && /^\d{2}\.\d{2}\.\d{2}\s*~/.test(c.text)).map((c) => c.row).sort((a, b) => a - b);
+  if (!starts.length) throw new Error("종합표 양식에서 기간 칸(H열 yy.mm.dd ~ yy.mm.dd)을 찾지 못했습니다");
+  const head = (rows: CellInfo[], from: number) => rows.find((c) => c.col === 5 && c.row > from && c.text)?.text?.trim();
+  const notes: string[] = [];
+  const done = new Set<Kind>();
+  let x = sheet.xml;
+
+  for (const bytes of saved) {
+    const src = openBook(bytes);
+    const kind = bookKind(src);
+    if (!kind) { notes.push("회입분이 아닌 파일이 있어 건너뛰었습니다"); continue; }
+    if (/fullCalcOnLoad="(1|true)"/.test(src.zip.file("xl/workbook.xml")?.asText() ?? "")) throw new Error(`${kind} 회입분이 아직 엑셀에서 저장되지 않았습니다 — 엑셀로 열어 Ctrl+S 로 저장한 뒤 올려 주세요`);
+    const b7 = cells(src, "작성방법").find((c) => c.ref === "B7")?.num;
+    if (b7 !== excelSerial(`${month}-01`)) throw new Error(`${kind} 회입분이 ${month} 사용분이 아닙니다 (작성방법!B7)`);
+    const each = [...src.sheets.keys()].find((n) => n.startsWith("각 사"));
+    if (!each) throw new Error(`${kind} 회입분에 「각 사 … 사용량 및 요금」 시트가 없습니다`);
+    const ec = cells(src, each);
+    const i = starts.findIndex((r) => head(cs, r) === head(ec, 0));
+    if (i < 0) throw new Error(`종합표에서 ${kind} 구역(머리글 「${head(ec, 0)}」)을 찾지 못했습니다`);
+    const from = starts[i], to = starts[i + 1] ?? Infinity;
+    const dst = lines(cs, from, to), srcLines = lines(ec);
+    if (dst.length !== srcLines.length || dst.some((l, j) => l.label !== srcLines[j].label))
+      throw new Error(`${kind}: 종합표와 회입분 「${each}」의 항목 줄이 맞지 않습니다 (${dst.length}줄 / ${srcLines.length}줄)`);
+    dst.forEach((l, j) => {
+      const s = srcLines[j];
+      if (s.d !== undefined) x = upsertCell(x, `D${l.row}`, s.d);
+      if (s.e !== undefined) x = upsertCell(x, `E${l.row}`, s.e);
+    });
+    // 총합계 줄: G = 세 회사 합, H = G − 고지서 금액
+    const totRow = ec.find((c) => c.col === 2 && c.text && /총\s*합계/.test(c.text))?.row;
+    const g = ec.find((c) => c.row === totRow && c.col === 7)?.num, h = ec.find((c) => c.row === totRow && c.col === 8)?.num;
+    const billCell = cs.find((c) => c.row >= from && c.row < to && c.col === 7 && !c.formula && c.num !== undefined);
+    if (g !== undefined && h !== undefined && billCell) {
+      const bill = Math.round(g - h);
+      x = upsertCell(x, billCell.ref, bill);
+      notes.push(`${kind}: 고지서 ${bill.toLocaleString("ko-KR")}원 (세 회사 합과 차이 ${h.toFixed(1)}원)`);
+    } else notes.push(`${kind}: 고지서 금액 칸을 찾지 못해 지난달 값 그대로입니다`);
+    const p = period(kind);
+    x = upsertCell(x, `H${from}`, `${yymmdd(p.from)} ~ ${yymmdd(p.to)}`);
+    done.add(kind);
+  }
+  const left = (["전기", "열", "수도", "중수"] as Kind[]).filter((k) => !done.has(k));
+  if (left.length) notes.push(`${left.join("·")} 회입분이 없어 그 구역은 지난달 값 그대로입니다`);
+  sheet.xml = x;
+  return { bytes: save(book), notes };
 }
 
 /** 파일 이름의 사용월을 바꾼다 — "…_2026.08월.xlsx" → "…_2026.09월.xlsx" */

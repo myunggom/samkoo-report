@@ -1,11 +1,11 @@
 "use client";
 
 // 수도광열비 — 검침자료(.xls)·고지서 값을 넣으면 회입분 엑셀 4개를 채워 준다. 계산·엑셀 작업은 모두 이 브라우저에서.
-// 순서: ① 회입분 양식(지난달 파일) ② 원격검침 자료 ③ 고지서 값 ④ 검증 ⑤ 엑셀 만들기. 근거: 수도광열비_자동화_인수인계.md
+// 순서: ① 회입분 양식(지난달 파일) ② 원격검침 자료 ③ 고지서 값 ④ 검증 ⑤ 엑셀 만들기 ⑥ 종합표. 근거: 수도광열비_자동화_인수인계.md
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { KINDS, addMonth, applyFixes, classify, meterUsage, parseFeed, parseFixText, runChecks, usageMonth } from "@/lib/utility";
+import { KINDS, addMonth, applyFixes, classify, expectedPeriod, meterUsage, parseFeed, parseFixText, runChecks, usageMonth } from "@/lib/utility";
 import type { Check, Feed, Fix, Kind, MonthData, UtilityDoc } from "@/lib/utility";
-import { billFields, bookKind, carryOver, fillBook, openBook, renameForMonth, templateMeters } from "@/lib/utilityXlsx";
+import { billFields, bookKind, carryOver, fillBook, fillSummary, openBook, renameForMonth, templateMeters } from "@/lib/utilityXlsx";
 import type { BillField } from "@/lib/utilityXlsx";
 
 const input = "rounded border border-slate-300 px-2 py-1 text-sm";
@@ -83,8 +83,8 @@ export default function UtilityPage() {
     try {
       for (const f of [...files]) {
         const bytes = new Uint8Array(await f.arrayBuffer());
-        const kind = bookKind(openBook(bytes));
-        if (!kind) { setMsg(`${f.name}: 회입분 파일이 아닙니다.`); continue; }
+        const kind = bookKind(openBook(bytes)) ?? (f.name.includes("종합표") ? "종합" : null);
+        if (!kind) { setMsg(`${f.name}: 회입분·종합표 파일이 아닙니다.`); continue; }
         const url = await uploadFile(f, f.name);
         const m = f.name.match(/(\d{4})\.(\d{2})월/);
         await fetch("/api/utility", { method: "PUT", body: JSON.stringify({ op: "template", kind, template: { url, name: f.name, month: m ? `${m[1]}-${m[2]}` : month } }) });
@@ -163,6 +163,23 @@ export default function UtilityPage() {
     } catch (e) { setMsg((e as Error).message); } finally { setBusy(""); }
   }
 
+  // ⑥ 종합표 — 엑셀에서 열어 저장한 회입분(계산된 값이 들어 있음)에서 값을 옮긴다
+  async function buildSummary(files: FileList | null) {
+    const t = doc?.templates.종합;
+    if (!files?.length || !t) return;
+    setBusy("sum"); setMsg("");
+    try {
+      const saved = await Promise.all([...files].map(async (f) => new Uint8Array(await f.arrayBuffer())));
+      const r = fillSummary(await getBytes(t.url), saved, month, (k) => expectedPeriod(k, month));
+      const name = renameForMonth(t.name, month);
+      download(r.bytes, name);
+      const url = await uploadFile(new Blob([r.bytes as BlobPart]), name);
+      await fetch("/api/utility", { method: "PUT", body: JSON.stringify({ op: "template", kind: "종합", template: { url, name, month } }) });
+      await reload();
+      setMsg(r.notes.join(" / "));
+    } catch (e) { setMsg((e as Error).message); } finally { setBusy(""); }
+  }
+
   if (!doc) return <p className="p-6 text-sm text-slate-500">불러오는 중…</p>;
   const errors = checks.filter((c) => c.level === "오류").length;
 
@@ -182,7 +199,7 @@ export default function UtilityPage() {
       <section className="rounded-xl border bg-white p-4">
         <h2 className="font-bold">① 회입분 양식 <span className="text-xs font-normal text-slate-500">— 지난달에 만든 회입분 엑셀. 한 번 올리면 이후로는 여기서 만든 파일이 자동으로 다음 달 양식이 됩니다.</span></h2>
         <div className="mt-2 grid gap-1 text-sm sm:grid-cols-2">
-          {KINDS.map((k) => <div key={k}><b className="inline-block w-10">{k}</b> {doc.templates[k] ? <>{doc.templates[k]!.name} <span className="text-slate-400">({doc.templates[k]!.month})</span></> : <span className="text-red-600">없음</span>}</div>)}
+          {([...KINDS, "종합"] as const).map((k) => <div key={k}><b className="inline-block w-10">{k}</b> {doc.templates[k] ? <>{doc.templates[k]!.name} <span className="text-slate-400">({doc.templates[k]!.month})</span></> : <span className="text-red-600">없음</span>}</div>)}
         </div>
         <input type="file" accept=".xlsx" multiple className="mt-2 text-sm" disabled={!!busy} onChange={(e) => onTemplates(e.target.files)} />
       </section>
@@ -250,6 +267,14 @@ export default function UtilityPage() {
         {KINDS.map((k) => <button key={k} className={ghost} disabled={!!busy} onClick={() => build([k])}>{k}만</button>)}
         <button className={ghost} onClick={() => download(JSON.stringify({ month, ...data, fixes: doc.fixes, templates: doc.templates }, null, 1), `수도광열비_${month}.json`, "application/json")}>JSON 내려받기</button>
         {data.done && <span className="text-xs text-slate-500">만든 시각: {KINDS.filter((k) => data.done?.[k]).map((k) => `${k} ${data.done![k]!.replace("T", " ")}`).join(" · ")}</span>}
+      </section>
+
+      <section className="rounded-xl border bg-white p-4">
+        <h2 className="font-bold">⑥ 종합표 <span className="text-xs font-normal text-slate-500">— ⑤에서 받은 회입분 4개를 엑셀로 열어 저장(Ctrl+S)한 뒤 여기에 올리면, 각 사 사용량·요금과 고지서 금액·기간을 종합표에 옮겨 내려받습니다.</span></h2>
+        {doc.templates.종합
+          ? <input type="file" accept=".xlsx" multiple className="mt-2 text-sm" disabled={!!busy} onChange={(e) => { buildSummary(e.target.files); e.target.value = ""; }} />
+          : <p className="mt-2 text-sm text-red-600">① 에 지난달 종합표(파일명에 「종합표」)를 먼저 올려 주세요.</p>}
+        {busy === "sum" && <p className="mt-1 text-sm text-slate-500">만드는 중…</p>}
       </section>
     </main>
   );

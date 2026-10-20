@@ -240,7 +240,7 @@ export type MonthData = {
   blank?: Partial<Record<Kind, boolean>>; // 이번 달은 검침값 대신 면적지분율로 배분 (원격검침 칸 비움)
   updatedAt?: string;
 };
-export type UtilityDoc = { fixes: Fix[]; templates: Partial<Record<Kind, Template>>; months: Record<string, MonthData> };
+export type UtilityDoc = { fixes: Fix[]; templates: Partial<Record<Kind | "종합", Template>>; months: Record<string, MonthData> };
 export const EMPTY_UTILITY: UtilityDoc = { fixes: [], templates: {}, months: {} };
 
 // ── 입력 검증 (API) ──────────────────────────────────────────────
@@ -289,8 +289,8 @@ export function normalizeMonth(month: unknown, v: unknown): MonthData | null {
   return { feeds, inputs, usage, done, blank, updatedAt: new Date().toISOString() };
 }
 
-export function normalizeTemplate(kind: unknown, t: unknown): { kind: Kind; t: Template } | null {
+export function normalizeTemplate(kind: unknown, t: unknown): { kind: Kind | "종합"; t: Template } | null {
   const x = (t ?? {}) as Record<string, unknown>;
-  if (!isKind(kind) || !isUrl(x.url) || typeof x.month !== "string" || !MONTH_RE.test(x.month)) return null;
+  if (!(isKind(kind) || kind === "종합") || !isUrl(x.url) || typeof x.month !== "string" || !MONTH_RE.test(x.month)) return null;
   return { kind, t: { url: x.url as string, name: str(x.name, 200), month: x.month } };
 }
