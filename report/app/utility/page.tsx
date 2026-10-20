@@ -14,6 +14,8 @@ const ghost = "rounded-md border border-slate-300 px-3 py-1.5 text-sm hover:bg-s
 const kstMonth = (n = 0) => addMonth(new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 7), n);
 const serialToDate = (n: number) => new Date(Date.UTC(1899, 11, 30) + n * 86400000).toISOString().slice(0, 10);
 const EMPTY_MONTH: MonthData = { feeds: [], inputs: {} };
+// 그 달에 만드는 항목 — 중수는 2개월마다(짝수 달 사용분, 예: 8월분 = 7/1~8/31)라 홀수 달엔 없다
+const kindsOf = (month: string) => KINDS.filter((k) => k !== "중수" || +month.slice(5) % 2 === 0);
 
 async function uploadFile(file: File | Blob, name: string): Promise<string> {
   const { upload } = await import("@vercel/blob/client");
@@ -127,7 +129,7 @@ export default function UtilityPage() {
   const checks = useMemo(() => {
     if (!doc) return [] as Check[];
     const out: Check[] = [];
-    for (const k of KINDS) {
+    for (const k of kindsOf(month)) {
       const L = loaded[k];
       if (!L?.feed) { out.push({ level: "경고", kind: k, text: "원격검침 자료가 아직 없습니다." }); continue; }
       if (!L.tpl) out.push({ level: "경고", kind: k, text: "회입분 양식이 없어 고지서 칸·계량기 목록을 확인할 수 없습니다." });
@@ -216,7 +218,7 @@ export default function UtilityPage() {
 
       <section className="rounded-xl border bg-white p-4">
         <h2 className="font-bold">③ 고지서 값 <span className="text-xs font-normal text-slate-500">— 회색 글씨는 지난달 값. 비워 두면 지난달 값(전월지침은 지난달 당월지침)이 그대로 들어갑니다.</span></h2>
-        <div className="mt-2 flex gap-1">{KINDS.map((k) => <button key={k} className={k === open ? btn : ghost} onClick={() => setOpen(k)}>{k}</button>)}</div>
+        <div className="mt-2 flex gap-1">{kindsOf(month).map((k) => <button key={k} className={k === open ? btn : ghost} onClick={() => setOpen(k)}>{k}</button>)}</div>
         {(() => {
           const L = loaded[open];
           if (!L?.fields.length) return <p className="mt-3 text-sm text-slate-500">회입분 양식을 올리면 입력 칸이 나옵니다.</p>;
@@ -264,14 +266,14 @@ export default function UtilityPage() {
       <FixTable fixes={doc.fixes} onSave={saveFixes} />
 
       <section className="flex flex-wrap items-center gap-2 rounded-xl border bg-white p-4">
-        <button className={btn} disabled={!!busy} onClick={() => build(KINDS)}>{busy === "build" ? "만드는 중…" : "⑤ 회입분 엑셀 4개 만들기"}</button>
-        {KINDS.map((k) => <button key={k} className={ghost} disabled={!!busy} onClick={() => build([k])}>{k}만</button>)}
+        <button className={btn} disabled={!!busy} onClick={() => build(kindsOf(month))}>{busy === "build" ? "만드는 중…" : `⑤ 회입분 엑셀 ${kindsOf(month).length}개 만들기`}</button>
+        {kindsOf(month).map((k) => <button key={k} className={ghost} disabled={!!busy} onClick={() => build([k])}>{k}만</button>)}
         <button className={ghost} onClick={() => download(JSON.stringify({ month, ...data, fixes: doc.fixes, templates: doc.templates }, null, 1), `수도광열비_${month}.json`, "application/json")}>JSON 내려받기</button>
         {data.done && <span className="text-xs text-slate-500">만든 시각: {KINDS.filter((k) => data.done?.[k]).map((k) => `${k} ${data.done![k]!.replace("T", " ")}`).join(" · ")}</span>}
       </section>
 
       <section className="rounded-xl border bg-white p-4">
-        <h2 className="font-bold">⑥ 종합표 <span className="text-xs font-normal text-slate-500">— ⑤에서 받은 회입분 4개를 엑셀로 열어 저장(Ctrl+S)한 뒤 여기에 올리면, 각 사 사용량·요금과 고지서 금액·기간을 종합표에 옮겨 내려받습니다.</span></h2>
+        <h2 className="font-bold">⑥ 종합표 <span className="text-xs font-normal text-slate-500">— ⑤에서 받은 회입분(홀수 달은 중수 제외 3개)을 엑셀로 열어 저장(Ctrl+S)한 뒤 여기에 올리면, 각 사 사용량·요금과 고지서 금액·기간을 종합표에 옮겨 내려받습니다.</span></h2>
         {doc.templates.종합
           ? <input type="file" accept=".xlsx" multiple className="mt-2 text-sm" disabled={!!busy} onChange={(e) => { buildSummary(e.target.files); e.target.value = ""; }} />
           : <p className="mt-2 text-sm text-red-600">① 에 지난달 종합표(파일명에 「종합표」)를 먼저 올려 주세요.</p>}
