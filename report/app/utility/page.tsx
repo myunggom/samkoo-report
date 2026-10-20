@@ -58,7 +58,8 @@ export default function UtilityPage() {
           const tpl = t ? await getBytes(t.url) : undefined;
           const book = tpl ? openBook(tpl) : null;
           const fields = book ? billFields(book) : [];
-          next[k] = { tpl, fields, carry: carryOver(fields), tplMeters: book ? templateMeters(book, k) : [], feed: f ? parseFeed(decode(await getBytes(f.url)), f.file) : undefined };
+          // 양식이 이미 이 달 것(⑤를 한 번 누른 뒤 다시 만들 때)이면 전월지침이 이미 맞으므로 당월→전월로 밀지 않는다
+          next[k] = { tpl, fields, carry: t?.month === month ? {} : carryOver(fields), tplMeters: book ? templateMeters(book, k) : [], feed: f ? parseFeed(decode(await getBytes(f.url)), f.file) : undefined };
         } catch (e) {
           next[k] = { fields: [], carry: {}, tplMeters: [] };
           setMsg(`${k}: 파일을 읽지 못했습니다 — ${(e as Error).message}`);
@@ -67,7 +68,7 @@ export default function UtilityPage() {
       if (alive) setLoaded(next);
     })();
     return () => { alive = false; };
-  }, [doc, data.feeds]);
+  }, [doc, data.feeds, month]);
 
   const save = async (patch: Partial<MonthData>) => {
     const next = { ...data, ...patch };
