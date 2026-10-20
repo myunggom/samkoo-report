@@ -21,6 +21,7 @@ import type { DailyLog } from "./dailyLog";
 import type { WeeklyLog } from "./weeklyLog";
 import type { MonthlyReport } from "./monthlyReport";
 import { EMPTY_DOC } from "./billing";
+import { EMPTY_UTILITY, type UtilityDoc } from "./utility";
 import type { BillingDoc } from "./billing";
 
 const BLOB_TOKEN = process.env.BLOB_READ_WRITE_TOKEN || "";
@@ -445,6 +446,8 @@ const monthlyStore = versionedStore<MonthlyReport>("db/monthlyreport-v/", MONTHL
 const dayNoteStore = versionedStore<DayNote>("db/daynotes-v/", DAYNOTE_PREFIX, DAYNOTE_FILE);
 // 실비 청구는 문서 하나(분담 비율·반복 점검·청구 항목)를 길이 1 배열로 둔다 — 같은 비교-교환 저장을 그대로 쓰려고
 const billingStore = versionedStore<BillingDoc>("db/billing-v/", "db/billing/", path.join(DATA_DIR, "billing.json"));
+// 수도광열비 — 보정표·회입분 양식 위치·달마다 고지서 입력값과 검침자료 위치 (문서 하나)
+const utilityStore = versionedStore<UtilityDoc>("db/utility-v/", "db/utility/", path.join(DATA_DIR, "utility.json"));
 
 export async function listDailyLogs(): Promise<DailyLog[]> {
   return (await dailyStore.list()).sort((a, b) => a.date.localeCompare(b.date));
@@ -492,5 +495,14 @@ export async function getBilling(): Promise<BillingDoc> {
 export const updateBilling = <R>(fn: (doc: BillingDoc) => { doc: BillingDoc; result: R }) =>
   billingStore.update((all) => {
     const { doc, result } = fn(all[0] ?? EMPTY_DOC);
+    return { all: [doc], result };
+  });
+
+export async function getUtility(): Promise<UtilityDoc> {
+  return (await utilityStore.list())[0] ?? EMPTY_UTILITY;
+}
+export const updateUtility = <R>(fn: (doc: UtilityDoc) => { doc: UtilityDoc; result: R }) =>
+  utilityStore.update((all) => {
+    const { doc, result } = fn(all[0] ?? EMPTY_UTILITY);
     return { all: [doc], result };
   });
