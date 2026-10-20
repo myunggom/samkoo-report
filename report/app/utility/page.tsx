@@ -285,9 +285,19 @@ export default function UtilityPage() {
 
 function FixTable({ fixes, onSave }: { fixes: Fix[]; onSave: (f: Fix[]) => void }) {
   const [rows, setRows] = useState(fixes);
-  useEffect(() => setRows(fixes), [fixes]);
+  const [draft, setDraft] = useState<Record<string, string>>({}); // 입력 중인 글자 ("12." 처럼 숫자로 바꾸면 점이 사라지는 것)
+  useEffect(() => { setRows(fixes); setDraft({}); }, [fixes]);
   const set = (i: number, p: Partial<Fix>) => setRows(rows.map((r, k) => (k === i ? { ...r, ...p } : r)));
-  const n = (v: string) => (v === "" ? undefined : Number(v));
+  const num = (i: number, f: "rate" | "start" | "end", shown: number | undefined, toVal: (x: number) => number = (x) => x) => ({
+    value: draft[`${i}${f}`] ?? (shown ?? ""),
+    inputMode: "decimal" as const,
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+      const v = e.target.value.replace(/[^\d.-]/g, "");
+      setDraft({ ...draft, [`${i}${f}`]: v });
+      const x = Number(v);
+      set(i, { [f]: v === "" || !Number.isFinite(x) ? undefined : toVal(x) });
+    },
+  });
   return (
     <section className="rounded-xl border bg-white p-4">
       <h2 className="font-bold">보정표 <span className="text-xs font-normal text-slate-500">— 계량기가 틀리게 재는 경우. 계량률(%)을 적으면 사용량을 역산해 종료지침을 다시 만듭니다. 사유는 꼭 적어 주세요.</span></h2>
@@ -296,11 +306,11 @@ function FixTable({ fixes, onSave }: { fixes: Fix[]; onSave: (f: Fix[]) => void 
           <div key={i} className="flex min-w-[720px] items-center gap-1 text-sm">
             <select className={input} value={r.kind} onChange={(e) => set(i, { kind: e.target.value as Kind })}>{KINDS.map((k) => <option key={k}>{k}</option>)}</select>
             <input className={input + " w-52"} placeholder="계량기명 (검침자료의 호)" value={r.meter} onChange={(e) => set(i, { meter: e.target.value })} />
-            <input className={input + " w-20 text-right"} placeholder="계량률%" value={r.rate ? +(r.rate * 100).toFixed(2) : ""} onChange={(e) => set(i, { rate: e.target.value ? Number(e.target.value) / 100 : undefined })} />
-            <input className={input + " w-20 text-right"} placeholder="시작" value={r.start ?? ""} onChange={(e) => set(i, { start: n(e.target.value) })} />
-            <input className={input + " w-20 text-right"} placeholder="종료" value={r.end ?? ""} onChange={(e) => set(i, { end: n(e.target.value) })} />
+            <input className={input + " w-20 text-right"} placeholder="계량률%" {...num(i, "rate", r.rate ? +(r.rate * 100).toFixed(2) : undefined, (x) => x / 100)} />
+            <input className={input + " w-20 text-right"} placeholder="시작" {...num(i, "start", r.start)} />
+            <input className={input + " w-20 text-right"} placeholder="종료" {...num(i, "end", r.end)} />
             <input className={input + " flex-1"} placeholder="사유 (필수)" value={r.reason} onChange={(e) => set(i, { reason: e.target.value })} />
-            <button className="px-1 text-slate-400 hover:text-red-600" onClick={() => setRows(rows.filter((_, k) => k !== i))} aria-label="삭제">✕</button>
+            <button className="px-1 text-slate-400 hover:text-red-600" onClick={() => { setRows(rows.filter((_, k) => k !== i)); setDraft({}); }} aria-label="삭제">✕</button>
           </div>
         ))}
       </div>
