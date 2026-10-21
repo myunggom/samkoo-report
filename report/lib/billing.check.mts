@@ -1,7 +1,7 @@
 // lib/billing.ts 자체점검 — node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON lib/billing.check.mts
 // 저장소가 공개라 실제 입주사·금액이 아닌 가짜 값만 쓴다.
 import assert from "node:assert/strict";
-import { monthItems, noTaxItems, pendingItems, splitAmount, addMonth } from "./billing.ts";
+import { deferItem, monthItems, noTaxItems, pendingItems, splitAmount, addMonth } from "./billing.ts";
 import type { BillingDoc } from "./billing.ts";
 
 const shares = [{ name: "A", pct: 50 }, { name: "B", pct: 28 }, { name: "C", pct: 22 }];
@@ -31,4 +31,12 @@ assert.deepEqual(noTaxItems({ ...doc, items: doc.items.map((i) => ({ ...i, taxOn
 const skipped: BillingDoc = { ...doc, items: [...doc.items, { id: "r-q-2026-09", month: "2026-09", ruleId: "q", name: "분기 점검", amount: 300000, status: "todo", skip: true }] };
 assert.deepEqual(monthItems(skipped, "2026-09").map((i) => i.name), ["월 점검"], "이 달만 뺀 반복 항목은 다시 생기지 않는다");
 assert.ok(!pendingItems(skipped, "2026-10").some((i) => i.name === "분기 점검" && i.month === "2026-09"));
+// 다음 달로 미루기: 반복 항목은 이 달에서 빠지고 다음 달에 단독 항목으로, 다음 달 자기 반복 항목과 따로 남는다
+const rd: BillingDoc = { shares, rules: [{ id: "m", name: "월 점검", amount: 100, months: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], from: "2026-09", active: true }], items: [] };
+const [orig, moved] = deferItem(monthItems(rd, "2026-09")[0], "new");
+rd.items.push(orig, moved);
+assert.deepEqual(monthItems(rd, "2026-09"), []);
+assert.deepEqual(monthItems(rd, "2026-10").map((i) => i.name), ["월 점검", "월 점검 (9월분)"]);
+assert.ok(!pendingItems(rd, "2026-10").some((i) => i.month === "2026-09"));
+assert.deepEqual(deferItem({ id: "x", month: "2026-12", name: "단독", amount: 5, status: "todo" }, "y").map((i) => [i.id, i.month]), [["x", "2027-01"]]);
 console.log("billing check ok");

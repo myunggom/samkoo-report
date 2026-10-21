@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBilling, updateBilling } from "@/lib/store";
-import { noTaxItems, normalizeItem, normalizeRule, normalizeShares, pendingItems, splitAmount } from "@/lib/billing";
+import { deferItem, noTaxItems, normalizeItem, normalizeRule, normalizeShares, pendingItems, splitAmount } from "@/lib/billing";
 import type { BillingDoc } from "@/lib/billing";
 
 export const dynamic = "force-dynamic";
@@ -22,16 +22,16 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(doc);
 }
 
-// 본문 { op, ... } — shares: 분담 비율 / rule·deleteRule: 반복 점검 / item·deleteItem: 그 달 청구 항목
+// 본문 { op, ... } — shares: 분담 비율 / rule·deleteRule: 반복 점검 / item·deleteItem: 그 달 청구 항목 / defer: 항목을 다음 달로
 export async function PUT(req: NextRequest) {
   const b = await req.json().catch(() => null);
   const op = b?.op;
   const shares = op === "shares" ? normalizeShares(b.shares) : null;
   const rule = op === "rule" ? normalizeRule(b.rule) : null;
-  const item = op === "item" ? normalizeItem(b.item) : null;
+  const item = op === "item" || op === "defer" ? normalizeItem(b.item) : null;
   const id = typeof b?.id === "string" ? b.id : "";
-  if ((op === "shares" && !shares) || (op === "rule" && !rule) || (op === "item" && !item) ||
-      (op.startsWith?.("delete") && !id) || !["shares", "rule", "deleteRule", "item", "deleteItem"].includes(op)) {
+  if ((op === "shares" && !shares) || (op === "rule" && !rule) || ((op === "item" || op === "defer") && !item) ||
+      (op.startsWith?.("delete") && !id) || !["shares", "rule", "deleteRule", "item", "deleteItem", "defer"].includes(op)) {
     return NextResponse.json({ error: "입력이 올바르지 않습니다." }, { status: 400 });
   }
   const doc = await updateBilling((cur): { doc: BillingDoc; result: BillingDoc } => {
@@ -39,7 +39,11 @@ export async function PUT(req: NextRequest) {
     if (shares) d.shares = shares;
     if (rule) d.rules = [...d.rules.filter((r) => r.id !== rule.id), rule];
     if (op === "deleteRule") d.rules = d.rules.filter((r) => r.id !== id);
-    if (item) d.items = [...d.items.filter((i) => i.id !== item.id), item];
+    if (item && op === "item") d.items = [...d.items.filter((i) => i.id !== item.id), item];
+    if (item && op === "defer") {
+      const writes = deferItem(item, crypto.randomUUID());
+      d.items = [...d.items.filter((i) => !writes.some((w) => w.id === i.id)), ...writes];
+    }
     if (op === "deleteItem") d.items = d.items.filter((i) => i.id !== id);
     return { doc: d, result: d };
   });

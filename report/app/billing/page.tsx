@@ -129,6 +129,10 @@ export default function BillingPage() {
                     <td className="px-1.5 py-1 text-right"><input className={cell + " w-24 text-right"} inputMode="numeric" defaultValue={won(i.amount)} onBlur={(e) => num(e.target.value) !== i.amount && saveItem(i, { amount: num(e.target.value) })} aria-label="금액" /></td>
                     {parts.map((v, k) => <td key={k} className="px-1.5 py-1 text-right tabular-nums">{won(v)}</td>)}
                     <td className="px-1.5 py-1 text-right">
+                      {i.status === "todo" && (
+                        <button className="mr-1 rounded border border-slate-300 px-2 py-0.5 text-xs text-slate-600 hover:bg-slate-50"
+                          onClick={() => confirm(`「${i.name}」을 ${addMonth(i.month, 1)} 로 미룰까요?`) && put({ op: "defer", item: i })}>다음 달로</button>
+                      )}
                       <button className="rounded border border-red-200 px-2 py-0.5 text-xs text-red-600 hover:bg-red-50"
                         onClick={() => i.ruleId
                           ? confirm(`${i.month} 「${i.name}」을 이 달 청구에서 뺄까요? (반복 점검은 그대로, 다음 달부터 계속 생깁니다)`) && saveItem(i, { skip: true })

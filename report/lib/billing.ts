@@ -86,6 +86,21 @@ export function pendingItems(doc: BillingDoc, thisMonth: string): BillingItem[] 
   return out;
 }
 
+/**
+ * 「청구 전」 항목을 다음 달로 미룬다 — 저장할 항목들을 돌려준다.
+ * 반복 항목은 이 달 것을 빼고(skip) 다음 달에 「이름 (M월분)」 단독 항목으로 옮긴다
+ * (다음 달 자기 반복 항목과 id·이름이 겹치지 않게). 단독 항목은 달만 바꾼다.
+ */
+export function deferItem(item: BillingItem, newId: string): BillingItem[] {
+  const next = addMonth(item.month, 1);
+  if (!item.ruleId) return [{ ...item, month: next, virtual: undefined }];
+  const label = `${Number(item.month.slice(5))}월분`;
+  return [
+    { ...item, skip: true, virtual: undefined, note: `${next} 로 미룸` },
+    { ...item, id: newId, month: next, ruleId: undefined, virtual: undefined, name: item.name.includes(label) ? item.name : `${item.name} (${label})`, note: `${item.month} 에서 미룸` },
+  ];
+}
+
 // ── 입력 검증 (API) ──────────────────────────────────────────────
 const text = (v: unknown, max = 200) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : undefined);
 const money = (v: unknown) => {
