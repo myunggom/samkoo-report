@@ -56,12 +56,18 @@ async function writeLocal(file: string, data: unknown): Promise<void> {
 // ── Blob JSON 헬퍼 (버전 파일 방식) ───────────────────────────────
 async function readBlobJson<T>(prefix: string, fallback: T): Promise<T> {
   const { list } = await import("@vercel/blob");
-  const { blobs } = await list({ prefix });
-  if (!blobs.length) return fallback;
-  blobs.sort((a, b) => b.pathname.localeCompare(a.pathname));
-  const res = await fetch(blobs[0].url, { cache: "no-store" });
-  if (!res.ok) return fallback;
-  return (await res.json()) as T;
+  // 목록과 읽기 사이에 다른 저장이 그 파일을 정리했으면 404 — 목록부터 다시. 그래도 못 읽으면 빈 값 대신 오류.
+  // (빈 값을 돌려주면 다음 저장이 「빈 목록 + 새 항목」으로 덮어써 전부 사라진다 — 2026-10-20 hgp 보고서 유실)
+  for (let attempt = 0; ; attempt++) {
+    const { blobs } = await list({ prefix });
+    if (!blobs.length) return fallback;
+    // 파일명에 zero-pad 타임스탬프가 들어있어 사전식 정렬의 마지막이 최신
+    blobs.sort((a, b) => b.pathname.localeCompare(a.pathname));
+    const res = await fetch(blobs[0].url, { cache: "no-store" });
+    if (res.ok) return (await res.json()) as T;
+    if (res.status !== 404 || attempt >= 5) throw new Error(`저장된 자료를 읽지 못했습니다 (${res.status})`);
+    await new Promise((r) => setTimeout(r, 100 + Math.random() * 200));
+  }
 }
 async function writeBlobJson(prefix: string, data: unknown): Promise<void> {
   const { put, list, del } = await import("@vercel/blob");
@@ -71,9 +77,16 @@ async function writeBlobJson(prefix: string, data: unknown): Promise<void> {
     contentType: "application/json; charset=utf-8",
     addRandomSuffix: false,
   });
+  // 정리: 내 파일보다 「오래된」 것만, 그중 최근 4개는 남긴다. 나보다 새 파일(거의 동시에 저장한 다른 요청)은 지우지 않는다.
+  // 예전엔 내 것 빼고 전부 지워서, 0.7초 간격 저장 두 건이 서로의 파일을 지워 목록이 통째로 비었다 (2026-10-20 hgp 보고서 유실).
+  // ponytail: 동시 저장은 여전히 나중 것이 이긴다(먼저 저장한 쪽 수정이 빠질 수 있음) — 전부 사라지지는 않는다. 완전히 막으려면 casUpdate 방식으로.
   try {
     const { blobs } = await list({ prefix });
-    const olds = blobs.filter((b) => b.pathname !== key).map((b) => b.url);
+    const olds = blobs
+      .filter((b) => b.pathname < key)
+      .sort((a, b) => b.pathname.localeCompare(a.pathname))
+      .slice(4)
+      .map((b) => b.url);
     if (olds.length) await del(olds);
   } catch {
     /* 정리 실패는 치명적이지 않음 */
