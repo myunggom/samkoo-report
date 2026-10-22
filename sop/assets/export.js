@@ -109,11 +109,13 @@
   }
   function renderNodes(nodes, type, quality) {
     var out = [];
-    var scale = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
     function one(i) {
       if (i >= nodes.length) return Promise.resolve(out);
       var node = nodes[i];
       var w = PXW, h = Math.max(node.scrollHeight, Math.round(PXW * A4H / A4W));
+      /* 기기 화면 배율과 상관없이 3배(A4 약 288dpi)로 — 예전엔 PC(배율 1)에서 96dpi 라 글자가 뭉개졌다.
+         휴대폰 캔버스 한도(약 1,600만 화소)를 넘지 않게 긴 페이지는 배율을 낮춘다. */
+      var scale = Math.max(1, Math.min(3, Math.sqrt(16e6 / (w * h))));
       var opt = { backgroundColor: '#ffffff', pixelRatio: scale, cacheBust: false,
         width: w, height: h, style: { margin: '0', transform: 'none' } };
       var fn = (type === 'png') ? htmlToImage.toPng : htmlToImage.toJpeg;
