@@ -8,7 +8,7 @@
 //   1-1 6·7행 교육 1건, 1-2 칸 안 사진 B10·D10·G10·G17 + 설명 B24·D24·G24
 //   2-1 C17~C21 증감분석 / 2-2~2-6 C~N 6행 작년·7행 올해 사용량, 31·32행 요금, N16·N41 특이사항
 //   3-1 D6 평면도 사진 / 3-2 6~19행 연락처 / 4-1 5행부터 실적 / 4-2 공종 제목 칸 기준 세트 12개
-//   5-1 5행부터 계획 / 5-2 9행부터 근무자(7·8행 본사 지원 인원은 양식 그대로), J~AN 날짜
+//   5-1 5행부터 계획 / 5-2 9행부터 근무자(7·8행 본사 지원 인원은 비우고 숨김), J~AN 날짜
 // 사람 사진이 들어간 1-3 조직도·3-1 층별 표는 웹에 칸이 없어 양식 그대로 둔다 (Q4 날짜만 바꿈).
 
 import PizZip from "pizzip";
@@ -329,9 +329,11 @@ export async function fillMonthlyXlsx(template: ArrayBuffer | Uint8Array, m: Mon
   const sch = b.sheet("5-2"), days = daysIn(next);
   cap("근무자", m.staff.length, 11);
   const fill = (r: number, row: string[]) => { for (let d = 0; d < 31; d++) b.set(sch, ref(10 + d, r), row[d]?.trim() ?? ""); };
+  // 7·8행(본사 지원: 관리소장·서무주임)은 근무표에서 뺀다(사용자 2026-10-23) — 줄을 지우면 아래 병합·합계 수식이 밀리므로
+  // 내용을 비우고 줄을 숨긴다(화면·인쇄에 안 나옴). 합계(21~23행)는 원래 9행부터라 그대로 맞다.
   for (const r of [7, 8]) {
-    const name = b.textAt(sch, `F${r}`);
-    if (name) fill(r, scheduleRow({ group: "", dept: "", title: "", to: 1, name }, next, m.holidays, m.overrides[name]));
+    for (let c = 2; c <= 41; c++) b.set(sch, ref(c, r), null);
+    sch.xml = sch.xml.replace(new RegExp(`<row r="${r}"[^>]*?(/?>)`), (tag, end: string) => tag.slice(0, -end.length).replace(/ hidden="[^"]*"/, "") + ` hidden="1"${end}`);
   }
   for (let i = 0; i < 11; i++) {
     const s = m.staff[i], r = 9 + i;
