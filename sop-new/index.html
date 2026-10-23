@@ -211,52 +211,68 @@ h2:first-child{margin-top:0}
 .ppe img{height:46px; width:auto; margin:0 auto 8px; object-fit:contain}
 .ppe span{font-size:12.5px; font-weight:600; white-space:nowrap}
 
-/* 위험성평가 */
-.step.rk{grid-template-columns:1fr 128px}
-.rk-g{display:grid; gap:14px; grid-template-columns:repeat(3,1fr); margin-top:4px}
-.rk-g h3{margin:0 0 5px; font-size:11.5px; font-weight:700; color:var(--ink-3)}
-.rk-g ul{margin:0; padding-left:15px; font-size:13px; color:var(--ink-2)}
-.rk-g li+li{margin-top:3px}
-.rk-r{display:flex; flex-direction:column; align-items:center; gap:4px;
-  justify-content:center; border-left:1px solid var(--line); padding-left:14px}
-.score{text-align:center}
-.score b{display:block; font-size:24px; font-weight:800; line-height:1.1;
-  font-variant-numeric:tabular-nums; color:var(--warn)}
-.score.ok b{color:var(--accent-ink)}
-.score span{display:block; font-size:11px; color:var(--ink-3)}
-.score em{font-style:normal; font-size:11px; color:var(--ink-3);
-  font-variant-numeric:tabular-nums}
-.arrow{color:var(--ink-3); font-size:13px; line-height:1}
-.due{margin-top:6px; font-size:11.5px; color:var(--ink-2);
-  background:var(--bg-sunk); padding:2px 8px; border-radius:5px}
+/* 서식 (위험성평가 · 완료보고서) */
+.sheet{border:1px solid var(--line); border-radius:var(--r); padding:18px;
+  background:var(--bg-sub)}
+.sheet-h{margin-bottom:14px}
+.sheet-h b{display:block; font-size:16px; font-weight:700; letter-spacing:-.015em}
+.sheet-h span{display:block; font-size:12.5px; color:var(--ink-2); margin-top:3px}
+.scroll{overflow-x:auto; margin:0 -4px; padding:0 4px}
+table{border-collapse:collapse; width:100%; background:var(--bg)}
+table.head{margin-bottom:14px; font-size:13px}
+table.head th{background:var(--bg-sunk); color:var(--ink-2); font-weight:600;
+  text-align:left; white-space:nowrap; padding:8px 10px;
+  border:1px solid var(--line); width:1%}
+table.head td{padding:6px 10px; border:1px solid var(--line)}
+table.head input{width:100%; min-width:80px; border:0; background:none;
+  color:var(--ink); font:inherit; font-size:13px; padding:2px 0}
+table.head input:focus{outline:2px solid var(--accent); outline-offset:2px;
+  border-radius:4px}
 
-/* 완료보고서 */
+table.grid{font-size:12.5px; min-width:1000px}
+table.grid th{background:var(--bg-sunk); color:var(--ink-2); font-weight:700;
+  padding:7px 8px; border:1px solid var(--line); white-space:nowrap}
+table.grid td{padding:7px 8px; border:1px solid var(--line); vertical-align:top}
+table.grid td.c{text-align:center; white-space:nowrap}
+table.grid td.n{font-variant-numeric:tabular-nums; font-weight:700}
+table.grid td.hi{background:var(--warn-sub); color:var(--warn)}
+table.grid td.mid{background:var(--bg-sunk)}
+table.grid td.low{background:var(--accent-sub); color:var(--accent-ink)}
+table.grid.crew{min-width:520px}
+table.grid .sg-c{height:38px}
+ul.cell{margin:0; padding-left:15px}
+ul.cell li+li{margin-top:3px}
+
+table.legend{margin-top:12px; font-size:12.5px; color:var(--ink-2);
+  background:none; width:auto}
+table.legend td{padding:4px 16px 4px 0; border:0}
+.chip{display:inline-block; padding:1px 8px; border-radius:5px;
+  font-weight:700; font-variant-numeric:tabular-nums}
+.chip.hi{background:var(--warn-sub); color:var(--warn)}
+.chip.mid{background:var(--bg-sunk); color:var(--ink-2)}
+.chip.low{background:var(--accent-sub); color:var(--accent-ink)}
+.fine{margin:12px 0 0; font-size:12px; color:var(--ink-3); line-height:1.65}
+
+ul.checks{margin:0; padding:0; list-style:none}
+ul.checks li{display:flex; gap:10px; align-items:center; padding:10px 2px;
+  border-bottom:1px solid var(--line); font-size:14px}
+ul.checks input{width:18px; height:18px; accent-color:var(--accent); flex:none}
+
 .shots{display:grid; gap:12px; grid-template-columns:repeat(4,1fr)}
-.drop{
-  display:grid; place-items:center; gap:3px; cursor:pointer;
+.drop{display:grid; place-items:center; gap:3px; cursor:pointer;
   aspect-ratio:4/3; border:1px dashed var(--line-2); border-radius:var(--r);
-  background:var(--bg-sub); text-align:center; padding:10px;
-}
+  background:var(--bg); text-align:center; padding:10px}
 .drop:hover{border-color:var(--accent); background:var(--accent-sub)}
 .drop .plus{font-size:21px; color:var(--ink-3); line-height:1}
-.drop b{font-size:13.5px; font-weight:600}
+.drop b{font-size:13px; font-weight:600}
 .drop em{font-style:normal; font-size:11.5px; color:var(--ink-3)}
-.sign{display:grid; gap:12px; grid-template-columns:repeat(2,1fr)}
-.sg{border:1px solid var(--line); border-radius:var(--r); padding:14px; background:var(--bg-sub)}
-.sg h3{margin:0 0 9px; font-size:12.5px; font-weight:700; color:var(--ink-2)}
-.pad{height:84px; border:1px dashed var(--line-2); border-radius:7px;
-  display:grid; place-items:center; color:var(--ink-3); font-size:13px;
-  background:var(--bg)}
-.who{margin-top:8px; font-size:13px; color:var(--ink-2)}
 .act{margin-top:22px}
-.btn{
-  min-height:var(--tap); padding:0 20px; border-radius:var(--r);
-  background:var(--accent); color:#fff; font-size:15px; font-weight:700;
-}
+.btn{min-height:var(--tap); padding:0 20px; border-radius:var(--r);
+  background:var(--accent); color:#fff; font-size:15px; font-weight:700}
 .btn:hover{filter:brightness(.94)}
 .btn:active{transform:translateY(1px)}
 
-/* 빈 상태 */
+/* 빈 상태 *//* 빈 상태 */
 .empty{
   border:1px dashed var(--line-2); border-radius:var(--r);
   padding:44px 24px; text-align:center; color:var(--ink-3);
@@ -289,12 +305,10 @@ h2:first-child{margin-top:0}
   .bar-in,.body{padding-left:16px; padding-right:16px}
   h1{font-size:21px}
   .notes{grid-template-columns:1fr}
-  .step.rk{grid-template-columns:1fr}
-  .rk-g{grid-template-columns:1fr}
-  .rk-r{border-left:0; border-top:1px solid var(--line); padding:12px 0 0;
-    flex-direction:row; gap:16px}
   .shots{grid-template-columns:repeat(2,1fr)}
-  .sign{grid-template-columns:1fr}
+  .sheet{padding:14px}
+  table.head th,table.head td{display:block; width:auto; border-top:0}
+  table.head tr:first-child th:first-child{border-top:1px solid var(--line)}
   .step{grid-template-columns:1fr}
   .shot{aspect-ratio:16/9}
 }
@@ -463,53 +477,144 @@ h2:first-child{margin-top:0}
       '이 작업에는 아직 자료가 없습니다.</div>';
   }
 
-  /* 위험성평가 : 빈도 x 강도. 숫자는 표가 아니라 칩으로 읽힌다. */
+  /* 위험성평가 : 기존 risk.html 과 같은 표 구성 */
+  function li(a) {
+    return '<ul class="cell">' + (a || []).map(function (x) {
+      return '<li>' + esc(x) + '</li>';
+    }).join('') + '</ul>';
+  }
+  function lv(n) { return n >= 15 ? 'hi' : n >= 8 ? 'mid' : n > 0 ? 'low' : ''; }
+
   function riskView(t) {
     var r = t.risk || {}, rows = r.rows || [];
     if (!rows.length) return empty('위험성평가표');
-    var h = '<p class="lede">빈도 × 강도로 위험도를 매기고, 조치 후 남는 위험을 다시 적습니다.' +
-      (r.target ? ' 대상 : ' + esc(r.target) : '') + '</p>';
-    h += '<div class="steps">' + rows.map(function (x, i) {
-      var before = (x.f || 0) * (x.s || 0), after = (x.f2 || 0) * (x.s2 || 0);
-      return '<div class="step rk"><div class="rk-l">' +
-        '<div class="step-h"><span class="num">' + (i + 1) + '</span>' +
-        '<span class="nm">' + esc(x.step) + '</span></div>' +
-        '<div class="rk-g"><div><h3>위험요인</h3><ul>' +
-        (x.hazards || []).map(function (y) { return '<li>' + esc(y) + '</li>'; }).join('') +
-        '</ul></div><div><h3>예상 피해</h3><ul>' +
-        (x.results || []).map(function (y) { return '<li>' + esc(y) + '</li>'; }).join('') +
-        '</ul></div><div><h3>조치 사항</h3><ul>' +
-        (x.measures || []).map(function (y) { return '<li>' + esc(y) + '</li>'; }).join('') +
-        '</ul></div></div></div>' +
-        '<div class="rk-r"><div class="score"><b>' + before + '</b>' +
-        '<span>조치 전</span><em>' + (x.f || 0) + ' × ' + (x.s || 0) + '</em></div>' +
-        '<div class="arrow">↓</div>' +
-        '<div class="score ok"><b>' + after + '</b>' +
-        '<span>조치 후</span><em>' + (x.f2 || 0) + ' × ' + (x.s2 || 0) + '</em></div>' +
-        (x.due ? '<div class="due">기한 ' + esc(x.due) + '</div>' : '') +
-        '</div></div>';
-    }).join('') + '</div>';
+    var h = '<div class="sheet"><table class="head"><tr>' +
+      '<th>공정 / 작업명</th><td>' + esc(t.name) + '</td>' +
+      '<th>평가대상</th><td>' + esc(r.target || '') + '</td>' +
+      '<th>평가일자</th><td><input placeholder="2026.00.00"></td>' +
+      '<th>평가자</th><td><input placeholder="성명"></td></tr></table>';
+
+    h += '<div class="scroll"><table class="grid"><thead>' +
+      '<tr><th rowspan="2">NO</th><th rowspan="2">작업단계</th>' +
+      '<th rowspan="2">유해 · 위험요인</th><th rowspan="2">위험 발생 상황 및 결과</th>' +
+      '<th colspan="3">현재 위험도</th>' +
+      '<th rowspan="2">위험성 감소대책 (개선 조치사항)</th>' +
+      '<th rowspan="2">조치<br>기한</th><th rowspan="2">담당자</th>' +
+      '<th rowspan="2">조치<br>여부</th><th colspan="3">개선 후 위험도</th></tr>' +
+      '<tr><th>빈도</th><th>강도</th><th>위험도</th>' +
+      '<th>빈도</th><th>강도</th><th>위험도</th></tr></thead><tbody>';
+
+    rows.forEach(function (x, i) {
+      var a1 = (x.f || 0) * (x.s || 0), a2 = (x.f2 || 0) * (x.s2 || 0);
+      h += '<tr><td class="c">' + (i + 1) + '</td>' +
+        '<td>' + esc(x.step) + '</td>' +
+        '<td>' + li(x.hazards) + '</td>' +
+        '<td>' + li(x.results) + '</td>' +
+        '<td class="c n">' + (x.f || '') + '</td>' +
+        '<td class="c n">' + (x.s || '') + '</td>' +
+        '<td class="c n ' + lv(a1) + '">' + a1 + '</td>' +
+        '<td>' + li(x.measures) + '</td>' +
+        '<td class="c">' + esc(x.due || '') + '</td>' +
+        '<td class="c">' + esc(x.owner || '') + '</td>' +
+        '<td class="c">' + esc(x.done || '') + '</td>' +
+        '<td class="c n">' + (x.f2 || '') + '</td>' +
+        '<td class="c n">' + (x.s2 || '') + '</td>' +
+        '<td class="c n ' + lv(a2) + '">' + a2 + '</td></tr>';
+    });
+    h += '</tbody></table></div>';
+
+    h += '<table class="legend"><tr>' +
+      [['15 ~ 25', '고위험', 'hi'], ['8 ~ 12', '중위험', 'mid'],
+       ['1 ~ 6', '저위험', 'low']].map(function (g) {
+        return '<td><span class="chip ' + g[2] + '">' + g[0] + '</span> ' +
+          g[1] + '</td>';
+      }).join('') + '</tr></table>' +
+      '<p class="fine">※ 위험성 = 빈도 × 강도　　' +
+      '※ 평가일자 · 평가자 · 조치여부는 실제 평가 시행 시 기입</p></div>';
     return h;
   }
 
-  /* 완료보고서 : 현장에서 채우는 화면 */
+  /* 완료보고서 : 기존 report.html 과 같은 서식 */
+  var RP = {
+    title: '사전작업 허가 · 위험성평가 교육 확인 서명부',
+    subtitle: '표준작업 1건 · 1일 단위로 1장 작성  ｜  교육 · 점검 · 작업 · 정리 사진 4종 필수 첨부',
+    fields: ['작업명', '작업일시', '작업장소', '작업책임자', '작업인원 · 명단', '현장명'],
+    slots: [
+      ['교육 사진', '작업 전 안전교육 ( TBM ) 실시 장면'],
+      ['안전장구류 점검 사진', '개인보호구 · 장비 점검 상태'],
+      ['작업 사진', '실제 작업 수행 장면'],
+      ['종료 후 정리 사진', '작업장 정리 · 원상복구 상태']
+    ],
+    checkTitle: '교육 및 평가 실시 내용',
+    checks: [
+      '안전작업허가(사전작업 허가) 내용 고지',
+      '유해 · 위험요인 및 위험성평가 결과 전파',
+      '안전작업수칙 및 비상조치 계획 교육',
+      '개인보호구 지급 · 착용상태 확인',
+      '작업 전 안전점검회의(TBM) 실시'
+    ],
+    crewTitle: '작업 참여자 확인 서명부',
+    crewHead: ['연번', '소속', '성명', '확인 서명'],
+    crewRows: 5,
+    signTitle: '확  인',
+    signHead: ['구분', '성명', '확인 서명'],
+    signs: ['작성자', '승인자'],
+    pledge: '본인은 위 작업과 관련하여 안전작업허가 내용 및 위험성평가 결과에 대한 설명을 듣고 충분히 이해하였으며, 안전수칙을 준수할 것을 서약합니다. 또한 급박한 위험을 인지한 경우 즉시 작업을 중지하고 대피한 후 보고할 수 있음(작업중지권)을 고지받았습니다.',
+    legal: '※ 법적 근거 : 「중대재해처벌법」 제4조 · 시행령 제4조제3호 · 제7호 · 제8호 · 제9호 ｜ 「산업안전보건법」 제16조 · 제29조 · 제36조 · 제52조　　※ 위험성평가표 · 작업 완료보고서와 함께 1건 1세트로 편철하여 3년간 보존'
+  };
+
   function reportView(t) {
-    var need = ['작업 전', '작업 중', '작업 후', '정리 상태'];
-    return '<p class="lede">작업을 마치면 사진 4종을 올리고 서명을 받습니다. ' +
-      '저장하면 PDF 로 내려받을 수 있습니다.</p>' +
-      '<h2>현장 사진</h2><div class="shots">' +
-      need.map(function (n) {
+    var R = RP, v = [t.name, '', t.place || '', '', '', ''];
+    var h = '<div class="sheet"><div class="sheet-h"><b>' + esc(R.title) +
+      '</b><span>' + esc(R.subtitle) + '</span></div>';
+
+    h += '<table class="head">';
+    for (var i = 0; i < 6; i += 3) {
+      h += '<tr>';
+      for (var j = i; j < i + 3; j++) {
+        h += '<th>' + esc(R.fields[j]) + '</th><td>' +
+          (v[j] ? esc(v[j]) : '<input>') + '</td>';
+      }
+      h += '</tr>';
+    }
+    h += '</table>';
+
+    h += '<h2>현장 사진 4종</h2><div class="shots">' +
+      R.slots.map(function (sl, i) {
         return '<label class="drop"><input type="file" accept="image/*" hidden>' +
-          '<span class="plus">＋</span><b>' + n + '</b>' +
-          '<em>눌러서 촬영 또는 선택</em></label>';
-      }).join('') + '</div>' +
-      '<h2>확인</h2><div class="sign">' +
-      [['작성자', t.ppe ? '시설팀' : ''], ['승인자', '관리소장']].map(function (s) {
-        return '<div class="sg"><h3>' + s[0] + '</h3>' +
-          '<div class="pad">여기에 서명</div>' +
-          '<div class="who">' + esc(s[1]) + '</div></div>';
-      }).join('') + '</div>' +
-      '<div class="act"><button class="btn">저장하고 PDF 만들기</button></div>';
+          '<span class="plus">＋</span><b>' + (i + 1) + '. ' + esc(sl[0]) +
+          '</b><em>' + esc(sl[1]) + '</em></label>';
+      }).join('') + '</div>';
+
+    h += '<h2>' + esc(R.checkTitle) + '</h2><ul class="checks">' +
+      R.checks.map(function (c) {
+        return '<li><input type="checkbox"><span>' + esc(c) + '</span></li>';
+      }).join('') + '</ul>';
+
+    h += '<h2>' + esc(R.crewTitle) + '</h2><div class="scroll">' +
+      '<table class="grid crew"><thead><tr>' +
+      R.crewHead.map(function (x) { return '<th>' + esc(x) + '</th>'; }).join('') +
+      '</tr></thead><tbody>';
+    for (var k = 1; k <= R.crewRows; k++) {
+      h += '<tr><td class="c">' + k + '</td><td></td><td></td>' +
+        '<td class="sg-c"></td></tr>';
+    }
+    h += '</tbody></table></div>';
+    h += '<p class="fine">' + esc(R.pledge) + '</p>';
+
+    h += '<h2>' + esc(R.signTitle) + '</h2><div class="scroll">' +
+      '<table class="grid"><thead><tr>' +
+      R.signHead.map(function (x) { return '<th>' + esc(x) + '</th>'; }).join('') +
+      '</tr></thead><tbody>' +
+      R.signs.map(function (n) {
+        return '<tr><td class="c">' + esc(n) + '</td><td></td>' +
+          '<td class="sg-c"></td></tr>';
+      }).join('') + '</tbody></table></div>';
+
+    h += '<p class="fine">' + esc(R.legal) + '</p>' +
+      '<div class="act"><button class="btn">저장하고 PDF 만들기</button></div>' +
+      '</div>';
+    return h;
   }
 
   function draw() {
