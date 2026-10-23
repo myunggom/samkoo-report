@@ -68,6 +68,17 @@ a{color:inherit}
 }
 .brand .logo{width:118px; height:auto; margin-bottom:10px}
 .brand b{display:block; font-size:14.5px; font-weight:700; letter-spacing:-.01em}
+.theme{display:flex; gap:3px; margin-top:11px}
+.theme button{
+  flex:1; padding:6px 0; border-radius:7px;
+  border:1px solid var(--line); background:var(--bg);
+  font-size:11.5px; font-weight:600; color:var(--ink-3);
+}
+.theme button:hover{color:var(--ink-2); border-color:var(--line-2)}
+.theme button[aria-pressed="true"]{
+  background:var(--accent-sub); border-color:var(--accent);
+  color:var(--accent-ink);
+}
 /* 로고는 밝은 배경용과 어두운 배경용 두 장. 테마에 맞는 것만 보인다 */
 .brand .dark{display:none}
 :root:not([data-theme="light"]){
@@ -170,6 +181,11 @@ h2:first-child{margin-top:0}
   background:var(--bg-sunk); overflow:hidden; margin:0;
 }
 .fig .wrap{position:relative; line-height:0}
+.fig .wrap.none{
+  aspect-ratio:4/3; display:grid; place-items:center; line-height:1.5;
+  border-bottom:1px dashed var(--line-2);
+}
+.fig .wrap.none span{font-size:13px; color:var(--ink-3)}
 .fig img{width:100%; height:auto}
 .fig figcaption{
   padding:9px 14px; font-size:12.5px; color:var(--ink-2);
@@ -221,6 +237,11 @@ h2:first-child{margin-top:0}
   border-radius:7px; border:1px solid var(--line); background:var(--bg-sunk);
   cursor:zoom-in;
 }
+.shot.none{
+  display:grid; place-items:center; cursor:default;
+  border-style:dashed; border-color:var(--line-2);
+}
+.shot.none span{font-size:12px; color:var(--ink-3)}
 .step-h{display:flex; align-items:center; gap:9px; margin-bottom:7px; flex-wrap:wrap}
 .step-h .nm{font-size:14.5px; font-weight:700; letter-spacing:-.015em}
 .tag{
@@ -348,6 +369,18 @@ table.grid.lvs{min-width:620px}
 }
 .btn.ghost{background:none; color:var(--ink-2); border:1px solid var(--line-2)}
 .btn.ghost:hover{border-color:var(--ink-3); filter:none}
+
+/* 체크시트 */
+table.grid.cs{min-width:760px}
+table.grid.cs td.ck{width:30px; height:26px; background:var(--bg-sunk)}
+table.grid.cs tr.sec td{
+  background:var(--accent-sub); color:var(--accent-ink);
+  font-weight:700; font-size:12px;
+}
+.ppe .noimg{
+  height:46px; margin:0 auto 8px; border-radius:7px;
+  border:1px dashed var(--line-2); background:var(--bg-sunk);
+}
 
 /* 빈 상태 */
 .empty{
@@ -501,6 +534,11 @@ table.grid.lvs{min-width:620px}
       <img class="logo light" src="assets/samkoo.png" alt="Samkoo">
       <img class="logo dark" src="assets/samkoo_dark.png" alt="Samkoo">
       <b>안전 표준운영절차</b>
+      <div class="theme" role="group" aria-label="화면 모드">
+        <button data-t="light" title="밝게">밝게</button>
+        <button data-t="dark" title="어둡게">어둡게</button>
+        <button data-t="auto" title="기기 설정 따름">자동</button>
+      </div>
     </div>
     <div class="find">
       <input id="q" type="search" placeholder="작업 찾기" autocomplete="off">
@@ -523,10 +561,12 @@ table.grid.lvs{min-width:620px}
 
 <script src="assets/qr.js"></script>
 <script src="assets/data.js"></script>
+<script src="assets/checks.js"></script>
 <script>
 (function () {
   var IMG = 'assets/img/';
   var T = window.TASKS || {}, S = window.SITE || {};
+  var CH = window.CHECKS || {};
   var tree = document.getElementById('tree');
   var view = document.getElementById('view');
   var tabs = document.getElementById('tabs');
@@ -562,20 +602,43 @@ table.grid.lvs{min-width:620px}
         });
       }
       if (!ids.length) return;
-      var d = document.createElement('details');
-      d.className = 'grp';
-      if (f || gi === 1) d.open = true;
-      var sum = '<button type="button">' + esc(g.title) +
-        '<span class="caret">&#9656;</span></button>';
-      var list = ids.map(function (id) {
-        return '<a href="#' + id + '" data-id="' + id + '"' +
-          (id === cur ? ' aria-current="true"' : '') + '>' +
-          esc(T[id].name) + '</a>';
-      }).join('');
-      d.innerHTML = '<summary style="list-style:none">' + sum + '</summary>' +
-        '<div class="list">' + list + '</div>';
-      tree.appendChild(d);
+      tree.appendChild(그룹상자(g.title, ids.map(function (id) {
+        return [id, T[id].name];
+      }), f || gi === 1));
     });
+
+    /* 안전 체크시트 */
+    (window.CHECKGROUPS || []).forEach(function (g) {
+      var ids = Object.keys(CH).filter(function (k) {
+        return CH[k].group === g.name &&
+          (!f || CH[k].name.indexOf(f) >= 0 || k.indexOf(f) >= 0);
+      }).sort(순번);
+      if (!ids.length) return;
+      tree.appendChild(그룹상자(g.title, ids.map(function (k) {
+        return [k, k + '  ' + CH[k].name];
+      }), !!f));
+    });
+  }
+
+  function 순번(a, b) {
+    var x = a.split('-'), y = b.split('-');
+    return (+x[0] - +y[0]) || (+x[1] - +y[1]);
+  }
+
+  function 그룹상자(title, pairs, open) {
+    var d = document.createElement('details');
+    d.className = 'grp';
+    if (open) d.open = true;
+    var list = pairs.map(function (p) {
+      return '<a href="#' + p[0] + '" data-id="' + p[0] + '"' +
+        (p[0] === cur ? ' aria-current="true"' : '') + '>' +
+        esc(p[1]) + '</a>';
+    }).join('');
+    d.innerHTML = '<summary style="list-style:none">' +
+      '<button type="button">' + esc(title) +
+      '<span class="caret">&#9656;</span></button></summary>' +
+      '<div class="list">' + list + '</div>';
+    return d;
   }
 
   /* ── 탭 ── */
@@ -592,6 +655,12 @@ table.grid.lvs{min-width:620px}
   /* ── 본문 ── */
   function partsView(t) {
     var p = t.parts || {}, h = '', fig = '', list = '';
+    if (!p.figure && (p.items || []).length) {
+      fig = '<figure class="fig"><div class="wrap none">' +
+        '<span>장비 도면 준비 중</span></div>' + (p.figureCaption ?
+          '<figcaption>' + esc(p.figureCaption) + '</figcaption>' : '') +
+        '</figure>';
+    }
     if (p.figure) {
       var marks = (p.marks || []).map(function (m) {
         return '<span class="mk" data-n="' + m.n + '" style="left:' +
@@ -631,6 +700,12 @@ table.grid.lvs{min-width:620px}
     return h || empty('각부 명칭 자료가 아직 없습니다.');
   }
 
+  function shot(name) {
+    return name
+      ? '<img class="shot" src="' + img(name) + '" alt="" loading="lazy">'
+      : '<div class="shot none"><span>사진 준비 중</span></div>';
+  }
+
   function guideView(t) {
     var secs = t.guide || [];
     if (!secs.length) return empty('교육자료가 아직 없습니다.');
@@ -638,7 +713,7 @@ table.grid.lvs{min-width:620px}
       return '<h2>' + esc(s.title) + '</h2><div class="steps">' +
         (s.items || []).map(function (it) {
           return '<div class="step' + (it.must ? ' must' : '') + '">' +
-            '<img class="shot" src="' + img(it.img) + '" alt="" loading="lazy">' +
+            shot(it.img) +
             '<div><div class="step-h"><span class="num">' + esc(it.n) +
             '</span><span class="nm">' + esc(it.name) + '</span>' +
             (it.must ? '<span class="tag">필수</span>' : '') +
@@ -926,7 +1001,85 @@ table.grid.lvs{min-width:620px}
     return h;
   }
 
+  /* 체크시트 : 엑셀 양식 그대로, 확인란은 양호/보통/보완 */
+  function checkView(c) {
+    var h = '<div class="sheet"><div class="sheet-h"><b>' + esc(c.title) +
+      '</b><span>확인란 : 양호 O · 보통 △ · 보완 X</span></div>';
+
+    h += '<table class="head">';
+    var 칸 = (c.head || []).concat(
+      [['일시', ''], ['장소', ''], ['조직(부서)', ''],
+       ['현장작업자', ''], ['관리감독자', ''], ['내용', '']]);
+    var 본 = [], 쓴 = {};
+    칸.forEach(function (x) {
+      var k = x[0].replace(/\s/g, '');
+      if (!쓴[k]) { 쓴[k] = 1; 본.push(x); }
+    });
+    본 = 본.slice(0, 6);
+    for (var i = 0; i < 본.length; i += 3) {
+      h += '<tr>';
+      for (var j = i; j < Math.min(i + 3, 본.length); j++) {
+        h += '<th>' + esc(본[j][0]) + '</th><td><input value="' +
+          esc(본[j][1] || '') + '"></td>';
+      }
+      h += '</tr>';
+    }
+    h += '</table>';
+
+    h += '<div class="scroll"><table class="grid cs"><thead><tr>' +
+      '<th>NO</th><th>사전조치 및 확인사항</th>' +
+      '<th>전</th><th>중</th><th>후</th><th>특기사항</th>' +
+      '</tr></thead><tbody>';
+    (c.items || []).forEach(function (it) {
+      if (it.sec) {
+        h += '<tr class="sec"><td colspan="6">' + esc(it.sec) + '</td></tr>';
+      }
+      h += '<tr><td class="c">' + it.n + '</td><td>' + esc(it.text) + '</td>' +
+        '<td class="c ck"></td><td class="c ck"></td><td class="c ck"></td>' +
+        '<td></td></tr>';
+    });
+    h += '</tbody></table></div>';
+
+    if ((c.common || []).length) {
+      h += '<h2>공통사항</h2><ul class="checks">' +
+        c.common.map(function (x) {
+          return '<li><input type="checkbox"><span>' + esc(x) + '</span></li>';
+        }).join('') + '</ul>';
+    }
+
+    if ((c.ppe || []).length) {
+      h += '<h2>이 작업에 필요한 개인보호구</h2><div class="ppe">' +
+        c.ppe.map(function (n) {
+          var im = PPEIMG[n] || PPEALT[n] || '';
+          return '<div class="it">' +
+            (im ? '<img src="' + img(im) + '" alt="">'
+                : '<div class="noimg"></div>') +
+            '<span>' + esc(n) + '</span></div>';
+        }).join('') + '</div>' +
+        '<p class="fine">※ 작업 내용에서 위험요인을 찾아 자동으로 뽑은 목록입니다. ' +
+        '현장 상황에 따라 더하거나 뺄 수 있습니다.</p>';
+    }
+
+    if (c.etc) h += '<h2>기타사항</h2><p class="lede">' + esc(c.etc) + '</p>';
+    return h + '</div>';
+  }
+
+  /* 그림이 따로 없는 보호구는 가장 가까운 것을 빌려 쓴다 */
+  var PPEALT = { '공기호흡기': 'ppe_2b723433e8.png' };
+
+  /* 보호구 이름 → 그림. 작업 자료에 쓰인 것을 그대로 빌린다 */
+  var PPEIMG = (function () {
+    var m = {};
+    for (var k in T) {
+      (T[k].ppe || []).forEach(function (q) {
+        if (q.img && !m[q.name]) m[q.name] = q.img;
+      });
+    }
+    return m;
+  })();
+
   function draw() {
+    if (CH[cur]) return drawCheck(CH[cur]);
     var t = T[cur];
     if (!t) return;
     document.getElementById('title').textContent = t.name || '';
@@ -970,8 +1123,25 @@ table.grid.lvs{min-width:620px}
     bind(mks); bind(lis);
   }
 
+  function drawCheck(c) {
+    document.getElementById('title').textContent = c.name;
+    document.getElementById('crumb').textContent = c.no + '. 안전 체크시트';
+    document.getElementById('meta').innerHTML =
+      '<span><b>구분</b> ' + esc(c.group) + '</span>' +
+      '<span><b>확인항목</b> ' + (c.items || []).length + '개</span>' +
+      ((c.ppe || []).length
+        ? '<span><b>보호구</b> ' + c.ppe.length + '종</span>' : '');
+    tabs.innerHTML =
+      '<button role="tab" aria-selected="true">체크시트</button>' +
+      '<button class="prt noprint" id="btnPrint">인쇄 · PDF</button>';
+    document.getElementById('btnPrint')
+      .addEventListener('click', function () { window.print(); });
+    view.innerHTML = checkView(c);
+    window.scrollTo(0, 0);
+  }
+
   function go(id) {
-    if (!T[id]) return;
+    if (!T[id] && !CH[id]) return;
     cur = id; tab = 'parts';
     drawTree(document.getElementById('q').value);
     draw();
@@ -996,6 +1166,27 @@ table.grid.lvs{min-width:620px}
   document.getElementById('menu').addEventListener('click', function () {
     document.body.classList.toggle('open');
   });
+
+  /* 화면 모드 : 밝게 · 어둡게 · 자동 */
+  (function theme() {
+    var box = document.querySelector('.theme');
+    if (!box) return;
+    function set(v, save) {
+      if (v === 'auto') document.documentElement.removeAttribute('data-theme');
+      else document.documentElement.setAttribute('data-theme', v);
+      [].forEach.call(box.querySelectorAll('button'), function (b) {
+        b.setAttribute('aria-pressed', b.dataset.t === v);
+      });
+      if (save) { try { localStorage.setItem('sop-theme', v); } catch (e) {} }
+    }
+    var saved = 'auto';
+    try { saved = localStorage.getItem('sop-theme') || 'auto'; } catch (e) {}
+    set(saved, false);
+    box.addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-t]');
+      if (b) set(b.dataset.t, true);
+    });
+  })();
 
   go((location.hash || '').slice(1) || 'c02');
 })();
