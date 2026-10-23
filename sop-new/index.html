@@ -146,6 +146,13 @@ h1{
 }
 .tabs button:hover{color:var(--ink-2)}
 .tabs button[aria-selected="true"]{color:var(--ink); border-bottom-color:var(--accent)}
+.tabs .prt{
+  margin-left:auto; align-self:center; padding:6px 13px;
+  border:1px solid var(--line-2); border-radius:8px;
+  font-size:12.5px; font-weight:600; color:var(--ink-2);
+  min-height:34px;
+}
+.tabs .prt:hover{border-color:var(--accent); color:var(--accent-ink)}
 
 .body{max-width:var(--wide); margin:0 auto; padding:24px 32px 96px; width:100%}
 h2{
@@ -294,7 +301,55 @@ ul.checks input{width:18px; height:18px; accent-color:var(--accent); flex:none}
 .btn:hover{filter:brightness(.94)}
 .btn:active{transform:translateY(1px)}
 
-/* 빈 상태 *//* 빈 상태 */
+/* 위험성평가 입력칸 */
+.grid.rk input.sc{
+  width:34px; padding:3px 0; text-align:center;
+  border:1px solid var(--line-2); border-radius:5px;
+  background:var(--bg); color:var(--ink);
+  font:inherit; font-size:12.5px; font-variant-numeric:tabular-nums;
+  -moz-appearance:textfield;
+}
+.grid.rk input.sc::-webkit-outer-spin-button,
+.grid.rk input.sc::-webkit-inner-spin-button{-webkit-appearance:none; margin:0}
+.grid.rk input.sc:focus{outline:2px solid var(--accent); outline-offset:1px;
+  border-color:transparent}
+.grid.rk td.v{font-size:13.5px}
+.yn{white-space:nowrap}
+.yn button{
+  width:25px; height:25px; margin:0 1px; border-radius:6px;
+  border:1px solid var(--line-2); background:var(--bg);
+  font-size:12px; font-weight:700; color:var(--ink-3);
+}
+.yn button:hover{border-color:var(--ink-3); color:var(--ink-2)}
+.yn button.on{background:var(--accent); border-color:var(--accent); color:#fff}
+.yn button[data-y="N"].on{background:var(--warn); border-color:var(--warn)}
+.only-print{display:none}
+
+/* 산정 기준 (뒷장) */
+.page2{margin-top:20px}
+table.grid.mx{min-width:620px}
+table.grid.mx th.lbl{text-align:left; white-space:nowrap}
+table.grid.lvs{min-width:620px}
+
+/* QR */
+.qr-card{
+  display:flex; gap:28px; align-items:center;
+  border:1px solid var(--line); border-radius:var(--r);
+  padding:26px; background:var(--bg);
+}
+.qr-card canvas{width:260px; height:260px; image-rendering:pixelated; flex:none}
+.qr-info{min-width:0}
+.qr-no{font-size:12.5px; font-weight:700; color:var(--accent-ink)}
+.qr-nm{font-size:24px; font-weight:800; letter-spacing:-.02em; margin:3px 0 7px}
+.qr-pl,.qr-dc{font-size:13px; color:var(--ink-2)}
+.qr-url{
+  margin-top:12px; font-size:11.5px; color:var(--ink-3);
+  word-break:break-all; max-width:46ch;
+}
+.btn.ghost{background:none; color:var(--ink-2); border:1px solid var(--line-2)}
+.btn.ghost:hover{border-color:var(--ink-3); filter:none}
+
+/* 빈 상태 */
 .empty{
   border:1px dashed var(--line-2); border-radius:var(--r);
   padding:44px 24px; text-align:center; color:var(--ink-3);
@@ -335,6 +390,99 @@ ul.checks input{width:18px; height:18px; accent-color:var(--accent); flex:none}
   .steps{grid-template-columns:1fr}
   .mk{width:23px; height:23px; font-size:11.5px}
 }
+
+/* ───────── 인쇄 · PDF : A4 가로 한 쪽 ───────── */
+@page{size:A4 landscape; margin:8mm}
+@media print{
+  :root{
+    --bg:#fff; --bg-sub:#fff; --bg-sunk:#f3f4f6;
+    --ink:#000; --ink-2:#333; --ink-3:#666;
+    --line:#bbb; --line-2:#999;
+    --accent:#2f6b1d; --accent-sub:#eaf3e6; --accent-ink:#2f6b1d;
+    --warn:#9b1c15; --warn-sub:#fbeceb;
+  }
+  html,body{background:#fff !important; font-size:9pt; line-height:1.4}
+  .side,.mob,.tabs,.crumb,.noprint,.act,.find{display:none !important}
+  .shell{display:block}
+  .bar{position:static; border:0; backdrop-filter:none}
+  .bar-in,.body{max-width:none; padding:0; margin:0}
+  .body{padding-bottom:0}
+  .main{display:block}
+
+  h1{font-size:15pt; margin:0 0 1mm}
+  .meta{font-size:8pt; gap:8px; padding-bottom:2mm;
+    border-bottom:1px solid var(--line); margin-bottom:3mm}
+  h2{font-size:9.5pt; margin:3mm 0 1.5mm}
+  .lede{font-size:8pt; margin-bottom:2mm}
+  .fine{font-size:7pt; margin-top:2mm}
+
+  /* 한 쪽에 들어가도록 */
+  .sheet{border:0; padding:0; background:none}
+  .sheet-h b{font-size:12pt}
+  .sheet-h span{font-size:8pt}
+  .scroll{overflow:visible !important; margin:0; padding:0}
+  table.grid{min-width:0 !important; width:100%; font-size:7pt}
+  table.grid th,table.grid td{padding:1.2mm 1.4mm}
+  table.head{font-size:8pt}
+  table.head th,table.head td{padding:1.2mm 2mm}
+  ul.cell{padding-left:3mm}
+
+  /* 입력칸은 적힌 값만 */
+  input,textarea,select{display:none !important}
+  .only-print{display:inline !important; font-weight:700}
+  .yn button{display:none !important}
+  table.head td:has(input){border-bottom:1px solid var(--line)}
+
+  /* 각부 명칭 : 도면 + 목록 한 쪽 */
+  .pt{grid-template-columns:1fr 1fr; gap:5mm}
+  .fig img{max-height:118mm; width:auto; margin:0 auto}
+  .fig figcaption{font-size:7.5pt; padding:1.5mm 2mm}
+  .mk{width:6mm; height:6mm; font-size:8pt; box-shadow:0 0 0 .6mm #fff}
+  .parts li{padding:1.6mm 0}
+  .parts .nm{font-size:8.5pt}
+  .parts .ds{font-size:7.5pt}
+  .num{width:5mm; height:5mm; font-size:7.5pt}
+  .notes{gap:3mm; margin-top:3mm}
+  .note{padding:2mm 2.5mm}
+  .note h3{font-size:7.5pt; margin-bottom:1mm}
+  .note ul{font-size:7pt; padding-left:3.5mm}
+
+  /* 교육자료 : 12칸을 한 쪽에 (4 x 3) */
+  .steps{grid-template-columns:repeat(4,1fr); gap:2.5mm}
+  .step{padding:1.5mm; gap:1.5mm; break-inside:avoid}
+  .shot{aspect-ratio:3/2; border-radius:1mm}
+  .step-h{gap:1.5mm; margin-bottom:1mm}
+  .step-h .nm{font-size:8pt}
+  .tag{font-size:6pt; padding:0 1mm}
+  .step ul{font-size:7pt; padding-left:3.5mm}
+  .step li+li{margin-top:.5mm}
+
+  /* 보호구 */
+  .ppe{gap:2mm}
+  .ppe .it{flex:0 1 20mm; padding:1.5mm}
+  .ppe img{height:9mm; margin-bottom:1mm}
+  .ppe span{font-size:7pt}
+
+  /* 완료보고서 */
+  .shots{gap:3mm}
+  .drop{aspect-ratio:4/3; border:1px solid var(--line)}
+  .drop .plus{font-size:11pt}
+  .drop b{font-size:7.5pt}
+  .drop em{font-size:6.5pt}
+  ul.checks li{padding:1.4mm 0; font-size:8pt}
+  ul.checks input{display:inline-block !important; width:3.2mm; height:3.2mm}
+  table.grid .sg-c{height:9mm}
+
+  /* 산정 기준은 뒷장으로 */
+  .page2{break-before:page; margin-top:0}
+
+  /* QR : 가운데 크게 */
+  .qr-card{border:1px solid var(--line); padding:10mm; gap:12mm;
+    justify-content:center}
+  .qr-card canvas{width:78mm; height:78mm}
+  .qr-nm{font-size:20pt}
+  .qr-url{font-size:8pt}
+}
 @media (prefers-reduced-motion:reduce){
   *{transition:none !important}
 }
@@ -373,6 +521,7 @@ ul.checks input{width:18px; height:18px; accent-color:var(--accent); flex:none}
   </main>
 </div>
 
+<script src="assets/qr.js"></script>
 <script src="assets/data.js"></script>
 <script>
 (function () {
@@ -387,7 +536,8 @@ ul.checks input{width:18px; height:18px; accent-color:var(--accent); flex:none}
     ['parts', '각부 명칭'],
     ['guide', '안전작업 지침'],
     ['risk', '위험성평가'],
-    ['report', '완료보고서']
+    ['report', '완료보고서'],
+    ['qr', 'QR 코드']
   ];
 
   function esc(s) {
@@ -433,7 +583,10 @@ ul.checks input{width:18px; height:18px; accent-color:var(--accent); flex:none}
     tabs.innerHTML = TABS.map(function (t) {
       return '<button role="tab" data-tab="' + t[0] + '" aria-selected="' +
         (t[0] === tab) + '">' + t[1] + '</button>';
-    }).join('');
+    }).join('') +
+      '<button class="prt noprint" id="btnPrint">인쇄 · PDF</button>';
+    document.getElementById('btnPrint')
+      .addEventListener('click', function () { window.print(); });
   }
 
   /* ── 본문 ── */
@@ -514,13 +667,16 @@ ul.checks input{width:18px; height:18px; accent-color:var(--accent); flex:none}
   function riskView(t) {
     var r = t.risk || {}, rows = r.rows || [];
     if (!rows.length) return empty('위험성평가표');
-    var h = '<div class="sheet"><table class="head"><tr>' +
+    var h = '<div class="sheet" id="sheetRisk"><div class="sheet-h"><b>위험성평가표</b>' +
+      '<span>빈도와 강도는 기본값이 들어 있습니다. 칸을 눌러 바꾸면 위험도가 다시 계산됩니다.</span></div>';
+
+    h += '<table class="head"><tr>' +
       '<th>공정 / 작업명</th><td>' + esc(t.name) + '</td>' +
       '<th>평가대상</th><td>' + esc(r.target || '') + '</td>' +
       '<th>평가일자</th><td><input placeholder="2026.00.00"></td>' +
       '<th>평가자</th><td><input placeholder="성명"></td></tr></table>';
 
-    h += '<div class="scroll"><table class="grid"><thead>' +
+    h += '<div class="scroll"><table class="grid rk"><thead>' +
       '<tr><th rowspan="2">NO</th><th rowspan="2">작업단계</th>' +
       '<th rowspan="2">유해 · 위험요인</th><th rowspan="2">위험 발생 상황 및 결과</th>' +
       '<th colspan="3">현재 위험도</th>' +
@@ -531,33 +687,160 @@ ul.checks input{width:18px; height:18px; accent-color:var(--accent); flex:none}
       '<th>빈도</th><th>강도</th><th>위험도</th></tr></thead><tbody>';
 
     rows.forEach(function (x, i) {
-      var a1 = (x.f || 0) * (x.s || 0), a2 = (x.f2 || 0) * (x.s2 || 0);
-      h += '<tr><td class="c">' + (i + 1) + '</td>' +
+      h += '<tr data-i="' + i + '"><td class="c">' + (i + 1) + '</td>' +
         '<td>' + esc(x.step) + '</td>' +
         '<td>' + li(x.hazards) + '</td>' +
         '<td>' + li(x.results) + '</td>' +
-        '<td class="c n">' + (x.f || '') + '</td>' +
-        '<td class="c n">' + (x.s || '') + '</td>' +
-        '<td class="c n ' + lv(a1) + '">' + a1 + '</td>' +
+        num(i, 'f', x.f) + num(i, 's', x.s) +
+        '<td class="c n v" data-v="1"></td>' +
         '<td>' + li(x.measures) + '</td>' +
         '<td class="c">' + esc(x.due || '') + '</td>' +
         '<td class="c">' + esc(x.owner || '') + '</td>' +
-        '<td class="c">' + esc(x.done || '') + '</td>' +
-        '<td class="c n">' + (x.f2 || '') + '</td>' +
-        '<td class="c n">' + (x.s2 || '') + '</td>' +
-        '<td class="c n ' + lv(a2) + '">' + a2 + '</td></tr>';
+        '<td class="c yn"><button type="button" data-y="Y">Y</button>' +
+        '<button type="button" data-y="N">N</button>' +
+        '<span class="only-print"></span></td>' +
+        num(i, 'f2', x.f2) + num(i, 's2', x.s2) +
+        '<td class="c n v" data-v="2"></td></tr>';
     });
     h += '</tbody></table></div>';
 
     h += '<table class="legend"><tr>' +
-      [['15 ~ 25', '고위험', 'hi'], ['8 ~ 12', '중위험', 'mid'],
-       ['1 ~ 6', '저위험', 'low']].map(function (g) {
+      [['15 ~ 25', '고위험', 'hi'], ['8 ~ 14', '중위험', 'mid'],
+       ['1 ~ 7', '저위험', 'low']].map(function (g) {
         return '<td><span class="chip ' + g[2] + '">' + g[0] + '</span> ' +
           g[1] + '</td>';
       }).join('') + '</tr></table>' +
-      '<p class="fine">※ 위험성 = 빈도 × 강도　　' +
-      '※ 평가일자 · 평가자 · 조치여부는 실제 평가 시행 시 기입</p></div>';
+      '<p class="fine">※ 위험도 = 빈도 × 강도　　' +
+      '※ 평가일자 · 평가자 · 조치여부는 실제 평가 시행 시 기입　　' +
+      '※ 산정 기준은 뒷장 참조</p></div>';
+
+    h += criteriaView();
     return h;
+  }
+
+  function num(i, k, v) {
+    return '<td class="c n"><input class="sc" type="number" min="1" max="5" ' +
+      'data-i="' + i + '" data-k="' + k + '" value="' + (v || '') + '">' +
+      '<span class="only-print">' + (v || '') + '</span></td>';
+  }
+
+  /* 뒷장 : 산정 기준 (인쇄하면 별쪽) */
+  function criteriaView() {
+    var FQ = ['1 ( 매우 낮음 )', '2 ( 낮음 )', '3 ( 보통 )',
+              '4 ( 높음 )', '5 ( 매우 높음 )'];
+    var SV = { 5: '5 ( 치명적 / 사망 )', 4: '4 ( 중상 / 장해 )',
+               3: '3 ( 경상 / 휴업 )', 2: '2 ( 경미 / 비휴업 )',
+               1: '1 ( 극히 경미 )' };
+    var h = '<div class="sheet page2"><div class="sheet-h">' +
+      '<b>위험도 산정 및 평가 기준</b>' +
+      '<span>위험도 = 빈도(가능성) × 강도(중대성),  5 × 5 기준표</span></div>';
+
+    h += '<div class="scroll"><table class="grid mx"><thead><tr><th>강도 \\ 빈도</th>' +
+      FQ.map(function (x) { return '<th>' + x + '</th>'; }).join('') +
+      '</tr></thead><tbody>';
+    [5, 4, 3, 2, 1].forEach(function (sv) {
+      h += '<tr><th class="lbl">' + SV[sv] + '</th>';
+      [1, 2, 3, 4, 5].forEach(function (f) {
+        var v = f * sv;
+        h += '<td class="c n ' + lv(v) + '">' + v + '</td>';
+      });
+      h += '</tr>';
+    });
+    h += '</tbody></table></div>';
+
+    h += '<h2>위험성 수준별 조치 기준</h2><div class="scroll">' +
+      '<table class="grid lvs"><thead><tr><th>위험도</th><th>수준</th>' +
+      '<th>조치 기준</th></tr></thead><tbody>' +
+      [['15 ~ 25', '고위험 (High)',
+        '즉시 작업을 중단한다. 개선 대책을 세우고 위험요인을 없앤 뒤에 다시 시작한다.', 'hi'],
+       ['8 ~ 14', '중위험 (Medium)',
+        '정해진 기한 안에 개선 대책을 시행한다. 그동안 안전수칙 준수를 철저히 관리한다.', 'mid'],
+       ['1 ~ 7', '저위험 (Low)',
+        '지금의 안전 상태를 유지한다. 작업자 교육과 점검을 계속한다.', 'low']
+      ].map(function (x) {
+        return '<tr><td class="c"><span class="chip ' + x[3] + '">' + x[0] +
+          '</span></td><td class="c">' + x[1] + '</td><td>' + x[2] + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+
+    h += '<p class="fine">※ 빈도는 그 일이 얼마나 자주 일어날 수 있는지, ' +
+      '강도는 일어났을 때 얼마나 크게 다치는지를 뜻합니다.<br>' +
+      '※ 개선 후 위험도가 7 이하가 되도록 대책을 세우는 것을 목표로 합니다.</p></div>';
+    return h;
+  }
+
+  /* 입력칸 동작 : 숫자 바꾸면 위험도 다시 계산, 조치여부는 Y/N */
+  function bindRisk() {
+    var tb = view.querySelector('table.rk tbody');
+    if (!tb) return;
+    function paint(tr) {
+      [1, 2].forEach(function (g) {
+        var f = tr.querySelector('input[data-k="' + (g === 1 ? 'f' : 'f2') + '"]');
+        var sv = tr.querySelector('input[data-k="' + (g === 1 ? 's' : 's2') + '"]');
+        var cell = tr.querySelector('td.v[data-v="' + g + '"]');
+        var a = parseInt(f && f.value, 10) || 0, b = parseInt(sv && sv.value, 10) || 0;
+        var v = a * b;
+        cell.textContent = v || '';
+        cell.className = 'c n v ' + lv(v);
+      });
+    }
+    [].forEach.call(tb.querySelectorAll('tr'), paint);
+    tb.addEventListener('input', function (e) {
+      var inp = e.target.closest('input.sc');
+      if (!inp) return;
+      var n = parseInt(inp.value, 10);
+      if (n > 5) inp.value = 5;
+      if (n < 1) inp.value = 1;
+      inp.nextElementSibling.textContent = inp.value;
+      paint(inp.closest('tr'));
+    });
+    tb.addEventListener('click', function (e) {
+      var b = e.target.closest('.yn button');
+      if (!b) return;
+      var box = b.parentNode, on = b.classList.contains('on');
+      [].forEach.call(box.querySelectorAll('button'), function (x) {
+        x.classList.remove('on');
+      });
+      if (!on) b.classList.add('on');
+      box.querySelector('.only-print').textContent = on ? '' : b.dataset.y;
+    });
+  }
+
+  /* QR : 현장에서 찍으면 이 작업으로 바로 들어온다 */
+  function qrView(t) {
+    return '<div class="sheet qr-sheet"><div class="sheet-h">' +
+      '<b>현장 부착용 QR 코드</b>' +
+      '<span>장비나 작업 구역에 붙이면, 찍는 즉시 이 작업의 절차서가 열립니다.</span>' +
+      '</div><div class="qr-card">' +
+      '<canvas id="qrc" width="520" height="520"></canvas>' +
+      '<div class="qr-info">' +
+      '<div class="qr-no">' + esc(t.no || '') + '</div>' +
+      '<div class="qr-nm">' + esc(t.name) + '</div>' +
+      (t.place ? '<div class="qr-pl">' + esc(t.place) + '</div>' : '') +
+      (t.docNo ? '<div class="qr-dc">' + esc(t.docNo) + '</div>' : '') +
+      '<div class="qr-url" id="qrUrl"></div>' +
+      '</div></div>' +
+      '<div class="act noprint">' +
+      '<button class="btn" id="qrPrint">인쇄하기</button> ' +
+      '<button class="btn ghost" id="qrSave">그림으로 저장</button></div>' +
+      '<p class="fine">※ A4 가로 한 장에 맞춰 인쇄됩니다. ' +
+      '코팅해서 붙이면 현장에서 오래 갑니다.</p></div>';
+  }
+
+  function bindQr(t) {
+    var cv = document.getElementById('qrc');
+    if (!cv || !window.QRLite) return;
+    var url = location.origin + location.pathname + '#' + t.id;
+    document.getElementById('qrUrl').textContent = url;
+    QRLite.toCanvas(cv, url, { size: 520, ec: 'M', quiet: 2 });
+    var p = document.getElementById('qrPrint');
+    if (p) p.addEventListener('click', function () { window.print(); });
+    var sv = document.getElementById('qrSave');
+    if (sv) sv.addEventListener('click', function () {
+      var a = document.createElement('a');
+      a.download = 'QR_' + t.id + '.png';
+      a.href = cv.toDataURL('image/png');
+      a.click();
+    });
   }
 
   /* 완료보고서 : 기존 report.html 과 같은 서식 */
@@ -656,9 +939,12 @@ ul.checks input{width:18px; height:18px; accent-color:var(--accent); flex:none}
     drawTabs();
     view.innerHTML = tab === 'parts' ? partsView(t)
       : tab === 'guide' ? guideView(t)
-      : tab === 'risk' ? riskView(t) : reportView(t);
+      : tab === 'risk' ? riskView(t)
+      : tab === 'qr' ? qrView(t) : reportView(t);
     window.scrollTo(0, 0);
     link();
+    bindRisk();
+    bindQr(t);
   }
 
   /* 도면의 번호와 아래 목록을 짚으면 짝이 같이 밝아진다 */
