@@ -14,14 +14,14 @@ import ArchivePicker from "@/components/ArchivePicker";
 import MonthlyReportDocument from "@/components/MonthlyReportDocument";
 import { pagesToPdfBlob, shareOrDownloadPdf } from "@/lib/pdf";
 
-// 엑셀에 넣을 사진 — 휴대폰 사진 방향을 바로 세우고(엑셀은 사진 속 방향 정보를 무시), 칸 비율(aspect)을 알면 흰 여백으로 맞춘다. 긴 변 1600px.
+// 엑셀에 넣을 사진 — 휴대폰 사진 방향을 바로 세우고(엑셀은 사진 속 방향 정보를 무시), 칸 비율(aspect)을 알면 흰 여백으로 맞춘다. 긴 변 1200px(작업사진 칸이 가로 5cm 남짓이라 인쇄에 충분, 메일로 보낼 크기 고려).
 async function excelImage(url: string, aspect: number | null): Promise<{ bytes: Uint8Array; ext: "png" | "jpeg" } | null> {
   try {
     const blob = await (await fetch(proxied(url))).blob();
     const bmp = await createImageBitmap(blob, { imageOrientation: "from-image" });
     const png = blob.type === "image/png";
     const box = aspect ?? bmp.width / bmp.height;
-    const [W, H] = box >= 1 ? [1600, Math.round(1600 / box)] : [Math.round(1600 * box), 1600];
+    const [W, H] = box >= 1 ? [1200, Math.round(1200 / box)] : [Math.round(1200 * box), 1200];
     const s = Math.min(W / bmp.width, H / bmp.height, aspect ? Infinity : 1);
     const cv = document.createElement("canvas");
     cv.width = aspect ? W : Math.round(bmp.width * s); cv.height = aspect ? H : Math.round(bmp.height * s);
@@ -30,7 +30,7 @@ async function excelImage(url: string, aspect: number | null): Promise<{ bytes: 
     const dw = bmp.width * s, dh = bmp.height * s;
     g.drawImage(bmp, (cv.width - dw) / 2, (cv.height - dh) / 2, dw, dh);
     const ext = png && !aspect ? "png" : "jpeg";
-    const out = await new Promise<Blob | null>((r) => cv.toBlob(r, `image/${ext}`, 0.9));
+    const out = await new Promise<Blob | null>((r) => cv.toBlob(r, `image/${ext}`, 0.85));
     return out ? { bytes: new Uint8Array(await out.arrayBuffer()), ext } : null;
   } catch { return null; }
 }
