@@ -14,6 +14,27 @@ import ArchivePicker from "@/components/ArchivePicker";
 import MonthlyReportDocument from "@/components/MonthlyReportDocument";
 import { pagesToPdfBlob, shareOrDownloadPdf } from "@/lib/pdf";
 
+// 엑셀에 넣을 사진 — 휴대폰 사진 방향을 바로 세우고(엑셀은 사진 속 방향 정보를 무시), 칸 비율(aspect)을 알면 흰 여백으로 맞춘다. 긴 변 1600px.
+async function excelImage(url: string, aspect: number | null): Promise<{ bytes: Uint8Array; ext: "png" | "jpeg" } | null> {
+  try {
+    const blob = await (await fetch(proxied(url))).blob();
+    const bmp = await createImageBitmap(blob, { imageOrientation: "from-image" });
+    const png = blob.type === "image/png";
+    const box = aspect ?? bmp.width / bmp.height;
+    const [W, H] = box >= 1 ? [1600, Math.round(1600 / box)] : [Math.round(1600 * box), 1600];
+    const s = Math.min(W / bmp.width, H / bmp.height, aspect ? Infinity : 1);
+    const cv = document.createElement("canvas");
+    cv.width = aspect ? W : Math.round(bmp.width * s); cv.height = aspect ? H : Math.round(bmp.height * s);
+    const g = cv.getContext("2d")!;
+    if (!png || aspect) { g.fillStyle = "#fff"; g.fillRect(0, 0, cv.width, cv.height); }
+    const dw = bmp.width * s, dh = bmp.height * s;
+    g.drawImage(bmp, (cv.width - dw) / 2, (cv.height - dh) / 2, dw, dh);
+    const ext = png && !aspect ? "png" : "jpeg";
+    const out = await new Promise<Blob | null>((r) => cv.toBlob(r, `image/${ext}`, 0.9));
+    return out ? { bytes: new Uint8Array(await out.arrayBuffer()), ext } : null;
+  } catch { return null; }
+}
+
 const input = "w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400";
 const area = input + " min-h-[5rem] leading-snug";
 const btn = "rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 disabled:opacity-50";
@@ -196,6 +217,30 @@ export default function MonthlyReportPage() {
       await shareOrDownloadPdf(blob, `[월간보고서] 바이오 이노베이션 허브_${month.replace("-", ".")}.pdf`);
       setMsg("");
     } catch { setMsg("PDF를 만들지 못했습니다. 다시 시도해 주세요."); } finally { setBusy(""); }
+  }
+
+  // 원래 엑셀 양식으로 — 양식(예전 그 달 엑셀 한 부)은 처음 한 번 올려 두면 계속 쓴다 (lib/monthlyReportXlsx.ts)
+  async function excel(file?: File) {
+    if ((dirty || !saved) && !(await save())) return;
+    setBusy("xlsx");
+    try {
+      if (file) {
+        setMsg("엑셀 양식 올리는 중…");
+        const { upload } = await import("@vercel/blob/client");
+        await upload(`templates/monthly-report/${file.name.replace(/[^\w.가-힣\[\]() -]+/g, "_")}`, file, { access: "public", handleUploadUrl: "/api/blob-upload", contentType: "application/octet-stream" });
+      }
+      const t = await (await fetch("/api/monthly-report/template", { cache: "no-store" })).json();
+      if (!t.url) { setMsg("엑셀 양식이 없습니다. 「엑셀 양식 올리기」로 예전 월간보고서 엑셀을 한 번 올려 주세요."); return; }
+      setMsg("엑셀 만드는 중… (사진이 많으면 1분 정도)");
+      const [{ fillMonthlyXlsx }, tpl] = await Promise.all([import("@/lib/monthlyReportXlsx"), fetch(t.url).then((r) => r.arrayBuffer())]);
+      const r = await fillMonthlyXlsx(tpl, d!, excelImage);
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([r.bytes as BlobPart], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+      a.download = `[월간보고서] 바이오 이노베이션 허브_${month.replace("-", ".")}.xlsx`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      setMsg(r.notes.length ? `엑셀을 받았습니다. 확인할 것: ${r.notes.join(" / ")}` : "엑셀을 받았습니다. 열면 날짜·합계가 다시 계산됩니다.");
+    } catch (e) { setMsg(`엑셀을 만들지 못했습니다: ${(e as Error).message}`); } finally { setBusy(""); }
   }
 
   const setEnergy = (k: string, field: string, i: number, v: string) => {
@@ -384,6 +429,11 @@ export default function MonthlyReportPage() {
       <div className="sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center gap-2 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur">
         <button onClick={save} disabled={!!busy} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy === "save" ? "저장 중…" : "저장"}</button>
         <button onClick={pdf} disabled={!!busy} className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy === "pdf" ? "PDF 만드는 중…" : "전체 PDF 받기"}</button>
+        <button onClick={() => excel()} disabled={!!busy} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy === "xlsx" ? "엑셀 만드는 중…" : "엑셀 받기 (원래 양식)"}</button>
+        <label className={btn + " cursor-pointer"} title="예전 월간보고서 엑셀(그 달 파일)을 올리면 다음부터 그 양식에 채웁니다">
+          엑셀 양식 올리기
+          <input type="file" accept=".xlsx" className="hidden" disabled={!!busy} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) excel(f); }} />
+        </label>
         <button onClick={() => setPreview((p) => !p)} className={btn}>{preview ? "미리보기 닫기" : "미리보기"}</button>
         {msg && <span className="text-sm text-slate-600">{msg}</span>}
       </div>
