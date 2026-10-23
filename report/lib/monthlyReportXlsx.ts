@@ -205,6 +205,19 @@ class Book {
 
   save(): Uint8Array {
     for (const s of this.sheets.values()) this.zip.file(s.path, s.xml);
+    // 바꿔 끼워서 더는 아무도 가리키지 않는 옛 사진은 뺀다 (안 빼면 파일이 두 배로 커진다)
+    const used = new Set<string>();
+    for (const f of this.zip.file(/_rels\/[^/]+\.rels$/)) {
+      const part = f.name.replace(/_rels\/([^/]+)\.rels$/, "$1");
+      for (const m of f.asText().matchAll(/<Relationship\b[^>]*>/g)) {
+        const id = m[0].match(/ Id="([^"]+)"/)?.[1], t = m[0].match(/ Target="([^"]+)"/)?.[1];
+        if (!t || /TargetMode="External"/.test(m[0])) continue;
+        // 그림 관계는 실제로 쓰는 것만 — 사진을 바꾸면 옛 rId 는 관계 파일에 남지만 그림·리치 값은 새 rId 를 가리킨다
+        if (/\/image"/.test(m[0]) && id && !this.text(part).includes(`"${id}"`)) continue;
+        used.add(resolve(part, t));
+      }
+    }
+    for (const f of this.zip.file(/^xl\/media\//)) if (!used.has(f.name)) this.zip.remove(f.name);
     // 값으로 바꾼 수식 칸이 계산 순서표(calcChain)에 남아 있으면 엑셀이 「복구」를 띄운다 — 지우면 열 때 다시 만든다
     this.zip.remove("xl/calcChain.xml");
     this.zip.file("[Content_Types].xml", this.text("[Content_Types].xml").replace(/<Override PartName="\/xl\/calcChain\.xml"[^>]*\/>/, ""));
