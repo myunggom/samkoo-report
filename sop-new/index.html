@@ -101,18 +101,21 @@ a{color:inherit}
 
 .tree{flex:1; padding:0 8px 24px}
 .grp{margin-bottom:2px}
-.grp>button{
-  width:100%; display:flex; align-items:center; gap:8px;
-  padding:9px 10px; border-radius:8px;
+.grp>summary{
+  display:flex; align-items:center; gap:8px; cursor:pointer;
+  padding:9px 10px; border-radius:8px; list-style:none;
   font-size:12.5px; font-weight:700; color:var(--ink-2);
-  letter-spacing:-.01em; text-align:left;
+  letter-spacing:-.01em; min-height:36px;
 }
-.grp>button:hover{background:var(--bg-sunk)}
-.grp>button .caret{
+.grp>summary::-webkit-details-marker{display:none}
+.grp>summary::marker{content:''}
+.grp>summary:hover{background:var(--bg-sunk)}
+.grp>summary:focus-visible{outline:2px solid var(--accent); outline-offset:-2px}
+.grp>summary .caret{
   margin-left:auto; color:var(--ink-3); font-size:11px;
   transition:transform .15s ease;
 }
-.grp[open]>button .caret{transform:rotate(90deg)}
+.grp[open]>summary .caret{transform:rotate(90deg)}
 .grp .list{padding:2px 0 8px}
 .grp .list a{
   display:block; padding:8px 10px 8px 18px; border-radius:8px;
@@ -571,6 +574,7 @@ table.grid.cs tr.sec td{
   var view = document.getElementById('view');
   var tabs = document.getElementById('tabs');
   var cur = null, tab = 'parts';
+  var 열린묶음 = {};        /* 펼쳐 둔 묶음을 기억해 다시 그려도 유지한다 */
 
   var TABS = [
     ['parts', '각부 명칭'],
@@ -615,7 +619,7 @@ table.grid.cs tr.sec td{
       }).sort(순번);
       if (!ids.length) return;
       tree.appendChild(그룹상자(g.title, ids.map(function (k) {
-        return [k, k + '  ' + CH[k].name];
+        return [k, CH[k].name];
       }), !!f));
     });
   }
@@ -628,15 +632,19 @@ table.grid.cs tr.sec td{
   function 그룹상자(title, pairs, open) {
     var d = document.createElement('details');
     d.className = 'grp';
-    if (open) d.open = true;
+    var 지금것 = pairs.some(function (p) { return p[0] === cur; });
+    if (open || 지금것 || 열린묶음[title]) d.open = true;
+    d.dataset.g = title;
+    d.addEventListener('toggle', function () {
+      열린묶음[title] = d.open;
+    });
     var list = pairs.map(function (p) {
       return '<a href="#' + p[0] + '" data-id="' + p[0] + '"' +
         (p[0] === cur ? ' aria-current="true"' : '') + '>' +
         esc(p[1]) + '</a>';
     }).join('');
-    d.innerHTML = '<summary style="list-style:none">' +
-      '<button type="button">' + esc(title) +
-      '<span class="caret">&#9656;</span></button></summary>' +
+    d.innerHTML = '<summary>' + esc(title) +
+      '<span class="caret">&#9656;</span></summary>' +
       '<div class="list">' + list + '</div>';
     return d;
   }
@@ -1146,6 +1154,13 @@ table.grid.cs tr.sec td{
     drawTree(document.getElementById('q').value);
     draw();
     document.body.classList.remove('open');
+    if (location.hash.slice(1) !== id) {
+      try { history.replaceState(null, '', '#' + id); } catch (e) {}
+    }
+    var 지금 = tree.querySelector('a[aria-current="true"]');
+    if (지금 && 지금.scrollIntoView) {
+      지금.scrollIntoView({ block: 'nearest' });
+    }
   }
 
   tree.addEventListener('click', function (e) {
