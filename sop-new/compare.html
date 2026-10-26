@@ -103,6 +103,18 @@ tr.sum td,tr.sum th{background:var(--accent-sub); font-weight:700;
   background:var(--bg-sub)}
 .w h3{margin:0 0 6px; font-size:14px; font-weight:700}
 .w p{margin:0; font-size:13px; color:var(--ink-2)}
+/* 설비 참조 */
+h2 .cnt{font-size:12.5px; font-weight:600; color:var(--ink-3); margin-left:6px}
+.lede.tasks{margin-bottom:12px; font-size:12.5px; color:var(--ink-3)}
+.refs{display:grid; gap:14px; grid-template-columns:repeat(3,minmax(0,1fr));
+  margin-bottom:8px}
+.rf{margin:0; border:1px solid var(--line); border-radius:var(--r);
+  overflow:hidden; background:var(--bg-sub); break-inside:avoid}
+.rf img{width:100%; aspect-ratio:4/3; object-fit:cover}
+.rf figcaption{padding:9px 12px; font-size:12.5px; color:var(--ink-2);
+  border-top:1px solid var(--line)}
+@media (max-width:980px){ .refs{grid-template-columns:1fr} }
+
 .note{border:1px solid color-mix(in srgb,var(--warn) 35%,var(--line));
   background:var(--warn-sub); border-radius:var(--r);
   padding:14px 16px; margin:0 0 22px}
@@ -158,6 +170,7 @@ tr.sum td,tr.sum th{background:var(--accent-sub); font-weight:700;
 </div>
 
 <script src="assets/data.js"></script>
+<script src="assets/refs.js"></script>
 <script src="assets/report.js"></script>
 <script>
 (function () {
@@ -169,7 +182,7 @@ tr.sum td,tr.sum th{background:var(--accent-sub); font-weight:700;
   /* 탭 : 작업별 사진 비교 + 비용 비교 */
   var 목록 = R.ids().map(function (id) {
     return [id, R.이름(id) + ' 사진'];
-  }).concat([['cost', '비용 비교']]);
+  }).concat([['cost', '비용 비교'], ['refs', '설비 참조']]);
 
   var cur = (location.search.match(/[?&]t=([a-z0-9]+)/i) || [])[1];
   if (!cur || !목록.some(function (t) { return t[0] === cur; })) {
@@ -192,6 +205,55 @@ tr.sum td,tr.sum th{background:var(--accent-sub); font-weight:700;
       '지시문을 고쳤습니다.</p></div></div>';
   }
 
+  /* 설비 참조 : 장소마다 실물 사진 + 그 사진이 걸리는 작업 */
+  function 참조화면() {
+    var R2 = window.REFS || [];
+    var T = window.TASKS || {};
+    if (!R2.length) return '<p class="lede">참조 자료를 불러오지 못했습니다.</p>';
+    var 사진수 = 0, 작업수 = 0;
+    R2.forEach(function (g) {
+      사진수 += (g.photos || []).length;
+      작업수 += (g.tasks || []).length;
+    });
+
+    var h = '<div class="kpi">' +
+      '<div class="k good"><b>' + R2.length + '곳</b><span>참조를 맞춘 장소</span>' +
+      '<em>장소 하나가 여러 작업에 쓰입니다</em></div>' +
+      '<div class="k"><b>' + 사진수 + '장</b><span>실물 참조 사진</span>' +
+      '<em>우리 건물에서 찍은 사진입니다</em></div>' +
+      '<div class="k good"><b>' + 작업수 + '건</b><span>덮는 작업</span>' +
+      '<em>이 장소들을 쓰는 SOP 작업 수</em></div>' +
+      '<div class="k"><b>0원</b><span>여기까지 든 돈</span>' +
+      '<em>있는 사진을 고른 것뿐입니다</em></div></div>';
+
+    h += '<p class="lede"><b>봐 주셔야 할 것</b> — 아래 사진이 그 장소의 설비가 ' +
+      '맞는지만 확인해 주십시오. 맞으면 그 장소의 작업 사진은 이 설비 모양을 ' +
+      '그대로 따라갑니다. 틀리거나 더 좋은 사진이 있으면 말씀해 주시면 ' +
+      '바꿉니다.</p>';
+
+    R2.forEach(function (g) {
+      var 이름 = (g.tasks || []).map(function (k) {
+        return T[k] ? T[k].name : k;
+      });
+      h += '<h2>' + esc(g.place) + ' <span class="cnt">작업 ' +
+        이름.length + '건</span></h2>' +
+        '<p class="lede tasks">' + esc(이름.join(' · ')) + '</p>' +
+        '<div class="refs">' +
+        (g.photos || []).map(function (p) {
+          return '<figure class="rf">' +
+            '<img src="assets/ref/' + p.file + '" alt="" loading="lazy">' +
+            '<figcaption>' + esc(p.note) + '</figcaption></figure>';
+        }).join('') + '</div>';
+    });
+    return h;
+  }
+
+  function esc(x) {
+    return String(x == null ? '' : x).replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
+  }
+
   function 그리기() {
     tabs.innerHTML = 목록.map(function (t) {
       return '<button role="tab" data-t="' + t[0] + '" aria-selected="' +
@@ -200,6 +262,11 @@ tr.sum td,tr.sum th{background:var(--accent-sub); font-weight:700;
     document.getElementById('btnPrint')
       .addEventListener('click', function () { window.print(); });
 
+    if (cur === 'refs') {
+      view.innerHTML = 참조화면();
+      window.scrollTo(0, 0);
+      return;
+    }
     if (cur === 'cost') {
       view.innerHTML = '<p class="lede">사진을 만드는 데 실제로 들어간 돈과, ' +
         '사람이 찍어 추려내던 방식과의 차이입니다. 인건비는 가정값임을 ' +
