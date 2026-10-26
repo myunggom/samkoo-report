@@ -137,7 +137,7 @@ window.SITE = {
   },
   {
    "id": "common",
-   "title": "1. 공통부문",
+   "title": "공통부문",
    "desc": "공통(장비/시설) 1-1 ~ 1-30 · 30건",
    "open": true,
    "chapters": [
@@ -217,7 +217,7 @@ window.SITE = {
   },
   {
    "id": "arch",
-   "title": "5. 건축부문",
+   "title": "건축부문",
    "desc": "건축 1 ~ 건축 15 · 15건",
    "open": false,
    "chapters": [
@@ -270,7 +270,7 @@ window.SITE = {
   },
   {
    "id": "elec",
-   "title": "6. 전기부문",
+   "title": "전기부문",
    "desc": "전기 1 ~ 전기 10 · 10건",
    "open": false,
    "chapters": [
@@ -318,7 +318,7 @@ window.SITE = {
   },
   {
    "id": "mech",
-   "title": "7. 기계부문",
+   "title": "기계부문",
    "desc": "기계 1 ~ 기계 15 · 15건",
    "open": false,
    "chapters": [
@@ -371,7 +371,7 @@ window.SITE = {
   },
   {
    "id": "clean",
-   "title": "2. 미화부문",
+   "title": "미화부문",
    "desc": "미화 1 ~ 미화 15 · 15건",
    "open": false,
    "chapters": [
@@ -418,7 +418,7 @@ window.SITE = {
   },
   {
    "id": "sec",
-   "title": "3. 보안부문",
+   "title": "보안부문",
    "desc": "보안 1 ~ 보안 10 · 10건",
    "open": false,
    "chapters": [
@@ -460,7 +460,7 @@ window.SITE = {
   },
   {
    "id": "fire",
-   "title": "8. 소방부문",
+   "title": "소방부문",
    "desc": "소방 1 ~ 소방 12 · 12건",
    "open": true,
    "chapters": [
@@ -33602,7 +33602,7 @@ window.TASKS = {
   "parts": {
    "title": "흡수식 냉동기 일상 점검 각부 명칭 및 점검 포인트",
    "subtitle": "흡수식 냉동기 일상 점검 — 작업 전 고온재생기 냉각 대기와 판넬 단자대를 확인하십시오",
-   "figure": "",
+   "figure": "m06_fig.png",
    "figureCaption": "",
    "marks": [],
    "items": [
@@ -34005,7 +34005,7 @@ window.TASKS = {
   "report": {
    "examples": []
   },
-  "guideFigure": ""
+  "guideFigure": "m06_gfig.png"
  },
  "m07": {
   "id": "m07",

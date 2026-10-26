@@ -373,6 +373,58 @@ table.grid.lvs{min-width:620px}
 .btn.ghost{background:none; color:var(--ink-2); border:1px solid var(--line-2)}
 .btn.ghost:hover{border-color:var(--ink-3); filter:none}
 
+/* 사진 비교 · 비용 비교 */
+.rep .jump a{color:var(--accent-ink); text-decoration:none;
+  border-bottom:1px solid currentColor}
+.kpi{display:grid; gap:11px; grid-template-columns:repeat(4,1fr); margin:0 0 24px}
+.kpi .k{border:1px solid var(--line); border-radius:9px; padding:14px 15px;
+  background:var(--bg-sub)}
+.kpi .k b{display:block; font-size:23px; font-weight:800; line-height:1.2;
+  letter-spacing:-.025em; font-variant-numeric:tabular-nums}
+.kpi .k span{display:block; font-size:12.5px; color:var(--ink-2); margin-top:3px}
+.kpi .k em{display:block; font-style:normal; font-size:11.5px;
+  color:var(--ink-3); margin-top:5px}
+.kpi .k.good b{color:var(--accent-ink)}
+
+.cmp{display:grid; gap:16px; grid-template-columns:repeat(2,minmax(0,1fr))}
+.cmp .item{border:1px solid var(--line); border-radius:9px; overflow:hidden;
+  background:var(--bg-sub); break-inside:avoid}
+.cmp .hd{display:flex; align-items:baseline; gap:8px; padding:10px 13px;
+  border-bottom:1px solid var(--line); background:var(--bg)}
+.cmp .no{font-size:12px; font-weight:800; color:var(--accent-ink);
+  font-variant-numeric:tabular-nums}
+.cmp .nm{font-size:14px; font-weight:700; letter-spacing:-.015em}
+.cmp .pair{display:grid; grid-template-columns:1fr 1fr; gap:1px;
+  background:var(--line)}
+.cmp .half{background:var(--bg); position:relative}
+.cmp .half img{width:100%; aspect-ratio:3/2; object-fit:cover; display:block}
+.cmp .ph{aspect-ratio:3/2; display:grid; place-items:center;
+  background:var(--bg-sunk)}
+.cmp .ph span{font-size:12px; color:var(--ink-3)}
+.cmp .tagp{position:absolute; top:6px; left:6px; padding:2px 7px;
+  border-radius:5px; font-size:11px; font-weight:700;
+  background:rgb(0 0 0 / .62); color:#fff; z-index:1}
+.cmp .half.after .tagp{background:var(--accent)}
+.cmp .half.after.wait .tagp{background:var(--ink-3)}
+.cmp .fixed{padding:8px 13px; font-size:12.5px; color:var(--ink-2);
+  border-top:1px solid var(--line)}
+.cmp .fixed b{color:var(--accent-ink)}
+
+.rep table{font-size:13px; margin-bottom:4px}
+.rep table th,.rep table td{border:1px solid var(--line); padding:8px 11px;
+  text-align:left; vertical-align:top}
+.rep table th{background:var(--bg-sunk); color:var(--ink-2); font-weight:700;
+  white-space:nowrap}
+.rep table td.n,.rep table th.n{text-align:right; white-space:nowrap;
+  font-variant-numeric:tabular-nums}
+.rep table tr.sum td,.rep table tr.sum th{background:var(--accent-sub);
+  color:var(--accent-ink); font-weight:700}
+
+@media (max-width:1100px){
+  .kpi{grid-template-columns:repeat(2,1fr)}
+  .cmp{grid-template-columns:1fr}
+}
+
 /* 체크시트 */
 table.grid.cs{min-width:760px}
 table.grid.cs td.ck{width:30px; height:26px; background:var(--bg-sunk)}
@@ -462,6 +514,21 @@ table.grid.cs tr.sec td{
   table.head{font-size:8pt}
   table.head th,table.head td{padding:1.2mm 2mm}
   ul.cell{padding-left:3mm}
+
+  /* 사진 비교 · 비용 비교 */
+  .kpi{gap:2.5mm; margin-bottom:4mm}
+  .kpi .k{padding:2mm 2.5mm}
+  .kpi .k b{font-size:13pt}
+  .kpi .k span{font-size:7.5pt}
+  .kpi .k em{font-size:6.5pt}
+  .cmp{gap:2.5mm}
+  .cmp .item{break-inside:avoid}
+  .cmp .nm{font-size:8.5pt}
+  .cmp .fixed{font-size:7pt; padding:1.2mm 2mm}
+  .rep .jump{display:none}
+  .rep table{font-size:7.5pt}
+  .rep table th,.rep table td{padding:1.2mm 1.8mm}
+  .pagebreak{break-before:page}
 
   /* 입력칸은 적힌 값만 */
   input,textarea,select{display:none !important}
@@ -565,6 +632,7 @@ table.grid.cs tr.sec td{
 <script src="assets/qr.js"></script>
 <script src="assets/data.js"></script>
 <script src="assets/checks.js"></script>
+<script src="assets/report.js"></script>
 <script>
 (function () {
   var IMG = 'assets/img/';
@@ -651,7 +719,10 @@ table.grid.cs tr.sec td{
 
   /* ── 탭 ── */
   function drawTabs() {
-    tabs.innerHTML = TABS.map(function (t) {
+    var 목록 = TABS.concat(
+      (window.REPORT && REPORT.has(cur))
+        ? [['compare', '사진 비교'], ['cost', '비용 비교']] : []);
+    tabs.innerHTML = 목록.map(function (t) {
       return '<button role="tab" data-tab="' + t[0] + '" aria-selected="' +
         (t[0] === tab) + '">' + t[1] + '</button>';
     }).join('') +
@@ -1086,6 +1157,33 @@ table.grid.cs tr.sec td{
     return m;
   })();
 
+  /* 사진 비교 : 왼쪽 기존 · 오른쪽 개선 */
+  function compareView(tid) {
+    if (!window.REPORT || !REPORT.has(tid)) {
+      return empty('이 작업은 아직 사진을 다시 만들지 않았습니다.');
+    }
+    var 다른 = REPORT.ids().filter(function (x) { return x !== tid; });
+    return '<div class="rep">' +
+      REPORT.요약칸(tid) +
+      '<p class="lede">' + REPORT.요약글(tid) + '</p>' +
+      (다른.length
+        ? '<p class="lede jump">다른 작업 비교 : ' + 다른.map(function (x) {
+            return '<a href="#' + x + '" data-jump="' + x + '">' +
+              REPORT.이름(x) + '</a>';
+          }).join(' · ') + '</p>' : '') +
+      '<h2>열두 장면 — 왼쪽이 기존, 오른쪽이 개선</h2>' +
+      '<div class="cmp">' + REPORT.사진격자(tid) + '</div></div>';
+  }
+
+  /* 비용 비교 */
+  function costView() {
+    if (!window.REPORT) return empty('비용 자료를 불러오지 못했습니다.');
+    return '<div class="rep">' +
+      '<p class="lede">사진을 만드는 데 실제로 들어간 돈과, 사람이 찍어 ' +
+      '추려내던 방식과의 차이입니다. 인건비는 가정값임을 표 아래에 밝혔습니다.</p>' +
+      REPORT.비용표() + '</div>';
+  }
+
   function draw() {
     if (CH[cur]) return drawCheck(CH[cur]);
     var t = T[cur];
@@ -1101,7 +1199,9 @@ table.grid.cs tr.sec td{
     view.innerHTML = tab === 'parts' ? partsView(t)
       : tab === 'guide' ? guideView(t)
       : tab === 'risk' ? riskView(t)
-      : tab === 'qr' ? qrView(t) : reportView(t);
+      : tab === 'qr' ? qrView(t)
+      : tab === 'compare' ? compareView(cur)
+      : tab === 'cost' ? costView() : reportView(t);
     window.scrollTo(0, 0);
     link();
     bindRisk();
@@ -1148,19 +1248,24 @@ table.grid.cs tr.sec td{
     window.scrollTo(0, 0);
   }
 
-  function go(id) {
+  function go(id, 탭) {
     if (!T[id] && !CH[id]) return;
-    cur = id; tab = 'parts';
+    cur = id; tab = 탭 || 'parts';
     drawTree(document.getElementById('q').value);
     draw();
     document.body.classList.remove('open');
-    if (location.hash.slice(1) !== id) {
-      try { history.replaceState(null, '', '#' + id); } catch (e) {}
-    }
+    주소쓰기();
     var 지금 = tree.querySelector('a[aria-current="true"]');
     if (지금 && 지금.scrollIntoView) {
       지금.scrollIntoView({ block: 'nearest' });
     }
+  }
+
+  /* 주소는 #작업id 또는 #작업id/탭 */
+  function 주소쓰기() {
+    var h = cur + (tab && tab !== 'parts' ? '/' + tab : '');
+    if (location.hash.slice(1) === h) return;
+    try { history.replaceState(null, '', '#' + h); } catch (e) {}
   }
 
   tree.addEventListener('click', function (e) {
@@ -1169,11 +1274,18 @@ table.grid.cs tr.sec td{
     e.preventDefault();
     go(a.dataset.id);
   });
+  view.addEventListener('click', function (e) {
+    var a = e.target.closest('a[data-jump]');
+    if (!a) return;
+    e.preventDefault();
+    go(a.dataset.jump, 'compare');
+  });
   tabs.addEventListener('click', function (e) {
     var b = e.target.closest('button[data-tab]');
     if (!b) return;
     tab = b.dataset.tab;
     draw();
+    주소쓰기();
   });
   document.getElementById('q').addEventListener('input', function () {
     drawTree(this.value);
@@ -1203,7 +1315,8 @@ table.grid.cs tr.sec td{
     });
   })();
 
-  go((location.hash || '').slice(1) || 'c02');
+  var 처음 = (location.hash || '').slice(1).split('/');
+  go(처음[0] || 'c02', 처음[1]);
 })();
 </script>
 </body>

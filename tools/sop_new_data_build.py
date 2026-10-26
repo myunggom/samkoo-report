@@ -29,6 +29,7 @@ NEW = os.path.join(ROOT, "sop-new", "assets")
 OUT = os.path.join(NEW, "data.js")
 
 사진있는작업 = {"c02"}          # 새 사진을 이미 만든 작업
+도면있는작업 = {"c02", "m06"}   # 각부 명칭 도면은 그대로 쓰는 작업
 
 
 def 읽기():
@@ -39,16 +40,21 @@ def 읽기():
     return json.loads(d.stdout.decode("utf-8"))
 
 
-def 비우기(t):
-    """사진 칸만 비운다. 글과 보호구는 그대로 둔다."""
+def 비우기(t, 도면남김=False):
+    """사진 칸만 비운다. 글과 보호구는 그대로 둔다.
+
+    도면남김=True 면 각부 명칭 도면과 지침 도면은 그대로 둔다.
+    도면은 번호를 붙인 그림이라 새로 만들 대상이 아니다.
+    """
     p = t.get("parts") or {}
-    p["figure"] = ""
+    if not 도면남김:
+        p["figure"] = ""
+        t["guideFigure"] = ""
     for it in p.get("items") or []:
         it["img"] = ""
     for sec in t.get("guide") or []:
         for it in sec.get("items") or []:
             it["img"] = ""
-    t["guideFigure"] = ""
     return t
 
 
@@ -60,11 +66,18 @@ def main():
     D = 읽기()
     T, S = D["t"], D["s"]
 
+    # 부문 제목 앞의 번호를 뗀다. 순서대로도 아니어서 읽기만 방해한다.
+    import re as _re
+    for g in S.get("groups") or []:
+        g["title"] = _re.sub(r"^\s*\d+\s*[.)]\s*", "", g.get("title", ""))
+        for c in g.get("chapters") or []:
+            c["title"] = _re.sub(r"^\s*\d+\s*[.)]\s*", "", c.get("title", ""))
+
     쓸보호구 = set()
     남긴사진 = 0
     for tid, t in T.items():
         if tid not in 사진있는작업:
-            비우기(t)
+            비우기(t, tid in 도면있는작업)
         else:
             남긴사진 += 1
         for q in (t.get("ppe") or []):
