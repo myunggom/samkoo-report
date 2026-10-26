@@ -217,6 +217,15 @@ SCENES_ALL = {"m06": {
 }}
 SCENES = SCENES_ALL["c02"]
 
+# 도면 사진. fig = 각부 명칭, gfig = 안전작업 지침 탭의 대표 사진.
+# 번호와 이름은 사이트가 표식으로 얹으므로 **사진에 글자를 넣지 않는다.**
+도면장면 = {
+    "m06": {
+        "fig": ('사람이 없는 **설비 근접 사진**입니다. 냉동기 전체를 멀리서 잡지 말고, **본체 오른쪽 앞 모서리를 가까이에서 비스듬히** 잡습니다. 계기와 밸브가 손바닥만 하게 크게 보여야 합니다. 아래 여섯 군데가 서로 가리지 않고 한 화면에 모두 들어옵니다.\n1) 화면 **왼쪽 위** — 본체 윗면에서 올라온 짧은 관에 달린 **둥근 압력계 한 개**. 지름이 손바닥만 합니다.\n2) 그 **바로 오른쪽** — 본체 옆면에 세로로 붙은 **길쭉한 막대형 온도계**. 눈금판이 길게 서 있습니다.\n3) 화면 **가운데** — 굵은 배관 중간에 **네모난 전동 액추에이터가 위에 올라앉은 자동밸브**. 액추에이터는 파란 쇳덩이 상자 모양이고 옆구리에 열림·닫힘 표시가 있습니다. 손으로 돌리는 둥근 핸들이 아닙니다.\n4) 화면 **오른쪽** — 바닥에 따로 선 **밝은 회색 MCC 판넬. 문이 활짝 열려 안쪽 단자대와 색색 전선 다발이 보입니다.**\n5) 화면 **아래 가운데** — 배관에 **나란히 달린 둥근 압력계 두 개**. 두 개가 같은 높이에 붙어 한 쌍으로 보입니다.\n6) 화면 **아래 왼쪽** — **은색 보온재를 감은 굵은 열교환기 몸통**.\n여섯 군데 모두 무엇인지 알아볼 수 있을 만큼 크게 나와야 합니다. 배경에 다른 계기나 밸브를 많이 넣어 헷갈리게 하지 마세요.', "4:3"),
+        "gfig": ('주인공이 **냉동기 앞 통로에 서서 점검 일지를 들여다보는** 모습입니다. 사람은 화면 왼쪽에 전신으로, 냉동기는 오른쪽에 길게 눕혀 **설비 전체가 보이도록** 넓게 잡습니다. 한 사람만 나옵니다.', "16:9"),
+    },
+}
+
 
 def load_key():
     k = os.environ.get("GEMINI_API_KEY")
@@ -275,6 +284,8 @@ def main():
     ap.add_argument("--run", action="store_true")
     ap.add_argument("--plan", action="store_true")
     ap.add_argument("--only", help="번호 (예: 3,7)")
+    ap.add_argument("--fig", action="store_true",
+                    help="도면 사진(각부 명칭 · 지침 대표)을 만든다")
     ap.add_argument("--model", default=MODEL)
     ap.add_argument("--saver", default=SAVER)
     ap.add_argument("--mix", action="store_true",
@@ -284,22 +295,37 @@ def main():
 
     t = task(a.task)
     장면표 = SCENES_ALL.get(a.task) or {}
+    if a.fig:
+        장면표 = {}
     설비 = 설비설명.get(a.task, "")
     장갑 = 장갑설명.get(a.task, "회색 작업장갑")
     items = [(it, sec["title"]) for sec in t["guide"] for it in sec["items"]]
+    if a.fig:
+        쪽 = 도면장면.get(a.task) or {}
+        items = [({"n": k, "name": {"fig": "각부 명칭 도면",
+                                    "gfig": "지침 대표 사진"}[k],
+                   "img": "%s_%s.png" % (a.task, k), "bullets": []}, "도면")
+                 for k in ("fig", "gfig") if k in 쪽]
+        장면표 = {k: (v[0], False, v[1]) for k, v in 쪽.items()}
     if a.only:
-        want = {int(x) for x in a.only.split(",")}
+        def 번호로(x):
+            x = x.strip()
+            return int(x) if x.isdigit() else x       # 도면은 fig · gfig
+
+        want = {번호로(x) for x in a.only.split(",")}
         items = [x for x in items if x[0]["n"] in want]
 
     프로 = 프로장면.get(a.task, set()) if a.mix else None
 
     def 고른모델(n):
         """(모델, 장당 비용). --mix 가 아니면 전부 Pro."""
-        if 프로 is None:
+        if 프로 is None or a.fig:
             return a.model, 190
         return (a.model, 190) if n in 프로 else (a.saver, 48)
 
     돈 = sum(고른모델(it["n"])[1] for it, _ in items)
+    if a.fig:
+        돈 = len(items) * 190
     print("작업 : %s (%s)" % (t["name"], a.task))
     if a.mix:
         비싼 = ",".join(str(it["n"]) for it, _ in items if it["n"] in 프로)
@@ -311,7 +337,7 @@ def main():
     if not a.run:
         for it, _ in items:
             어떤, 값 = 고른모델(it["n"])
-            print("  %2d. %-18s %-22s %4d원"
+            print("  %4s. %-18s %-22s %4d원"
                   % (it["n"], it["name"][:18], 어떤, 값))
         print("\n(계획만 봤습니다. 실제로 만들려면 --run)")
         return
@@ -327,9 +353,12 @@ def main():
         장면, two, 비율 = 장면표.get(n, ("", False, "3:2"))
         if not 장면:
             continue
+        혼자 = (a.fig and n == "fig")
         ref_imgs, got = refs(two, a.task)
         설비장수 = sum(1 for g in got if g.startswith("설비:"))
-        인원 = ("## 등장 인원 : **두 사람**. 주인공 1명 + 보조자 1명."
+        인원 = ("## 등장 인원 : **아무도 나오지 않습니다.** 설비만 찍습니다."
+              if 혼자 else
+              "## 등장 인원 : **두 사람**. 주인공 1명 + 보조자 1명."
               " 세 번째 사람을 넣지 마세요."
               if two else
               "## 등장 인원 : **한 사람**. 주인공 혼자입니다."
@@ -370,20 +399,20 @@ def main():
                     break
             if not 데이터:
                 실패.append((n, "그림 없음"))
-                print("  %2d. %-20s 실패 (그림 없음)" % (n, it["name"][:20]))
+                print("  %4s. %-20s 실패 (그림 없음)" % (n, it["name"][:20]))
                 continue
             저장(데이터, path)
-            print("  %2d. %-18s 완료 %-16s %-22s (참조 %d장, 설비 %d장)"
+            print("  %4s. %-18s 완료 %-16s %-22s (참조 %d장, 설비 %d장)"
                   % (n, it["name"][:18], 이름, 쓸모델,
                      len(ref_imgs), 설비장수))
             됨 += 1
         except Exception as e:
             실패.append((n, str(e)[:70]))
-            print("  %2d. %-20s 실패 %s" % (n, it["name"][:20], str(e)[:50]))
+            print("  %4s. %-20s 실패 %s" % (n, it["name"][:20], str(e)[:50]))
 
     print("\n만든 것 %d장 / 실패 %d장" % (됨, len(실패)))
     for n, why in 실패:
-        print("   %d : %s" % (n, why))
+        print("   %s : %s" % (n, why))
 
 
 if __name__ == "__main__":

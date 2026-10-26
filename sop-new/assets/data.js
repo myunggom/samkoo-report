@@ -33602,9 +33602,40 @@ window.TASKS = {
   "parts": {
    "title": "흡수식 냉동기 일상 점검 각부 명칭 및 점검 포인트",
    "subtitle": "흡수식 냉동기 일상 점검 — 작업 전 고온재생기 냉각 대기와 판넬 단자대를 확인하십시오",
-   "figure": "m06_fig.png",
+   "figure": "m06_fig.jpg",
    "figureCaption": "",
-   "marks": [],
+   "marks": [
+    {
+     "n": 1,
+     "x": 26.5,
+     "y": 9
+    },
+    {
+     "n": 2,
+     "x": 43.5,
+     "y": 29
+    },
+    {
+     "n": 3,
+     "x": 54.5,
+     "y": 51
+    },
+    {
+     "n": 4,
+     "x": 72,
+     "y": 54
+    },
+    {
+     "n": 5,
+     "x": 45,
+     "y": 80
+    },
+    {
+     "n": 6,
+     "x": 12.5,
+     "y": 67
+    }
+   ],
    "items": [
     {
      "n": 1,
@@ -33999,7 +34030,7 @@ window.TASKS = {
   "report": {
    "examples": []
   },
-  "guideFigure": "m06_gfig.png"
+  "guideFigure": "m06_gfig.jpg"
  },
  "m07": {
   "id": "m07",
