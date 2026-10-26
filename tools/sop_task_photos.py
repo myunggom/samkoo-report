@@ -203,6 +203,17 @@ def task(tid):
     return json.loads(m.group(1))[tid]
 
 
+def 저장(데이터, path, 가로=1600):
+    """받은 그림을 가로 1600px JPEG 로 줄여 저장한다."""
+    import io as _io
+    from PIL import Image
+    im = Image.open(_io.BytesIO(데이터)).convert("RGB")
+    w, h = im.size
+    if w > 가로:
+        im = im.resize((가로, round(h * 가로 / w)), Image.LANCZOS)
+    im.save(path, "JPEG", quality=86, optimize=True, progressive=True)
+
+
 def refs(two):
     from PIL import Image
     names = list(메인) + (list(서브) if two else []) + list(물체)
@@ -289,7 +300,9 @@ def main():
             "제목 : %s" % it["name"],
             "\n".join("- " + b for b in it.get("bullets") or []),
         ])
-        path = os.path.join(OUT_DIR, it["img"])
+        # 사이트에 올릴 파일은 가볍게. 원본 PNG 는 2.5MB 라 현장에서 안 열린다.
+        이름 = os.path.splitext(it["img"] or "%s_g%02d" % (a.task, n))[0] + ".jpg"
+        path = os.path.join(OUT_DIR, 이름)
         try:
             쓸모델, _ = 고른모델(n)
             크기 = "2K" if 쓸모델 == a.model else "1K"
@@ -314,10 +327,9 @@ def main():
                 실패.append((n, "그림 없음"))
                 print("  %2d. %-20s 실패 (그림 없음)" % (n, it["name"][:20]))
                 continue
-            with open(path, "wb") as f:
-                f.write(데이터)
+            저장(데이터, path)
             print("  %2d. %-18s 완료 %-16s %-22s (참조 %d장)"
-                  % (n, it["name"][:18], it["img"], 쓸모델, len(ref_imgs)))
+                  % (n, it["name"][:18], 이름, 쓸모델, len(ref_imgs)))
             됨 += 1
         except Exception as e:
             실패.append((n, str(e)[:70]))

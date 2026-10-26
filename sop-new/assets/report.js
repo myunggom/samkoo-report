@@ -12,6 +12,7 @@
     c02: {
       name: '사다리 작업',
       where: '공통부문',
+      옛: 'jpg',
       날짜: '2026.10.23',
       생성: 18,               /* 실제로 돌린 횟수 (재작업 포함) */
       채택: 12,
@@ -35,14 +36,13 @@
     m06: {
       name: '흡수식 냉동기 일상 점검',
       where: '기계부문',
-      날짜: '충전 대기',
-      대기: true,
-      생성: 0,
-      채택: 0,
-      예정: 12,
+      옛: 'png',          /* 옛 사진은 PNG, 새 사진은 가벼운 JPEG */
+      날짜: '2026.10.26',
+      생성: 13,
+      채택: 12,
       요약: '사다리 작업에서 지적받은 것(어두운 배경 · 실제와 다른 설비)을 ' +
-        '지시문에 모두 반영해 두었습니다. 충전액이 떨어져 생성만 남았습니다. ' +
-        '충전하면 한 번 돌려 열두 장이 이 자리에 채워집니다.',
+        '지시문에 먼저 반영하고 만들었습니다. 열두 장면이 모두 한 번에 ' +
+        '나왔고, 한 번만 다시 돌렸습니다.',
       바뀐점: {
         1: '내열장갑을 끼는 동작 · 귀마개를 함께',
         2: '보조자를 떨어뜨려 두 사람이 모두 보이게',
@@ -76,6 +76,14 @@
 
   var 충전 = { 넣은돈: 8000, 쓴돈: 7090 };
 
+  /* 받고 나서 눈에 띈 것. 다시 만들지는 사장 결정 */
+  var 손볼것 = {
+    m06: ['바닥색이 장면마다 회색과 녹색을 오갑니다. 같은 기계실인데 ' +
+      '달라 보입니다 — 지시문에 바닥색을 하나로 못박으면 잡힙니다.',
+      '설비가 흡수식이라기보다 터보 · 스크류 냉동기 모양에 가깝습니다. ' +
+      '고온재생기가 뚜렷하지 않습니다.']
+  };
+
   function 원(n) { return Math.round(n).toLocaleString('ko-KR') + '원'; }
 
   function esc(s) {
@@ -84,11 +92,17 @@
     });
   }
 
-  /* 사진 파일 이름. data.js 에서 비워 둔 작업은 규칙으로 되살린다 */
-  function 파일(tid, it) {
-    if (it.img) return it.img;
-    var n = it.n < 10 ? '0' + it.n : '' + it.n;
-    return tid + '_g' + n + '.png';
+  /* 사진 파일 이름.
+     옛 사진은 원래 확장자 그대로, 새 사진은 자료에 적힌 이름을 쓴다.
+     자료가 비어 있으면(아직 안 만든 작업) 규칙으로 되살린다. */
+  function 번호(it) {
+    return it.n < 10 ? '0' + it.n : '' + it.n;
+  }
+  function 옛파일(tid, it) {
+    return tid + '_g' + 번호(it) + '.' + ((작업[tid] || {}).옛 || 'jpg');
+  }
+  function 새파일(tid, it) {
+    return it.img || (tid + '_g' + 번호(it) + '.jpg');
   }
 
   function 항목들(tid) {
@@ -104,17 +118,18 @@
     var info = 작업[tid];
     if (!info) return '';
     return 항목들(tid).map(function (it) {
-      var f = 파일(tid, it);
       var 개선 = info.대기
         ? '<div class="half after wait"><span class="tagp">개선</span>' +
           '<div class="ph"><span>생성 대기</span></div></div>'
         : '<div class="half after"><span class="tagp">개선</span>' +
-          '<img src="assets/img/' + f + '" alt="" loading="lazy"></div>';
+          '<img src="assets/img/' + 새파일(tid, it) +
+          '" alt="" loading="lazy"></div>';
       return '<div class="item"><div class="hd"><span class="no">' + it.n +
         '</span><span class="nm">' + esc(it.name) + '</span></div>' +
         '<div class="pair">' +
         '<div class="half"><span class="tagp">기존</span>' +
-        '<img src="assets/old/' + f + '" alt="" loading="lazy"></div>' +
+        '<img src="assets/old/' + 옛파일(tid, it) +
+        '" alt="" loading="lazy"></div>' +
         개선 + '</div><div class="fixed"><b>' +
         (info.대기 ? '고칠 점' : '바뀐 점') + '</b> ' +
         esc(info.바뀐점[it.n] || '') + '</div></div>';
@@ -203,23 +218,23 @@
       밑작업.reduce(function (a, r) { return a + r[1]; }, 0) + '장</td>' +
       '<td class="n">' + 원(밑합) + '</td><td>다시 들지 않음</td></tr></table>';
 
-    /* 3. 충전 현황 */
-    h += '<h2>3. 충전 현황 — 2026.10.26 기준</h2>' +
+    /* 3. 쓴 돈 */
+    h += '<h2>3. 지금까지 쓴 돈 — 2026.10.26 기준</h2>' +
       '<table><tr><th>구분</th><th class="n">금액</th><th>내용</th></tr>' +
-      '<tr><td>충전</td><td class="n">' + 원(충전.넣은돈) +
-      '</td><td>2026.10.22</td></tr>' +
-      '<tr><td>사용 (공개 단가 추정)</td><td class="n">' + 원(충전.쓴돈) +
-      '</td><td>밑작업 ' + 원(밑합) + ' + 사다리 작업 ' +
-      원(총생성 * 장당) + '</td></tr>' +
-      '<tr class="sum"><td>실제 잔액</td><td class="n">0원</td>' +
-      '<td>냉동기 12장을 만들려면 추가 충전이 필요합니다</td></tr></table>' +
-      '<p class="fine">※ 냉동기 작업 생성을 시도했으나 ' +
-      '<b>충전액 소진(402 prepaid credits depleted)</b>으로 12건 모두 ' +
-      '시작되지 않았습니다. 실패한 호출은 과금되지 않습니다.<br>' +
-      '※ 위 추정액(' + 원(충전.쓴돈) + ')보다 실제 사용액이 컸습니다. ' +
-      '정확한 금액은 Google AI Studio 결제 화면에서 확인해야 합니다. ' +
-      '추정은 2K 1장 ' + 원(장당) + ' 기준이며, 시험 생성에 쓴 다른 모델 ' +
-      '단가는 반영돼 있지 않습니다.</p>';
+      '<tr><td>밑작업</td><td class="n">' + 원(밑합) +
+      '</td><td>표준 인물 · 방식 검토. 다시 들지 않음</td></tr>' +
+      '<tr><td>사다리 작업</td><td class="n">' + 원(18 * 장당) +
+      '</td><td>18회 생성 · 12장 채택</td></tr>' +
+      '<tr><td>냉동기 작업</td><td class="n">' + 원(13 * 장당) +
+      '</td><td>13회 생성 · 12장 채택</td></tr>' +
+      '<tr class="sum"><td>합계 (공개 단가 추정)</td><td class="n">' +
+      원(밑합 + 31 * 장당) + '</td>' +
+      '<td>1차 충전 8,000원 + 추가 충전</td></tr></table>' +
+      '<p class="fine">※ 10월 26일 1차 충전분이 소진돼 12건이 ' +
+      '<b>402 (prepaid credits depleted)</b>로 거절됐습니다. ' +
+      '실패한 호출은 과금되지 않아 이 표에 넣지 않았습니다.<br>' +
+      '※ 공개 단가(2K 1장 ' + 원(장당) + ')로 계산한 추정치입니다. ' +
+      '정확한 금액은 Google AI Studio 결제 화면에서 확인해야 합니다.</p>';
 
     /* 4. 사람이 하던 방식과 */
     var 사람1건 = 사람방식.인원 * 사람방식.시간 * 사람방식.시급;
@@ -273,6 +288,7 @@
     ids: function () { return Object.keys(작업); },
     대기: function (tid) { return !!(작업[tid] || {}).대기; },
     요약글: function (tid) { return (작업[tid] || {}).요약 || ''; },
+    손볼것: function (tid) { return 손볼것[tid] || []; },
     이름: function (tid) { return (작업[tid] || {}).name || ''; }
   };
 })();

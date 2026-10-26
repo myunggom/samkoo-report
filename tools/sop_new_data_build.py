@@ -28,7 +28,7 @@ SRCIMG = os.path.join(SITE, "assets", "img")
 NEW = os.path.join(ROOT, "sop-new", "assets")
 OUT = os.path.join(NEW, "data.js")
 
-사진있는작업 = {"c02"}          # 새 사진을 이미 만든 작업
+사진있는작업 = {"c02", "m06"}   # 새 사진을 이미 만든 작업
 도면있는작업 = {"c02", "m06"}   # 각부 명칭 도면은 그대로 쓰는 작업
 
 
@@ -38,6 +38,31 @@ def 읽기():
           % json.dumps(SRC.replace("\\", "/")))
     d = subprocess.run(["node", "-e", js], capture_output=True, check=True)
     return json.loads(d.stdout.decode("utf-8"))
+
+
+def 이름맞추기(t, img폴더):
+    """자료의 사진 이름을 폴더에 실제로 있는 파일로 맞춘다.
+
+    사진을 다시 만들 때 PNG 를 JPEG 로 줄여 저장하므로 확장자가 바뀐다.
+    """
+    def 고치기(d, key):
+        v = d.get(key)
+        if not v or os.path.exists(os.path.join(img폴더, v)):
+            return
+        밑, _ = os.path.splitext(v)
+        for 끝 in (".jpg", ".png", ".jpeg", ".webp"):
+            if os.path.exists(os.path.join(img폴더, 밑 + 끝)):
+                d[key] = 밑 + 끝
+                return
+
+    고치기(t, "guideFigure")
+    p = t.get("parts") or {}
+    고치기(p, "figure")
+    for it in p.get("items") or []:
+        고치기(it, "img")
+    for sec in t.get("guide") or []:
+        for it in sec.get("items") or []:
+            고치기(it, "img")
 
 
 def 비우기(t, 도면남김=False):
@@ -79,6 +104,7 @@ def main():
         if tid not in 사진있는작업:
             비우기(t, tid in 도면있는작업)
         else:
+            이름맞추기(t, os.path.join(NEW, "img"))
             남긴사진 += 1
         for q in (t.get("ppe") or []):
             if q.get("img"):

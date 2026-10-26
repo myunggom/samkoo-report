@@ -103,6 +103,12 @@ tr.sum td,tr.sum th{background:var(--accent-sub); font-weight:700;
   background:var(--bg-sub)}
 .w h3{margin:0 0 6px; font-size:14px; font-weight:700}
 .w p{margin:0; font-size:13px; color:var(--ink-2)}
+.note{border:1px solid color-mix(in srgb,var(--warn) 35%,var(--line));
+  background:var(--warn-sub); border-radius:var(--r);
+  padding:14px 16px; margin:0 0 22px}
+.note h3{margin:0 0 4px; font-size:14px; font-weight:700; color:var(--warn)}
+.note ul{margin:0; padding-left:17px}
+.note li{font-size:13px; color:var(--ink-2); margin-top:3px}
 .fine{margin-top:10px; font-size:12px; color:var(--ink-3); line-height:1.65}
 .back{display:inline-block; margin-top:26px; font-size:13.5px;
   color:var(--accent-ink); text-decoration:none;
@@ -199,8 +205,14 @@ tr.sum td,tr.sum th{background:var(--accent-sub); font-weight:700;
         '사람이 찍어 추려내던 방식과의 차이입니다. 인건비는 가정값임을 ' +
         '표 아래에 밝혔습니다.</p>' + R.비용표();
     } else {
+      var 볼것 = R.손볼것(cur);
       view.innerHTML = R.요약칸(cur) +
-        '<p class="lede">' + R.요약글(cur) + '</p>' + 왜() +
+        '<p class="lede">' + R.요약글(cur) + '</p>' +
+        (볼것.length
+          ? '<div class="note"><h3>받고 나서 눈에 띈 것</h3><ul>' +
+            볼것.map(function (x) { return '<li>' + x + '</li>'; }).join('') +
+            '</ul></div>'
+          : '') + 왜() +
         '<h2 class="pagebreak">사진 비교 : 왼쪽이 기존, 오른쪽이 개선</h2>' +
         '<div class="cmp">' + R.사진격자(cur) + '</div>';
     }

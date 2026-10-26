@@ -374,6 +374,8 @@ table.grid.lvs{min-width:620px}
 .btn.ghost:hover{border-color:var(--ink-3); filter:none}
 
 /* 사진 비교 · 비용 비교 */
+.rep .note ul{margin:4px 0 0; padding-left:17px}
+.rep .note li{font-size:13px; color:var(--ink-2); margin-top:3px}
 .rep .jump a{color:var(--accent-ink); text-decoration:none;
   border-bottom:1px solid currentColor}
 .kpi{display:grid; gap:11px; grid-template-columns:repeat(4,1fr); margin:0 0 24px}
@@ -1166,6 +1168,12 @@ table.grid.cs tr.sec td{
     return '<div class="rep">' +
       REPORT.요약칸(tid) +
       '<p class="lede">' + REPORT.요약글(tid) + '</p>' +
+      (REPORT.손볼것(tid).length
+        ? '<div class="note ban"><h3>받고 나서 눈에 띈 것</h3><ul>' +
+          REPORT.손볼것(tid).map(function (x) {
+            return '<li>' + esc(x) + '</li>';
+          }).join('') + '</ul></div>'
+        : '') +
       (다른.length
         ? '<p class="lede jump">다른 작업 비교 : ' + 다른.map(function (x) {
             return '<a href="#' + x + '" data-jump="' + x + '">' +
