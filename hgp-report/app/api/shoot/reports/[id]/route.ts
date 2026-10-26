@@ -28,6 +28,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     },
     specialPhotos: body.specialPhotos ?? [],
     specialNote: body.specialNote ?? "",
+    specialPage: body.specialPage !== false,
     note: body.note,
     updatedAt: new Date().toISOString(),
   });

@@ -2,7 +2,7 @@
 
 // 촬영 완료보고서 PPT — PDF(ReportDocument.tsx)와 똑같은 모양의 양식(public/templates/shoot.pptx,
 // scripts/build_shoot_pptx.py로 생성)을 채워 만든다.
-//  · 1 표지 · 2 촬영 개요(회차 표 행 반복, 이번 회차 강조) · 3 구역 사진 · 4 특이사항
+//  · 1 표지 · 2 촬영 개요(회차 표 행 반복, 이번 회차 강조) · 3 구역 사진 · 4 특이사항(「특이사항 페이지 출력」을 끄면 뺀다)
 //  · 구역 사진 슬라이드는 PDF와 같게 "구역마다, 사진 8장마다" 한 장씩 → zip 단계에서 slide3을 복제하고
 //    복제본마다 태그에 _i 접미사를 붙여 개별로 채운다 (docxtemplater 무료판은 슬라이드 복제를 못 함).
 //  · 사진 설명은 PDF처럼 사진 아래쪽 반투명 띠로 사진에 합성한다.
@@ -83,6 +83,24 @@ function fitBadge(xml: string, label: string): string {
 interface ZipLike {
   file(name: string): { asText(): string } | null;
   file(name: string, content: string): unknown;
+  remove(name: string): unknown;
+}
+
+// 슬라이드 하나를 뺀다 — 목록(presentation.xml)·관계·콘텐츠 형식에서 지우고 파일도 지운다
+function removeSlide(zip: ZipLike, name: string): void {
+  const esc = name.replace(/\./g, "\\.");
+  const prelPath = "ppt/_rels/presentation.xml.rels";
+  const prel = zip.file(prelPath)!.asText();
+  const rel = new RegExp(`<Relationship Id="([^"]+)"[^>]*Target="slides/${esc}"/>`).exec(prel);
+  const pres = zip.file("ppt/presentation.xml")!.asText();
+  const sld = rel ? new RegExp(`<p:sldId id="\\d+" r:id="${rel[1]}"/>`).exec(pres)?.[0] : undefined;
+  if (!rel || !sld) throw new Error("PPT 양식 구조를 읽지 못했습니다.");
+  zip.file(prelPath, prel.replace(rel[0], ""));
+  zip.file("ppt/presentation.xml", pres.replace(sld, ""));
+  const ct = zip.file("[Content_Types].xml")!.asText();
+  zip.file("[Content_Types].xml", ct.replace(new RegExp(`<Override PartName="/ppt/slides/${esc}"[^>]*/>`), ""));
+  zip.remove(`ppt/slides/${name}`);
+  zip.remove(`ppt/slides/_rels/${name}.rels`);
 }
 
 // slide3(구역 사진)을 페이지 수만큼: 첫 장은 slide3 재사용, 나머지는 slide101.. 추가 후 slide3 바로 뒤에 배치
@@ -188,8 +206,9 @@ export async function generateShootPptx(schedule: Schedule, report: Report, roun
       data[`p${k + 1}_${i}`] = await put(`p${k + 1}_${i}`, pg.photos[k], SECTION_BOX);
     }
   }
-  // 특이사항 사진 2×2
-  for (let k = 0; k < 4; k++) {
+  // 특이사항 사진 2×2 (특이사항 페이지를 넣을 때만)
+  const special = report.specialPage !== false;
+  for (let k = 0; special && k < 4; k++) {
     data[`s${k + 1}`] = await put(`s${k + 1}`, report.specialPhotos?.[k], SPECIAL_BOX);
   }
 
@@ -197,6 +216,7 @@ export async function generateShootPptx(schedule: Schedule, report: Report, roun
   if (!res.ok) throw new Error("PPT 양식을 불러오지 못했습니다.");
   const zip = new PizZip(await res.arrayBuffer());
   expandSectionSlides(zip, pages.map((p) => SECTION_LABELS[p.sec]));
+  if (!special) removeSlide(zip, "slide4.xml");
 
   const imageModule = new ImageModule({
     getImage: (key: string) => store.get(key)?.bytes ?? new Uint8Array(),

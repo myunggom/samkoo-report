@@ -45,6 +45,7 @@ export type Report = {
   // 마지막 특이사항 페이지 (사진 4장 2×2 + 우측 설명)
   specialPhotos?: Photo[];
   specialNote?: string;
+  specialPage?: boolean; // 특이사항 페이지 출력 여부 — false 면 PPT·PDF 에서 뺀다 (없으면 출력)
   note?: string; // 구버전 전체 비고 (하위 호환)
   updatedAt: string;
 };

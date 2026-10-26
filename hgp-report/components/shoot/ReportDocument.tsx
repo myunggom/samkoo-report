@@ -283,28 +283,30 @@ const ReportDocument = forwardRef<HTMLDivElement, Props>(function ReportDocument
         );
       })}
 
-      {/* ── 마지막. 특이사항 (사진 2×2 + 우측 설명) ── */}
-      <div className="pdf-page" style={pageBase}>
-        <PageHeader title="특이사항" subtitle={subtitle} />
-        <InfoTableCompact schedule={schedule} />
-        <div style={{ display: "flex", gap: 12, flex: 1, minHeight: 0 }}>
-          {/* 좌: 2×2 사진 */}
-          <div style={{ flex: "0 0 64%", display: "grid", gridTemplateColumns: "1fr 1fr", gridTemplateRows: "1fr 1fr", gap: 10 }}>
-            {specialCells.map((p, i) => (
-              <PhotoCell key={i} photo={p} index={i} />
-            ))}
-          </div>
-          {/* 우: 특이사항 설명 */}
-          <div style={{ flex: 1, border: "1px solid #e2e8f0", borderRadius: 8, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-            <div style={{ background: "#eef2f7", padding: "8px 12px", fontWeight: 700, fontSize: 14, color: "#334155", borderBottom: "1px solid #e2e8f0" }}>
-              특이사항 설명
+      {/* ── 마지막. 특이사항 (사진 2×2 + 우측 설명) — 「특이사항 페이지 출력」을 끄면 뺀다 ── */}
+      {report.specialPage !== false && (
+        <div className="pdf-page" style={pageBase}>
+          <PageHeader title="특이사항" subtitle={subtitle} />
+          <InfoTableCompact schedule={schedule} />
+          <div style={{ display: "flex", gap: 12, flex: 1, minHeight: 0 }}>
+            {/* 좌: 2×2 사진 */}
+            <div style={{ flex: "0 0 64%", display: "grid", gridTemplateColumns: "1fr 1fr", gridTemplateRows: "1fr 1fr", gap: 10 }}>
+              {specialCells.map((p, i) => (
+                <PhotoCell key={i} photo={p} index={i} />
+              ))}
             </div>
-            <div style={{ padding: 12, fontSize: 13, lineHeight: 1.7, whiteSpace: "pre-wrap", color: specialNote ? "#111" : "#94a3b8", flex: 1, overflow: "hidden" }}>
-              {specialNote || "해당 없음"}
+            {/* 우: 특이사항 설명 */}
+            <div style={{ flex: 1, border: "1px solid #e2e8f0", borderRadius: 8, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+              <div style={{ background: "#eef2f7", padding: "8px 12px", fontWeight: 700, fontSize: 14, color: "#334155", borderBottom: "1px solid #e2e8f0" }}>
+                특이사항 설명
+              </div>
+              <div style={{ padding: 12, fontSize: 13, lineHeight: 1.7, whiteSpace: "pre-wrap", color: specialNote ? "#111" : "#94a3b8", flex: 1, overflow: "hidden" }}>
+                {specialNote || "해당 없음"}
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 });

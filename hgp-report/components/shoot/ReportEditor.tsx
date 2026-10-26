@@ -140,30 +140,51 @@ export default function ReportEditor({ schedule, initialReport }: Props) {
           }
         >
           특이사항
-          {(report.specialPhotos?.length ?? 0) > 0 && (
-            <span className="ml-1 text-xs text-slate-400">({report.specialPhotos!.length})</span>
+          {report.specialPage === false ? (
+            <span className="ml-1 text-xs text-slate-400">(제외)</span>
+          ) : (
+            (report.specialPhotos?.length ?? 0) > 0 && (
+              <span className="ml-1 text-xs text-slate-400">({report.specialPhotos!.length})</span>
+            )
           )}
         </button>
       </div>
 
       {active === "special" ? (
         <>
-          <p className="text-sm text-slate-500">
-            보고서 <b>마지막 페이지</b>입니다. 사진 4장(2×2)과 오른쪽 설명으로 만들어집니다.
-          </p>
-          <PhotoGrid
-            photos={report.specialPhotos ?? []}
-            onChange={(p) => setReport((r) => ({ ...r, specialPhotos: p }))}
-          />
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">특이사항 설명 (오른쪽에 표시)</label>
-            <textarea
-              value={report.specialNote ?? ""}
-              onChange={(e) => setReport((r) => ({ ...r, specialNote: e.target.value }))}
-              rows={5}
-              placeholder="특이사항 내용을 적어 주세요. (없으면 비워두세요)"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-900 focus:outline-none"
+          <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-medium text-slate-800">
+            <input
+              type="checkbox"
+              checked={report.specialPage !== false}
+              onChange={(e) => setReport((r) => ({ ...r, specialPage: e.target.checked }))}
+              className="h-4 w-4 accent-slate-900"
             />
+            특이사항 페이지를 PPT·PDF에 넣기
+          </label>
+          {report.specialPage === false ? (
+            <p className="text-sm text-slate-500">
+              특이사항 페이지 <b>없이</b> 출력합니다. 아래에 적어 둔 사진·설명은 지워지지 않고, 다시 체크하면 들어갑니다.
+            </p>
+          ) : (
+            <p className="text-sm text-slate-500">
+              보고서 <b>마지막 페이지</b>입니다. 사진 4장(2×2)과 오른쪽 설명으로 만들어집니다.
+            </p>
+          )}
+          <div className={report.specialPage === false ? "pointer-events-none space-y-4 opacity-40" : "space-y-4"}>
+            <PhotoGrid
+              photos={report.specialPhotos ?? []}
+              onChange={(p) => setReport((r) => ({ ...r, specialPhotos: p }))}
+            />
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">특이사항 설명 (오른쪽에 표시)</label>
+              <textarea
+                value={report.specialNote ?? ""}
+                onChange={(e) => setReport((r) => ({ ...r, specialNote: e.target.value }))}
+                rows={5}
+                placeholder="특이사항 내용을 적어 주세요. (없으면 비워두세요)"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-900 focus:outline-none"
+              />
+            </div>
           </div>
         </>
       ) : (
