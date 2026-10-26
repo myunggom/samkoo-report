@@ -26,7 +26,15 @@ SITE = os.path.join(ROOT, "sop-new")
 DATA = os.path.join(SITE, "assets", "data.js")
 OUT_DIR = os.path.join(SITE, "assets", "img")
 
-MODEL = "gemini-3-pro-image"
+MODEL = "gemini-3-pro-image"      # 안전모 글자가 정확. 장당 약 190원
+SAVER = "gemini-nano-banana-2.1"  # 글자가 깨짐. 장당 약 48원
+
+# --mix 일 때 Pro 를 쓰는 장면.
+# 사람이 크게 나와 안전모 · 가슴 로고 글자가 읽히는 장면만 고른다.
+프로장면 = {
+    "c02": {1, 3, 4, 8, 11},
+    "m06": {1, 3, 4, 8, 10},
+}
 TASK = "c02"          # --task 로 바꾼다
 
 메인 = ["표준인물_메인_01_정면.png", "표준인물_메인_02_좌34.png",
@@ -213,6 +221,9 @@ def main():
     ap.add_argument("--plan", action="store_true")
     ap.add_argument("--only", help="번호 (예: 3,7)")
     ap.add_argument("--model", default=MODEL)
+    ap.add_argument("--saver", default=SAVER)
+    ap.add_argument("--mix", action="store_true",
+                    help="사람이 크게 나오는 장면만 Pro, 나머지는 싼 모델")
     ap.add_argument("--task", default=TASK, help="작업 id (예: m06)")
     a = ap.parse_args()
 
@@ -225,13 +236,28 @@ def main():
         want = {int(x) for x in a.only.split(",")}
         items = [x for x in items if x[0]["n"] in want]
 
+    프로 = 프로장면.get(a.task, set()) if a.mix else None
+
+    def 고른모델(n):
+        """(모델, 장당 비용). --mix 가 아니면 전부 Pro."""
+        if 프로 is None:
+            return a.model, 190
+        return (a.model, 190) if n in 프로 else (a.saver, 48)
+
+    돈 = sum(고른모델(it["n"])[1] for it, _ in items)
     print("작업 : %s (%s)" % (t["name"], a.task))
-    print("모델 : %s" % a.model)
-    print("만들 사진 : %d장  (약 %d원)" % (len(items), len(items) * 190))
+    if a.mix:
+        비싼 = ",".join(str(it["n"]) for it, _ in items if it["n"] in 프로)
+        print("모델 : 섞어 쓰기 — Pro %s번 / 나머지 %s" % (비싼, a.saver))
+    else:
+        print("모델 : %s" % a.model)
+    print("만들 사진 : %d장  (약 %d원)" % (len(items), 돈))
     print("저장 : %s" % OUT_DIR)
     if not a.run:
         for it, _ in items:
-            print("  %2d. %s" % (it["n"], it["name"]))
+            어떤, 값 = 고른모델(it["n"])
+            print("  %2d. %-18s %-22s %4d원"
+                  % (it["n"], it["name"][:18], 어떤, 값))
         print("\n(계획만 봤습니다. 실제로 만들려면 --run)")
         return
 
@@ -265,12 +291,14 @@ def main():
         ])
         path = os.path.join(OUT_DIR, it["img"])
         try:
+            쓸모델, _ = 고른모델(n)
+            크기 = "2K" if 쓸모델 == a.model else "1K"
             res = client.models.generate_content(
-                model=a.model, contents=[글] + ref_imgs,
+                model=쓸모델, contents=[글] + ref_imgs,
                 config=types.GenerateContentConfig(
                     response_modalities=["IMAGE"],
                     image_config=types.ImageConfig(aspect_ratio=비율,
-                                                   image_size="2K"),
+                                                   image_size=크기),
                 ),
             )
             데이터 = None
@@ -288,8 +316,8 @@ def main():
                 continue
             with open(path, "wb") as f:
                 f.write(데이터)
-            print("  %2d. %-20s 완료 %s (참조 %d장)"
-                  % (n, it["name"][:20], it["img"], len(ref_imgs)))
+            print("  %2d. %-18s 완료 %-16s %-22s (참조 %d장)"
+                  % (n, it["name"][:18], it["img"], 쓸모델, len(ref_imgs)))
             됨 += 1
         except Exception as e:
             실패.append((n, str(e)[:70]))
