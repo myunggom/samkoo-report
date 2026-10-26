@@ -138,7 +138,7 @@ const ReportDocument = forwardRef<HTMLDivElement, Props>(function ReportDocument
     groups.forEach((g, i) => sectionPages.push({ section: sec, photos: g, part: i + 1, parts: groups.length }));
   }
 
-  const coverImg = report.cover ? proxied(report.cover.url) : "/cover-building.jpg";
+  const coverImg = report.cover ? proxied(report.cover.url) : "/cover-building-night.jpg";
   const specialCells: (Photo | null)[] = Array.from({ length: 4 }, (_, i) => report.specialPhotos?.[i] ?? null);
   const specialNote = report.specialNote?.trim();
   const subtitle = `촬영 기간 : ${shootPeriod(schedule)}`;
@@ -146,25 +146,22 @@ const ReportDocument = forwardRef<HTMLDivElement, Props>(function ReportDocument
   return (
     <div ref={ref} style={{ fontFamily: "var(--font-noto), 'Malgun Gothic', sans-serif" }}>
       {/* ── 1. 겉표지 ─────────────────────────────── */}
-      <div className="pdf-page" style={{ ...pageBase, padding: 0, position: "relative", overflow: "hidden" }}>
+      <div className="pdf-page" style={{ ...pageBase, padding: 0, position: "relative", overflow: "hidden", background: "#fff" }}>
+        {/* 아래쪽 절반에만 건물 야경 사진 */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={coverImg} alt="" crossOrigin="anonymous" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
-        {/* 좌측 네이비 그라디언트 */}
-        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(100deg, rgba(9,24,51,0.94) 0%, rgba(12,33,72,0.82) 34%, rgba(15,44,92,0.35) 60%, rgba(15,44,92,0) 82%)" }} />
+        <img src={coverImg} alt="" crossOrigin="anonymous" style={{ position: "absolute", left: 0, right: 0, top: 379, bottom: 0, width: "100%", objectFit: "cover" }} />
         {/* 상단 로고 (투명 배경) */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/samkoo.png" alt="Samkoo" style={{ position: "absolute", top: 36, right: 44, height: 46, width: "auto" }} />
-        {/* 텍스트 블록 */}
-        <div style={{ position: "absolute", left: 60, top: 0, bottom: 0, width: 640, display: "flex", flexDirection: "column", justifyContent: "center", color: "#fff" }}>
-          <div style={{ fontSize: 16, letterSpacing: 3, color: "#cfe0f5", fontWeight: 600 }}>한독 · 제넥신 · 프로젠 연구소</div>
-          <div style={{ fontSize: 15, letterSpacing: 2, color: "#9db8dd", marginTop: 4 }}>{schedule.shootType || "촬영"}</div>
-          <h1 style={{ fontSize: 58, fontWeight: 800, margin: "14px 0 6px", lineHeight: 1.1 }}>촬영 완료보고서</h1>
-          <div style={{ fontSize: 30, fontWeight: 600, color: "#eaf1fb" }}>{schedule.title}</div>
-          <div style={{ width: 90, height: 4, background: "#4f86d6", borderRadius: 2, margin: "24px 0" }} />
-          <div style={{ fontSize: 16, color: "#dbe6f6", lineHeight: 1.8 }}>
-            <div>제작사 : {schedule.production || "-"}</div>
-            <div>촬영 기간 : {shootPeriod(schedule)}</div>
-            {schedule.manager && <div>관리자 : {schedule.manager}</div>}
+        {/* 텍스트 블록 — 흰 바탕 위 검정 글씨 */}
+        <div style={{ position: "absolute", left: 60, top: 60, width: 900, color: "#111" }}>
+          <div style={{ fontSize: 16, letterSpacing: 3, fontWeight: 600, lineHeight: "24px" }}>한독 · 제넥신 · 프로젠 연구소</div>
+          <h1 style={{ fontSize: 58, fontWeight: 800, margin: "41px 0 0", lineHeight: "64px" }}>촬영 완료보고서</h1>
+          <div style={{ fontSize: 16, lineHeight: "29px", marginTop: 18 }}>
+            <div>촬영 명 : {schedule.title}</div>
+            <div style={{ marginTop: 13 }}>제작사 : {schedule.production || "-"}</div>
+            <div style={{ marginTop: 13 }}>촬영 기간 : {shootPeriod(schedule)}</div>
+            {schedule.manager && <div style={{ marginTop: 13 }}>관리자 : {schedule.manager}</div>}
           </div>
         </div>
         {/* 하단 액센트 바 */}

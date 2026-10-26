@@ -17,7 +17,7 @@ type Box = { w: number; h: number };
 // 사진 크기(px) — build_shoot_pptx.py의 사진칸 안쪽 크기와 같아야 함
 const SECTION_BOX: Box = { w: 258.8, h: 211.5 };
 const SPECIAL_BOX: Box = { w: 334.4, h: 285.8 };
-const COVER_BOX: Box = { w: 1123, h: 794 };
+const COVER_BOX: Box = { w: 1123, h: 415 };   // 표지 사진은 아래쪽 절반에만 들어간다
 const EMU = 9525;
 
 // 구역 슬라이드에서 복제본마다 달라지는 태그

@@ -5,7 +5,7 @@
 좌표·크기·색·글자 크기는 PDF 페이지(1123×794px, A4 가로)를 브라우저에서 실측한 값을 그대로 쓴다.
 PDF 디자인을 바꾸면 이 파일의 좌표도 같이 맞춰야 한다.
 
-  1  표지        건물 사진 + 네이비 그라디언트 + Samkoo 로고 + 제목 블록 + 하단 바
+  1  표지        흰 바탕 위쪽에 제목 블록 + Samkoo 로고, 아래쪽 절반에 건물 야경 사진 + 하단 바
   2  촬영 개요   개요 표(4행) + 촬영 회차 표(이번 회차 강조)
   3  구역 사진   정보표 + 구역 배지 + 사진 4×2 + 촬영 중 특이사항·비고   ← 웹에서 구역·8장마다 복제
   4  특이사항    정보표 + 사진 2×2 + 특이사항 설명
@@ -29,13 +29,15 @@ from pptx.util import Emu, Pt
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
-COVER_IMG = os.path.join(ROOT, "public", "cover-building.jpg")
+COVER_IMG = os.path.join(ROOT, "public", "cover-building-night.jpg")
 LOGO = os.path.join(ROOT, "public", "samkoo.png")
 OUT = os.path.join(ROOT, "public", "templates", "shoot.pptx")
 
 FONT = "맑은 고딕"
 PAGE_W, PAGE_H = 1123, 794
 NAVY = "0F2C5C"
+INK = "111111"
+COVER_Y = 379.2          # 표지 사진이 시작하는 높이 (위쪽은 흰 바탕)
 SECTIONS = ["보양 및 세팅", "촬영", "철수 및 정리"]
 MODE = "template"  # or "blank"
 
@@ -267,24 +269,22 @@ def blank_slide(prs):
 
 # ── 슬라이드 ────────────────────────────────────────────────
 def build_cover(prs):
+    """흰 바탕 위쪽에 글, 아래쪽 절반에 건물 야경 사진."""
     s = blank_slide(prs)
-    picture_cover(s, COVER_IMG, 0, 0, PAGE_W, PAGE_H)
+    shape(s, 0, 0, PAGE_W, PAGE_H, fill="FFFFFF")
+    사진높이 = PAGE_H - COVER_Y
+    picture_cover(s, COVER_IMG, 0, COVER_Y, PAGE_W, 사진높이)
     if MODE == "template":
         # 보고서에 겉표지 사진을 따로 올렸으면 그 사진으로 덮음
-        text(s, 0, 0, PAGE_W, PAGE_H, [R("{%cover}", 8, "FFFFFF")], anchor=MSO_ANCHOR.TOP)
-    g = shape(s, 0, 0, PAGE_W, PAGE_H, fill="091833")
-    # CSS linear-gradient(100deg, …) = DrawingML 10°
-    gradient(g, [(0, "091833", 0.94), (0.34, "0C2148", 0.82), (0.60, NAVY, 0.35), (0.82, NAVY, 0.0), (1, NAVY, 0.0)], 10)
+        text(s, 0, COVER_Y, PAGE_W, 사진높이, [R("{%cover}", 8, "FFFFFF")], anchor=MSO_ANCHOR.TOP)
     s.shapes.add_picture(LOGO, px(979.8), px(36), px(99.2), px(46))
-    text(s, 60, 238.2, 640, 24, [R("한독 · 제넥신 · 프로젠 연구소", 16, "CFE0F5", True, 3)])
-    text(s, 60, 266.2, 640, 22.5, [R(T("표지종류", "촬영"), 15, "9DB8DD", False, 2)])
-    text(s, 60, 302.7, 900, 63.8, [R("촬영 완료보고서", 58, "FFFFFF", True)])
-    text(s, 60, 372.5, 900, 45, [R(T("촬영명"), 30, "EAF1FB", True)])
-    shape(s, 60, 441.5, 90, 4, fill="4F86D6", radius=2)
-    text(s, 60, 469.5, 900, 28.8, [R("제작사 : " + T("제작사"), 16, "DBE6F6")])
-    text(s, 60, 498.3, 900, 28.8, [R("촬영 기간 : " + T("촬영기간"), 16, "DBE6F6")])
+    text(s, 60, 60.7, 640, 24, [R("한독 · 제넥신 · 프로젠 연구소", 16, INK, True, 3)])
+    text(s, 60, 125.2, 900, 63.8, [R("촬영 완료보고서", 58, INK, True)])
+    text(s, 60, 206.8, 900, 28.8, [R("촬영 명 : " + T("촬영명"), 16, INK)])
+    text(s, 60, 248.9, 900, 28.8, [R("제작사 : " + T("제작사"), 16, INK)])
+    text(s, 60, 290.5, 900, 28.8, [R("촬영 기간 : " + T("촬영기간"), 16, INK)])
     manager = "{#관리자있음}관리자 : {관리자}{/관리자있음}" if MODE == "template" else "관리자 : "
-    text(s, 60, 527, 900, 28.8, [R(manager, 16, "DBE6F6")])
+    text(s, 60, 332.1, 900, 28.8, [R(manager, 16, INK)])
     bar = shape(s, 0, PAGE_H - 8, PAGE_W, 8, fill=NAVY)
     gradient(bar, [(0, NAVY, 1), (1, "4F86D6", 1)], 0)
 
