@@ -141,19 +141,5 @@ window.REFS = [
     "src": "12.jpg"
    }
   ]
- },
- {
-  "place": "공조실 · 제어반",
-  "tasks": [
-   "m08",
-   "m12"
-  ],
-  "photos": [
-   {
-    "file": "ref07_01.jpg",
-    "note": "공조 제어반 터치패널",
-    "src": "9.jpg"
-   }
-  ]
  }
 ];
