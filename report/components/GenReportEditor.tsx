@@ -119,12 +119,42 @@ export default function GenReportEditor({ initial }: { initial: GenReport }) {
             <input type="date" value={r.date} onChange={(e) => patch({ date: e.target.value })} className={field} />
           </label>
         </div>
-        {layout === "common" && (
-          <label className="mt-3 block">
-            <span className="mb-1 block text-xs font-medium text-slate-500">문서 상단 큰 제목</span>
-            <input value={r.docTitle} onChange={(e) => patch({ docTitle: e.target.value })} placeholder="예: 10층 직원휴게실 EHP 점검 완료 보고서" className={field} />
+        {/* 문서 머리 — 양식 맨 위 네이비 칸과 바로 아래 표에 그대로 들어간다 */}
+        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+          <p className="mb-2 text-xs font-semibold text-slate-500">문서 머리 (양식 맨 위에 그대로 들어갑니다)</p>
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-slate-500">큰 제목</span>
+            <input
+              value={r.docTitle}
+              onChange={(e) => patch({ docTitle: e.target.value })}
+              placeholder={layout === "accident" ? "예: 지하 3층 수변전실 정전 사고 보고서" : "예: 10층 직원휴게실 EHP 점검 완료 보고서"}
+              className={field}
+            />
           </label>
-        )}
+          <label className="mt-2 block">
+            <span className="mb-1 block text-xs font-medium text-slate-500">부제 (제목 아래 한 줄 설명)</span>
+            <input
+              value={r.subtitle}
+              onChange={(e) => patch({ subtitle: e.target.value })}
+              placeholder="예: 실내기 누수 원인 확인 및 드레인 배관 세척 완료"
+              className={field}
+            />
+          </label>
+          <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-slate-500">대상 건물</span>
+              <input value={r.building} onChange={(e) => patch({ building: e.target.value })} className={field} />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-slate-500">구분</span>
+              <input value={r.category} onChange={(e) => patch({ category: e.target.value })} placeholder="예: 공조설비 점검 완료" className={field} />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-slate-500">{layout === "accident" ? "보고자" : "작성"}</span>
+              <input value={r.author} onChange={(e) => patch({ author: e.target.value })} className={field} />
+            </label>
+          </div>
+        </div>
         <p className="mt-2 text-xs text-slate-400">
           PDF 파일명: <span className="font-medium text-slate-500">{reportFileName(r)}</span>
         </p>
@@ -140,7 +170,7 @@ export default function GenReportEditor({ initial }: { initial: GenReport }) {
                 <input value={s.heading} onChange={(e) => updateSection(i, { heading: e.target.value })} placeholder="소제목" className="flex-1 rounded-lg border border-slate-300 px-2 py-1.5 text-sm font-semibold" />
                 <button onClick={() => removeSection(i)} className="rounded border border-red-200 px-2 py-1 text-xs text-red-400 hover:bg-red-50">삭제</button>
               </div>
-              <textarea value={s.body} onChange={(e) => updateSection(i, { body: e.target.value })} rows={3} placeholder="내용을 입력하세요" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+              <textarea value={s.body} onChange={(e) => updateSection(i, { body: e.target.value })} rows={3} placeholder="내용을 입력하세요 (엔터로 줄을 나누면 항목이 됩니다)" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
             </div>
           ))}
           <button onClick={addSection} className="w-full rounded-lg border-2 border-dashed border-slate-300 py-2 text-xs text-slate-400 hover:border-slate-400 hover:bg-slate-50">＋ 항목 추가</button>
@@ -191,10 +221,7 @@ function AccField({ value, onChange, label, ph }: { value: string; onChange: (v:
 function AccidentForm({ a, patch }: { a: AccidentFields; patch: (p: Partial<AccidentFields>) => void }) {
   return (
     <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
-      <div className="grid grid-cols-2 gap-3">
-        <AccField value={a.reporter} onChange={(v) => patch({ reporter: v })} label="보고자" ph="예: 시설팀장 이명진" />
-        <AccField value={a.title} onChange={(v) => patch({ title: v })} label="제목(사고 개요)" />
-      </div>
+      <AccField value={a.title} onChange={(v) => patch({ title: v })} label="사고 제목" ph="예: 한전 계통 순간 정전으로 인한 일시 정전" />
       <div className="grid grid-cols-2 gap-3">
         <AccField value={a.occurredAt} onChange={(v) => patch({ occurredAt: v })} label="발생 일시" />
         <AccField value={a.place} onChange={(v) => patch({ place: v })} label="발생 장소" />
@@ -209,11 +236,11 @@ function AccidentForm({ a, patch }: { a: AccidentFields; patch: (p: Partial<Acci
         <AccField value={a.damageCost} onChange={(v) => patch({ damageCost: v })} label="피해액" />
       </div>
       <label className="block">
-        <span className="mb-1 block text-xs font-medium text-slate-500">조치 사항 및 경과</span>
+        <span className="mb-1 block text-xs font-medium text-slate-500">조치 사항 및 경과 (엔터로 줄을 나누면 항목이 됩니다)</span>
         <textarea value={a.actions} onChange={(e) => patch({ actions: e.target.value })} rows={5} placeholder={"예:\n1) 10:48 누수 확인\n2) 10:49 보고"} className={ACC_FIELD_CLASS} />
       </label>
       <label className="block">
-        <span className="mb-1 block text-xs font-medium text-slate-500">대응 적합성 및 향후 방안</span>
+        <span className="mb-1 block text-xs font-medium text-slate-500">대응 적합성 및 향후 방안 (엔터로 줄을 나누면 항목이 됩니다)</span>
         <textarea value={a.followup} onChange={(e) => patch({ followup: e.target.value })} rows={3} className={ACC_FIELD_CLASS} />
       </label>
     </div>

@@ -1,21 +1,26 @@
 "use client";
 
-// 보고서를 사장 원본 양식(.docx) 그대로 채워 생성 — 클라이언트 전용.
-//  · 사고: accident.docx (필드표 그대로 + 사진 반복표)
-//  · 점검/완료/보수요청: inspection/completion/repair.docx (반복 섹션 + 사진 반복표)
-//  · 풍수해: pungsuhae.docx (점검표 결과 + 사진 5구간×3)
-// 사진은 개수에 맞춰 표가 늘어나고, 셀에 꽉 차게(cover) 들어갑니다. 글꼴은 양식에서 맑은 고딕.
+// 보고서를 사장 결재 양식(.docx) 그대로 채워 생성 — 클라이언트 전용.
+// 양식 5종은 모두 구매검토서와 같은 모양: 네이비 제목 머리 + 메타표(작성일/작성/대상 건물/구분)
+// + 번호 붙은 섹션 바 + 연청색 표 + 삼구 로고 머리글 + 페이지 번호 바닥글.
+//  · 사고: accident.docx (사고 개요·피해 현황 표 + 조치·향후방안 + 사진)
+//  · 점검/완료/보수요청: inspection/completion/repair.docx (섹션 반복 + 사진)
+//  · 풍수해: pungsuhae.docx (점검표 반복 + 구간별 사진 3칸 반복)
+// 사진·섹션·점검 항목은 개수에 맞춰 표가 늘어납니다. 글꼴은 양식에서 맑은 고딕.
 
 import type { GenReport, ReportKind } from "@/lib/reports";
-import { dotDate, layoutOf } from "@/lib/reports";
+import { DEFAULT_AUTHOR, DEFAULT_BUILDING, KIND_CATEGORY, KIND_LABEL, dotDate, layoutOf } from "@/lib/reports";
 import type { PungReport } from "@/lib/pungsuhae";
-import { dotDate as pungDotDate } from "@/lib/pungsuhae";
+import {
+  PUNG_BUILDING, PUNG_CATEGORY, PUNG_SUBTITLE, PUNG_TITLE, RESULT_LEGEND,
+  dotDate as pungDotDate, effectiveCaption,
+} from "@/lib/pungsuhae";
 import { proxied } from "@/lib/client";
 
 // 사진 박스(px). 양식의 사진 셀 크기에 맞춰 넣어야 표 크기가 변하지 않음.
 type Box = { w: number; h: number };
-const COMMON_BOX: Box = { w: 300, h: 225 }; // 일반 보고서 2열 표(셀 3.25in, 높이 자동)
-const PUNG_BOX: Box = { w: 198, h: 138 }; // 풍수해 사진 셀(2.25×1.50in 고정) 안에 맞춤
+const COMMON_BOX: Box = { w: 300, h: 225 }; // 일반 보고서 2열 표(셀 4959dxa ≈ 3.3in)
+const PUNG_BOX: Box = { w: 198, h: 138 }; // 풍수해 3열 표(셀 3306dxa ≈ 2.2in) 안에 맞춤
 
 // 사진을 흰 배경 고정 박스에 여백 없이 cover-crop → 셀 크기에 딱 맞게(표가 커지지 않음)
 async function normalizePhoto(url: string, box: Box = COMMON_BOX): Promise<Uint8Array | null> {
@@ -72,25 +77,28 @@ const TEMPLATE_BY_KIND: Record<ReportKind, string> = {
   repair: "repair.docx",
 };
 
-function splitLines(text: string, n: number): string[] {
-  const lines = (text || "").split("\n").map((s) => s.trim());
-  const out: string[] = [];
-  for (let i = 0; i < n; i++) out.push(lines[i] ?? "");
-  if (lines.length > n) out[n - 1] = lines.slice(n - 1).join(" ");
-  return out;
+// 엔터로 나눈 줄 = 불릿 한 줄. 빈 줄은 버린다.
+function bulletLines(text: string): string[] {
+  return (text || "").split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
 }
 
 async function buildCommonData(report: GenReport, store: Map<string, Uint8Array>) {
   const photoRows = await buildPhotoRows(report.photos, store);
+  // 섹션 바 번호(1,2,3…)는 코드에서 매긴다 — 사진 섹션이 마지막 번호를 이어받는다.
+  const sections = report.sections.map((s, i) => ({
+    no: String(i + 1),
+    heading: s.heading,
+    내용: bulletLines(s.body),
+  }));
   return {
-    제목: report.subject || report.docTitle || "",
+    제목: report.docTitle?.trim() || report.subject?.trim() || KIND_LABEL[report.kind],
+    부제: report.subtitle?.trim() || "",
     "작성 일자": dotDate(report.date),
-    // 본문은 줄마다 ○ 항목으로 반복(엔터 줄바꿈 = 항목 분리). 빈 줄은 제외.
-    sections: report.sections.map((s) => ({
-      heading: s.heading,
-      내용: (s.body || "").split(/\r?\n/).map((l) => l.trim()).filter(Boolean),
-    })),
-    // 첨부사진은 제목과 같은 자동번호 목록 → Word가 다음 번호를 자동 부여(형식 일치)
+    작성자: report.author?.trim() || DEFAULT_AUTHOR,
+    "대상 건물": report.building?.trim() || DEFAULT_BUILDING,
+    구분: report.category?.trim() || KIND_CATEGORY[report.kind],
+    sections,
+    photoNo: String(sections.length + 1),
     photosLabel: "첨부사진",
     photoRows,
   };
@@ -98,11 +106,14 @@ async function buildCommonData(report: GenReport, store: Map<string, Uint8Array>
 
 async function buildAccidentData(report: GenReport, store: Map<string, Uint8Array>) {
   const a = report.accident;
-  const data: Record<string, unknown> = {
-    "보고자 직책": a.reporter,
-    이름: "",
+  return {
+    제목: report.docTitle?.trim() || a.title?.trim() || "사고 보고서",
+    부제: report.subtitle?.trim() || "",
     "보고 일자": dotDate(report.date),
-    제목: a.title,
+    "보고자 직책": report.author?.trim() || a.reporter?.trim() || DEFAULT_AUTHOR,
+    "대상 건물": report.building?.trim() || DEFAULT_BUILDING,
+    구분: report.category?.trim() || KIND_CATEGORY.accident,
+    "사고 제목": a.title,
     "사고 발생일자": a.occurredAt,
     "사고 장소": a.place,
     "사고 발생 원인": a.cause,
@@ -110,17 +121,10 @@ async function buildAccidentData(report: GenReport, store: Map<string, Uint8Arra
     "인적 피해": a.humanDamage,
     "물적 피해": a.propertyDamage,
     "피해 금액": a.damageCost,
-    "사고 발생일": a.occurredAt,
+    조치: bulletLines(a.actions),
+    향후방안: bulletLines(a.followup),
+    photoRows: await buildPhotoRows(report.photos, store),
   };
-  splitLines(a.actions, 5).forEach((line, i) => {
-    data[`사고 시간${i + 1}`] = "";
-    data[`사고 시간${i + 1} 내용`] = line;
-  });
-  const fol = splitLines(a.followup, 2);
-  data["대응 적합성 및 향후 방안1"] = fol[0];
-  data["대응 적합성 및 향후 방안2"] = fol[1];
-  data.photoRows = await buildPhotoRows(report.photos, store);
-  return data;
 }
 
 async function renderDocx(templateFile: string, data: unknown, store: Map<string, Uint8Array>, box: Box = COMMON_BOX): Promise<Blob> {
@@ -156,29 +160,54 @@ export async function generateReportDocx(report: GenReport): Promise<Blob> {
   return renderDocx(TEMPLATE_BY_KIND[report.kind], data, store);
 }
 
-// ── 풍수해 예방 점검 보고서 (원본 양식) ──
+// ── 풍수해 예방 점검 보고서 (같은 양식) ──
+// 점검 항목과 사진 칸은 개수가 바뀔 수 있으므로 모두 반복으로 채운다.
 export async function generatePungReportDocx(report: PungReport): Promise<Blob> {
   const store = new Map<string, Uint8Array>();
+
+  let n = 0;
+  const photoSections: { no: string; title: string; rows: Record<string, string>[] }[] = [];
+  for (let si = 0; si < report.sections.length; si++) {
+    const sec = report.sections[si];
+    const items = await Promise.all(
+      sec.slots.map(async (slot) => {
+        const cap = effectiveCaption(slot);
+        if (!slot.url) return { key: "", cap };
+        const bytes = await normalizePhoto(slot.url, PUNG_BOX);
+        if (!bytes) return { key: "", cap };
+        const key = `p${n++}`;
+        store.set(key, bytes);
+        return { key, cap };
+      })
+    );
+    // 한 행에 3칸. 칸이 3의 배수가 아니면 마지막 행 남은 칸은 비워 둔다.
+    const rows: Record<string, string>[] = [];
+    for (let i = 0; i < items.length; i += 3) {
+      const g = [items[i], items[i + 1], items[i + 2]];
+      rows.push({
+        i1: g[0]?.key ?? "", c1: g[0]?.cap ?? "",
+        i2: g[1]?.key ?? "", c2: g[1]?.cap ?? "",
+        i3: g[2]?.key ?? "", c3: g[2]?.cap ?? "",
+      });
+    }
+    // 섹션 바 번호: 1번은 점검 결과이므로 사진 구간은 2번부터
+    photoSections.push({ no: String(si + 2), title: sec.title, rows });
+  }
+
   const data: Record<string, unknown> = {
+    제목: PUNG_TITLE,
+    부제: PUNG_SUBTITLE,
     점검일자: pungDotDate(report.date),
     점검자: report.inspector || "",
+    "대상 건물": PUNG_BUILDING,
+    구분: PUNG_CATEGORY,
+    범례: RESULT_LEGEND,
+    checkRows: report.checklist.map((it) => ({
+      category: it.category,
+      content: it.content,
+      result: it.result || "",
+    })),
+    photoSections,
   };
-  // 점검결과 13칸 (항목 순서대로)
-  report.checklist.forEach((it, i) => {
-    data[`점검결과${i + 1}`] = it.result || "";
-  });
-  // 사진 5구간×3 = 최대 15칸 (구간 순서대로 평탄화)
-  const slots: { url?: string; caption?: string }[] = [];
-  report.sections.forEach((sec) => sec.slots.forEach((s) => slots.push(s)));
-  const imgs = await Promise.all(slots.map((s) => (s.url ? normalizePhoto(s.url, PUNG_BOX) : Promise.resolve(null))));
-  for (let n = 1; n <= 15; n++) {
-    const bytes = imgs[n - 1];
-    if (bytes) {
-      store.set(`사진${n}`, bytes);
-      data[`사진${n}`] = `사진${n}`;
-    } else {
-      data[`사진${n}`] = "";
-    }
-  }
   return renderDocx("pungsuhae.docx", data, store, PUNG_BOX);
 }

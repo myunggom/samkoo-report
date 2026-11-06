@@ -12,7 +12,7 @@ import path from "path";
 import { randomUUID } from "crypto";
 import type { PungReport } from "./pungsuhae";
 import type { MediaItem, DayNote } from "./archive";
-import type { GenReport } from "./reports";
+import { fillDefaults, type GenReport } from "./reports";
 import type { CalEvent } from "./events";
 import type { Issue } from "./issues";
 import type { WeeklyDraft } from "./weekly";
@@ -213,8 +213,11 @@ export async function saveDayNote(date: string, note: string, base?: string): Pr
 
 // ── 일반 보고서(사고·완료·점검·보수요청 · 단일 집계 JSON) ─────────
 async function allGenReports(): Promise<GenReport[]> {
-  if (USE_BLOB) return readBlobJson<GenReport[]>(GENREPORT_PREFIX, []);
-  return readLocal<GenReport[]>(GENREPORT_FILE, []);
+  const list = USE_BLOB
+    ? await readBlobJson<GenReport[]>(GENREPORT_PREFIX, [])
+    : await readLocal<GenReport[]>(GENREPORT_FILE, []);
+  // 양식 칸이 없던 옛 보고서도 새 양식으로 열리도록 기본값을 채워 넘긴다.
+  return list.map(fillDefaults);
 }
 async function putGenReports(list: GenReport[]): Promise<void> {
   if (USE_BLOB) await writeBlobJson(GENREPORT_PREFIX, list);

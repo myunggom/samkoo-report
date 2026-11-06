@@ -67,6 +67,12 @@ export function pungFileName(report: Pick<PungReport, "date">): string {
 // 점검결과 범례
 export const RESULT_LEGEND = "※ ○ : 이상 없음 / △ : 양호 / X : 점검 요함";
 
+// 문서 양식 머리에 들어가는 고정값 (사장 결재 양식과 동일한 구성)
+export const PUNG_TITLE = "풍수해 예방 점검표";
+export const PUNG_SUBTITLE = "집중호우·태풍 대비 배수·전기·기계설비 사전 점검";
+export const PUNG_BUILDING = "바이오 이노베이션 허브";
+export const PUNG_CATEGORY = "풍수해 예방 점검";
+
 // ── 양식 기본 점검표 ─────────────────────────────────────────────
 export function defaultChecklist(): PungCheckItem[] {
   return [
