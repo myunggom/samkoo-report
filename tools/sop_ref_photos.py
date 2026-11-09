@@ -39,8 +39,10 @@ OUT = os.path.join(ROOT, "sop-new", "assets", "refs.js")
 # '설명' 은 사장이 화면에서 보고 맞는지 판단하는 글이다.
 묶음 = [
     {
+        # 예시 'ladder' 는 c02 와 글이 똑같은 보기 자료다. 같은 사다리를
+        # 참조로 붙여야 두 곳의 사진이 어긋나지 않는다. 2026-11-04 에 넣었다.
         "장소": "사다리 — 우리가 쓰는 것",
-        "작업": ["c02"],
+        "작업": ["c02", "ladder"],
         "사진": [
             (장비 + "1. 사다리.png",
              "다목적 알루미늄 사다리 (노란 힌지 · 노란 전도방지대 · 검은 고무발)"),
@@ -57,8 +59,11 @@ OUT = os.path.join(ROOT, "sop-new", "assets", "refs.js")
         "사진": [(장비 + "3. 테이블리프트.png", "우리가 쓰는 테이블 리프트")],
     },
     {
+        # h05 는 계단 신주솔(손솔) 광택 작업이다. 바닥 광택기를 쓰지 않는데
+        # 광택기 사진을 붙여 두어 계단에 광택기가 그려질 판이었다.
+        # 2026-11-04 에 뺐다.
         "장소": "바닥 광택기",
-        "작업": ["c17", "h05", "h08", "h09"],
+        "작업": ["c17", "h08", "h09"],
         "사진": [(장비 + "5. 왁스 작업 - 광택기.png", "우리가 쓰는 바닥 광택기")],
     },
     {
@@ -116,13 +121,28 @@ OUT = os.path.join(ROOT, "sop-new", "assets", "refs.js")
         ],
     },
     {
+        # c25 는 승강기(E/L · E/S) 점검이다. 저수조 사진을 붙여 두었더니
+        # 엘리베이터 작업에 물탱크가 그려질 판이었다. 2026-11-04 에 뺐다.
         "장소": "물탱크실 · 저수조",
-        "작업": ["m09", "c25"],
+        "작업": ["m09"],
         "사진": [
             (하절 + "0807 점검사진/12.jpg", "저수조 스트레이너 청소"),
         ],
     },
 ]
+
+
+def 보관이름(번, i, 원본):
+    """원본 보관용 파일 이름.
+
+    그냥 파일 이름만 쓰면 안 된다. 점검일이 다른 '7.jpg' · '11.jpg' 가
+    여러 폴더에 있어서 서로 덮어써 버린다(실제로 21장 중 4장이 사라졌다).
+    그래서 **번호와 원본이 있던 폴더 이름을 앞에 붙여** 반드시 다르게 만든다.
+    """
+    밑 = os.path.basename(원본)
+    폴더 = os.path.basename(os.path.dirname(원본))
+    이름, 확장 = os.path.splitext(밑)
+    return "%02d-%02d_%s_%s%s" % (번, i, 폴더, 이름, 확장.lower())
 
 
 def 줄여쓰기(원본, 길, 가로=1200):
@@ -148,8 +168,10 @@ def main():
                 없음.append(원본)
                 continue
             밑 = "ref%02d_%02d.jpg" % (번, i)   # 장소마다 번호가 달라야 안 겹친다
+            # 원본 경로를 함께 들고 다닌다. 나중에 다시 걸러 맞추면 어긋난다.
             줄["photos"].append({"file": 밑, "note": 설명,
-                                 "src": os.path.basename(원본)})
+                                 "src": os.path.basename(원본),
+                                 "_원본": 원본, "_보관이름": 보관이름(번, i, 원본)})
         자료.append(줄)
 
     print("장소 %d곳 / 참조 사진 %d장" % (len(묶음), 전체))
@@ -165,19 +187,32 @@ def main():
         return
 
     os.makedirs(WEB, exist_ok=True)
+    복사 = 0
     for 칸, 줄 in zip(묶음, 자료):
         폴더 = os.path.join(보관, 칸["장소"].replace("·", "").strip())
         os.makedirs(폴더, exist_ok=True)
-        for (원본, _), 사진 in zip(
-                [x for x in 칸["사진"] if os.path.exists(x[0])], 줄["photos"]):
-            shutil.copy2(원본, os.path.join(폴더, os.path.basename(원본)))
-            줄여쓰기(원본, os.path.join(WEB, 사진["file"]))
+        for 사진 in 줄["photos"]:
+            shutil.copy2(사진["_원본"], os.path.join(폴더, 사진["_보관이름"]))
+            줄여쓰기(사진["_원본"], os.path.join(WEB, 사진["file"]))
+            복사 += 1
 
+    # 한 장도 잃지 않았는지 센다. 예전에 이름이 겹쳐 조용히 사라진 적이 있다.
+    보관장수 = sum(len(os.listdir(os.path.join(보관, d)))
+                for d in os.listdir(보관)
+                if os.path.isdir(os.path.join(보관, d)))
+    if 보관장수 < 복사:
+        print("주의 : 보관 폴더에 %d장만 있습니다 (복사한 것은 %d장). "
+              "이름이 겹쳤는지 확인하세요." % (보관장수, 복사))
+
+    # 밑줄로 시작하는 칸은 우리끼리 쓰는 것이라 사이트 자료에는 넣지 않는다.
+    깨끗 = [dict(줄, photos=[{k: v for k, v in p.items()
+                            if not k.startswith("_")} for p in 줄["photos"]])
+           for 줄 in 자료]
     io.open(OUT, "w", encoding="utf-8", newline="\n").write(
         "/* 설비 참조 사진. tools/sop_ref_photos.py 가 만든다.\n"
         "   사진을 만들 때 이 사진들을 참조로 넣어 설비 모양을 맞춘다. */\n"
         "window.REFS = "
-        + json.dumps(자료, ensure_ascii=False, indent=1) + ";\n")
+        + json.dumps(깨끗, ensure_ascii=False, indent=1) + ";\n")
     크기 = sum(os.path.getsize(os.path.join(WEB, f))
               for f in os.listdir(WEB) if f.endswith(".jpg"))
     print("\n원본 보관 : %s" % 보관)
