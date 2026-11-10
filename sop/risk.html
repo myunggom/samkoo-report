@@ -20,22 +20,32 @@
 <script src="assets/inline.js"></script>
 <script src="assets/html-to-image.js"></script>
 <script src="assets/export.js"></script>
+<script src="assets/day.js"></script>
+<script src="assets/xlsx.js"></script>
 <script>
 (function () {
   var t = currentTask(); if (!t) return;
   var KEY = 'risk:' + t.id, B = 'TASKS.' + t.id, RP = B + '.risk';
   document.title = t.name + ' 위험성평가표';
 
-  var saved = store.get(KEY) || {};
-  var head = { date: saved.date != null ? saved.date : t.risk.date,
-               assessor: saved.assessor != null ? saved.assessor : t.risk.assessor };
+  /* 일일 작업 보고서(묶음)로 열렸으면 평가일자는 묶음 날짜를 따르고,
+     고친 숫자도 묶음 안에 저장한다. */
+  var DAY = (window.dayCtx ? dayCtx() : null);
+  var saved = DAY ? ((DAY.risk && DAY.risk[t.id]) || {}) : (store.get(KEY) || {});
+  var head = { date: saved.date != null ? saved.date : ((DAY && DAY.date) || t.risk.date),
+               assessor: saved.assessor != null ? saved.assessor
+                         : ((DAY && DAY.leader) || t.risk.assessor) };
   var rows = t.risk.rows.map(function (r, i) {
     var s = (saved.rows && saved.rows[i]) || {};
     return { f: s.f != null ? s.f : r.f, s: s.s != null ? s.s : r.s,
              f2: s.f2 != null ? s.f2 : r.f2, s2: s.s2 != null ? s.s2 : r.s2,
              done: s.done != null ? s.done : r.done };
   });
-  function save() { store.set(KEY, { date: head.date, assessor: head.assessor, rows: rows }); }
+  function save() {
+    var v = { date: head.date, assessor: head.assessor, rows: rows };
+    if (DAY) { DAY.risk = DAY.risk || {}; DAY.risk[t.id] = v; return daySet(DAY); }
+    return store.set(KEY, v);
+  }
   var CN = '①②③④⑤⑥⑦⑧⑨⑩';
   function ol(a, q) {
     return (a || []).map(function (x, i) {
@@ -44,8 +54,18 @@
     }).join('');
   }
 
+  /* 위험성평가는 두 쪽이다 — 1쪽 평가표(작업마다 다름) · 2쪽 산정 기준(모두 같음).
+     묶음으로 뽑을 때 2쪽을 작업 수만큼 되풀이할 이유가 없으므로 주소로 가려낸다.
+       mx=0     → 평가표만 (작업마다)
+       mx=only  → 산정 기준만 (묶음 맨 뒤에 한 번)
+     아무것도 안 붙이면 예전처럼 두 쪽 다 나온다(혼자 볼 때).
+     지우지 않고 숨기는 까닭 : 묶음 출력은 보이는 .slide 만 찍기 때문이다. */
+  var MXQ = qs('mx');
+  var HIDE_TBL = (MXQ === 'only') ? ' style="display:none"' : '';
+  var HIDE_MX = (MXQ === '0') ? ' style="display:none"' : '';
+
   var h = snav(t.no + '. ' + t.name + ' — 위험성평가표', 'work.html?id=' + t.id);
-  h += '<div class="stage"><div class="slide">';
+  h += '<div class="stage"><div class="slide"' + HIDE_TBL + '>';
   h += sHead('위험성평가표 — <span' + EA(B + '.name') + '>' + esc(t.name) + '</span>',
              '<span' + EA('SITE.labels.riskSub') + '>' + esc(SITE.labels.riskSub) + '</span>', true);
   h += '<div class="s-body">';
@@ -98,7 +118,7 @@
 
   var MX = [5, 4, 3, 2, 1], LB = { 5: '5 ( 치명적 / 사망 )', 4: '4 ( 중상 / 장해 )', 3: '3 ( 경상 / 휴업 )', 2: '2 ( 경미 / 비휴업 )', 1: '1 ( 극히 경미 )' };
   var HD = ['1 ( 매우 낮음 )', '2 ( 낮음 )', '3 ( 보통 )', '4 ( 높음 )', '5 ( 매우 높음 )'];
-  h += '<div class="slide">' + sHead('위험도 산정 및 평가 매트릭스 기준', '위험도 = 빈도(Possibility) × 강도(Severity) — 5 × 5 Matrix');
+  h += '<div class="slide"' + HIDE_MX + '>' + sHead('위험도 산정 및 평가 매트릭스 기준', '위험도 = 빈도(Possibility) × 강도(Severity) — 5 × 5 Matrix');
   h += '<div class="s-body"><div class="thint noprint">표를 옆으로 밀어서 보세요</div>' +
     '<div class="tblscroll"><table class="mx"><tr><th>빈도 x 강도</th>' +
     HD.map(function (x) { return '<th>' + x + '</th>'; }).join('') + '</tr>';
@@ -125,11 +145,13 @@
   h += '</div></div>';
   h += '</div><div class="s-foot">안전 표준운영절차 ｜ 위험도 산정 및 평가 매트릭스 기준 (공통)</div></div>';
 
+  var DQ = DAY ? ('&day=' + encodeURIComponent(DAY.id)) : '';
   h += '<div class="btnbar noprint" style="max-width:1180px;margin:0 auto 30px;padding:0 12px">' +
-    '<a class="btn" href="guide.html?id=' + t.id + '">‹ 교육자료</a>' +
-    '<button class="btn" id="btnCsv">⤓ 엑셀(CSV) 저장</button>' +
+    '<a class="btn" href="guide.html?id=' + t.id + DQ + '">‹ 교육자료</a>' +
+    '<button class="btn" id="btnXls">⤓ 엑셀 저장 (양식 그대로)</button>' +
     '<button class="btn ghost" id="btnReset">입력 초기화</button>' +
-    '<a class="btn primary" href="report.html?id=' + t.id + '">다음 : 작업 완료보고서 ›</a></div>';
+    (DAY ? '<a class="btn" href="day.html?d=' + encodeURIComponent(DAY.id) + '">일일 보고서</a>' : '') +
+    '<a class="btn primary" href="report.html?id=' + t.id + DQ + '">다음 : 작업 완료보고서 ›</a></div>';
   h += '</div>';
   document.getElementById('app').innerHTML = h;
   initInline();
@@ -166,26 +188,51 @@
   document.getElementById('fAssessor').addEventListener('input', function () { head.assessor = this.value; save(); });
   document.getElementById('btnReset').addEventListener('click', function () {
     if (!confirm('입력한 숫자와 조치여부를 원본값으로 되돌립니다.')) return;
-    store.del(KEY); location.reload();
+    if (DAY) { if (DAY.risk) delete DAY.risk[t.id]; daySet(DAY); }
+    else store.del(KEY);
+    location.reload();
   });
-  document.getElementById('btnCsv').addEventListener('click', function () {
-    var L = [['NO', '작업단계', '유해·위험요인', '위험 발생 상황 및 결과', '빈도', '강도', '현재 위험도',
-      '위험성 감소대책', '조치 기한', '담당자', '조치 여부', '개선 후 빈도', '개선 후 강도', '개선 후 위험도']];
-    t.risk.rows.forEach(function (r, i) {
-      var a = rows[i];
-      L.push([i + 1, r.step, r.hazards.join(' / '), r.results.join(' / '), a.f, a.s, a.f * a.s,
-        r.measures.join(' / '), r.due, r.owner, a.done, a.f2, a.s2, a.f2 * a.s2]);
-    });
-    var csv = '﻿' + L.map(function (l) {
-      return l.map(function (c) { return '"' + String(c).replace(/"/g, '""') + '"'; }).join(',');
-    }).join('\r\n');
-    var a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-    a.download = '위험성평가표_' + t.name + '_' + todayStr() + '.csv';
-    a.click(); URL.revokeObjectURL(a.href);
+  /* 엑셀로 내보내기 — 표 모양 · 칸 합치기 · 색 · 수식을 그대로 담은 .xlsx 를 만든다.
+     묶음(일일 보고서)으로 열렸으면 그 날의 작업 전부를 한 파일에 장을 나눠 담는다. */
+  document.getElementById('btnXls').addEventListener('click', function () {
+    var btn = this, was = btn.textContent;
+    btn.disabled = true; btn.textContent = '만드는 중...';
+    try {
+      var sheets = [], fname;
+      if (DAY && (DAY.tasks || []).length > 1) {
+        DAY.tasks.forEach(function (tid) {
+          var tt = TASKS[tid]; if (!tt || !tt.risk) return;
+          var sv = (DAY.risk && DAY.risk[tid]) || {};
+          var hd = { date: sv.date != null ? sv.date : (DAY.date || tt.risk.date),
+                     assessor: sv.assessor != null ? sv.assessor : (DAY.leader || tt.risk.assessor) };
+          var rr = tt.risk.rows.map(function (r, k) {
+            var v = (sv.rows && sv.rows[k]) || {};
+            return { f: v.f != null ? v.f : r.f, s: v.s != null ? v.s : r.s,
+                     f2: v.f2 != null ? v.f2 : r.f2, s2: v.s2 != null ? v.s2 : r.s2,
+                     done: v.done != null ? v.done : r.done };
+          });
+          sheets.push(riskSheet(tt, hd, rr));
+        });
+        fname = '위험성평가표_' + String(DAY.date || todayStr()).replace(/[^0-9]/g, '') +
+          '_' + DAY.tasks.length + '건.xlsx';
+      } else {
+        sheets.push(riskSheet(t, head, rows));
+        fname = '위험성평가표_' + t.name + '_' +
+          String(head.date || todayStr()).replace(/[^0-9]/g, '') + '.xlsx';
+      }
+      sheets.push(riskMatrixSheet());
+      XL.save(fname, sheets);
+      document.getElementById('savedAt').textContent =
+        '· 엑셀 파일을 내려받았습니다 (' + sheets.length + '장)';
+    } catch (e) {
+      alert('엑셀 파일을 만들지 못했습니다 : ' + (e && e.message ? e.message : e));
+    }
+    btn.disabled = false; btn.textContent = was;
   });
   rows.forEach(function (_, i) { paint(i); });
-  if (store.get(KEY)) document.getElementById('savedAt').textContent = '· 이 브라우저에 저장된 내용을 불러왔습니다';
+  if (DAY) document.getElementById('savedAt').textContent =
+    '· 일일 작업 보고서 ' + esc(DAY.date) + ' 에 저장됩니다';
+  else if (store.get(KEY)) document.getElementById('savedAt').textContent = '· 이 브라우저에 저장된 내용을 불러왔습니다';
 })();
 </script>
 </body>

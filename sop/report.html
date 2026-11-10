@@ -11,6 +11,7 @@
 <link rel="stylesheet" href="assets/inline.css">
 <link rel="stylesheet" href="assets/export.css">
 <link rel="stylesheet" href="assets/sign.css">
+<link rel="stylesheet" href="assets/day.css">
 </head>
 <body>
 <div id="app"></div>
@@ -22,6 +23,7 @@
 <script src="assets/html-to-image.js"></script>
 <script src="assets/export.js"></script>
 <script src="assets/sign.js"></script>
+<script src="assets/day.js"></script>
 <script>
 (function () {
   var t = currentTask(); if (!t) return;
@@ -29,18 +31,87 @@
   var B = 'TASKS.' + t.id, R = SITE.report;
   document.title = t.name + ' 사전작업 허가 서명부';
 
-  var data = store.get(KEY) || {};
+  /* 일일 작업 보고서(묶음)의 일부로 열렸는가.
+     그렇다면 날짜 · 장소 · 책임자 · 참여자 · 교육확인 · 서명은 묶음 값이 이긴다.
+     서명을 한 번만 받아도 모든 작업의 보고서에 똑같이 들어가는 이유가 여기다. */
+  var DAY = (window.dayCtx ? dayCtx() : null);
+
+  var data;
+  if (DAY) {
+    data = {
+      f: {
+        name: t.name,
+        date: DAY.date || todayStr(),
+        place: DAY.place || t.place,
+        leader: DAY.leader || '',
+        crew: (DAY.crew || []).filter(function (c) { return c && c.name; })
+                .map(function (c) { return c.name; }).join(', '),
+        sitename: DAY.sitename || '',
+        opinion: DAY.opinion || '',
+        opinChk: !!DAY.opinChk,
+        opinNone: !!DAY.opinNone
+      },
+      photos: (DAY.photos && DAY.photos[t.id]) || {},
+      sigs: {}, crewSigs: {}, chk: DAY.chk || {}
+    };
+    if ((DAY.sigs || {}).writer) data.sigs[0] = DAY.sigs.writer;
+    if ((DAY.sigs || {}).approver) data.sigs[1] = DAY.sigs.approver;
+    /* 확인란 성명 — 0 작성자 / 1 승인자(결재권자) */
+    data.f.sign_0 = DAY.writer || '';
+    data.f.sign_1 = (DAY.approver && DAY.approver.name) || '';
+    (DAY.crew || []).forEach(function (c, i) {
+      data.f['cw_org_' + i] = (c && c.org) || '';
+      data.f['cw_nm_' + i] = (c && c.name) || '';
+      if (c && c.sig) data.crewSigs[i] = c.sig;
+    });
+  } else {
+    data = store.get(KEY) || {};
+  }
   data.f = data.f || {}; data.photos = data.photos || {};
   data.sigs = data.sigs || {};      /* 확인란 서명 : 0 작성자 / 1 승인자 */
   data.crewSigs = data.crewSigs || {};  /* 참여자 서명 */
   data.chk = data.chk || {};
 
-  function save() {
-    var ok = store.set(KEY, data);
-    var el = document.getElementById('savedAt');
-    if (el) el.textContent = ok ? '· 자동 저장됨' : '⚠ 용량이 커서 자동 저장 실패 — [파일로 저장] 을 사용하세요';
+  /* 참여자 줄 수 — 묶음에 사람이 더 많으면 그만큼 늘린다 */
+  var crewRows = DAY ? Math.max(R.crewRows, (DAY.crew || []).length) : R.crewRows;
+
+  function saveDay() {
+    DAY.date = data.f.date; DAY.place = data.f.place;
+    DAY.leader = data.f.leader; DAY.sitename = data.f.sitename;
+    if (data.f.sign_0 != null) DAY.writer = data.f.sign_0;   /* 작성자 성명 */
+    DAY.opinion = data.f.opinion;
+    DAY.opinChk = !!data.f.opinChk; DAY.opinNone = !!data.f.opinNone;
+    DAY.chk = data.chk;
+    DAY.photos = DAY.photos || {};
+    DAY.photos[t.id] = data.photos;
+    DAY.sigs = DAY.sigs || {};
+    if (data.sigs[0]) DAY.sigs.writer = data.sigs[0]; else delete DAY.sigs.writer;
+    /* 결재(승인자) 서명은 결재 화면에서만 받는다 — 여기서는 건드리지 않는다 */
+    var crew = [];
+    for (var i = 0; i < crewRows; i++) {
+      var org = data.f['cw_org_' + i] || '', nm = data.f['cw_nm_' + i] || '';
+      var sg = data.crewSigs[i] || '';
+      if (org || nm || sg) crew[i] = { org: org, name: nm, sig: sg };
+    }
+    for (var j = 0; j < crew.length; j++) if (!crew[j]) crew[j] = { org: '', name: '', sig: '' };
+    DAY.crew = crew;
+    return daySet(DAY);
   }
-  function cell(k, ph) { return '<td><input data-f="' + k + '" placeholder="' + esc(ph || '') + '"></td>'; }
+
+  function save() {
+    var ok = DAY ? saveDay() : store.set(KEY, data);
+    var el = document.getElementById('savedAt');
+    if (!el) return;
+    el.textContent = ok
+      ? (DAY ? '· 일일 작업 보고서에 저장됨' : '· 자동 저장됨')
+      : '⚠ 용량이 커서 자동 저장 실패 — [파일로 저장] 을 사용하세요';
+  }
+  /* ro : 일일 보고서가 주인인 칸. 묶음으로 열렸을 때는 여기서 고치지 못하게 막는다.
+     (여기서 고쳐도 묶음에 되돌려 담을 자리가 없어 그냥 사라지기 때문) */
+  function cell(k, ph, ro) {
+    return '<td><input data-f="' + k + '" placeholder="' + esc(ph || '') + '"' +
+      ((ro && DAY) ? ' readonly title="일일 작업 보고서 화면에서 고칩니다"' : '') + '></td>';
+  }
   function lab(k, txt) { return '<th' + EA('SITE.report.' + k) + '>' + esc(txt) + '</th>'; }
 
   var h = snav(t.no + '. ' + t.name + ' — 사전작업 허가 서명부', 'work.html?id=' + t.id);
@@ -52,11 +123,11 @@
   /* ── 상단 정보 ── */
   h += '<div class="thint noprint">표를 옆으로 밀어서 보세요</div>' +
     '<div class="tblscroll"><table class="rp-info">' +
-    '<tr>' + lab('fields.0', R.fields[0]) + cell('name', t.name) +
+    '<tr>' + lab('fields.0', R.fields[0]) + cell('name', t.name, true) +
              lab('fields.1', R.fields[1]) + cell('date', todayStr()) +
              lab('fields.2', R.fields[2]) + cell('place', t.place) + '</tr>' +
     '<tr>' + lab('fields.3', R.fields[3]) + cell('leader') +
-             lab('fields.4', R.fields[4]) + cell('crew') +
+             lab('fields.4', R.fields[4]) + cell('crew', '', true) +
              lab('fields.5', R.fields[5]) + cell('sitename') + '</tr></table></div>';
 
   h += '<div class="rp-main">';
@@ -70,11 +141,14 @@
       '<em' + EA('SITE.report.slots.' + i + '.desc') + '>' + esc(s.desc) + '</em></div>' +
       '<label class="rp-drop" data-slot="' + s.n + '">' +
         '<input type="file" accept="image/*" hidden data-slot="' + s.n + '">' +
+        '<input type="file" accept="image/*" capture="environment" hidden data-cam="' + s.n + '">' +
         '<span class="txt"><b class="noprint">+ 사진 추가</b>' + s.n + '. ' + esc(s.name) + '</span>' +
       '</label>' +
-      '<div class="noprint" style="display:flex;gap:6px;margin-top:4px">' +
-        '<button type="button" class="sfbtn" data-act="change" data-slot="' + s.n + '">사진 변경</button>' +
+      '<div class="noprint" style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap">' +
+        '<button type="button" class="sfbtn" data-act="cam" data-slot="' + s.n + '">📷 사진 찍기</button>' +
+        '<button type="button" class="sfbtn" data-act="change" data-slot="' + s.n + '">📁 파일</button>' +
         '<button type="button" class="sfbtn" data-act="clear" data-slot="' + s.n + '">삭제</button></div>' +
+      '<em class="rp-st noprint" data-st="' + s.n + '"></em>' +
       '</div>';
   });
   h += '</div>';
@@ -108,7 +182,7 @@
     '<table class="rp-crew"><tr>' +
     R.crewHead.map(function (x, i) { return '<th' + EA('SITE.report.crewHead.' + i) + '>' + esc(x) + '</th>'; }).join('') +
     '</tr>';
-  for (var i = 0; i < R.crewRows; i++) {
+  for (var i = 0; i < crewRows; i++) {
     h += '<tr><th>' + (i + 1) + '</th>' +
       '<td><input data-f="cw_org_' + i + '"></td>' +
       '<td><input data-f="cw_nm_' + i + '"></td>' +
@@ -123,7 +197,8 @@
     '</tr>' +
     R.signs.map(function (nm, i) {
       return '<tr><th' + EA('SITE.report.signs.' + i) + '>' + esc(nm) + '</th>' +
-        '<td><input data-f="sign_' + i + '" placeholder="성명"></td>' +
+        '<td><input data-f="sign_' + i + '" placeholder="성명"' +
+        ((DAY && i === 1) ? ' readonly title="결재 화면에서 들어옵니다"' : '') + '></td>' +
         '<td style="padding:.15em"><div class="sigbox" data-sig="' + i + '"><span class="ph">눌러서 서명</span></div></td></tr>';
     }).join('') + '</table></div></div>';
   h += '</div></div>';
@@ -133,16 +208,24 @@
     '<span id="savedAt" class="noprint" style="color:#94a3b8">　</span></p>';
   h += '</div><div class="s-foot"><span' + EA('SITE.report.foot') + '>' + esc(R.foot) + '</span></div></div>';
 
-  h += '<div class="btnbar noprint" style="max-width:1180px;margin:0 auto 8px;padding:0 12px">' +
-    '<button class="btn primary" id="btnSaveRec">💾 이 보고서 저장</button>' +
-    '<button class="btn" id="btnOpenRec">📂 저장된 보고서</button>' +
-    '<button class="btn" id="btnFileSave">⤓ 파일로 저장</button>' +
-    '<label class="btn" style="cursor:pointer">📁 파일 열기<input type="file" accept=".json" hidden id="fileRec"></label>' +
-    '</div>';
-  h += '<div class="btnbar noprint" style="max-width:1180px;margin:0 auto 30px;padding:0 12px">' +
-    '<a class="btn" href="risk.html?id=' + t.id + '">‹ 위험성평가표</a>' +
-    '<button class="btn ghost" id="btnReset">새로 작성 (전체 지우기)</button>' +
-    '<a class="btn primary" href="work.html?id=' + t.id + '">작업 메뉴 ›</a></div>';
+  if (DAY) {
+    var dq = '?id=' + t.id + '&day=' + encodeURIComponent(DAY.id);
+    h += '<div class="btnbar noprint" style="max-width:1180px;margin:0 auto 30px;padding:0 12px">' +
+      '<a class="btn" href="risk' + dq + '">‹ 위험성평가표</a>' +
+      '<a class="btn primary" href="day.html?d=' + encodeURIComponent(DAY.id) + '">일일 작업 보고서로 돌아가기 ›</a>' +
+      '</div>';
+  } else {
+    h += '<div class="btnbar noprint" style="max-width:1180px;margin:0 auto 8px;padding:0 12px">' +
+      '<button class="btn primary" id="btnSaveRec">💾 이 보고서 저장</button>' +
+      '<button class="btn" id="btnOpenRec">📂 저장된 보고서</button>' +
+      '<button class="btn" id="btnFileSave">⤓ 파일로 저장</button>' +
+      '<label class="btn" style="cursor:pointer">📁 파일 열기<input type="file" accept=".json" hidden id="fileRec"></label>' +
+      '</div>';
+    h += '<div class="btnbar noprint" style="max-width:1180px;margin:0 auto 30px;padding:0 12px">' +
+      '<a class="btn" href="risk.html?id=' + t.id + '">‹ 위험성평가표</a>' +
+      '<button class="btn ghost" id="btnReset">새로 작성 (전체 지우기)</button>' +
+      '<a class="btn primary" href="work.html?id=' + t.id + '">작업 메뉴 ›</a></div>';
+  }
   h += '</div>';
 
   document.getElementById('app').innerHTML = h;
@@ -176,12 +259,40 @@
       d.appendChild(img); txt.style.display = 'none';
     } else txt.style.display = '';
   }
-  document.querySelectorAll('input[type=file][data-slot]').forEach(function (inp) {
-    inp.addEventListener('change', function () {
-      var f = inp.files && inp.files[0]; if (!f) return;
-      fileToDataURL(f, function (url) {
-        data.photos[inp.dataset.slot] = url; renderPhoto(inp.dataset.slot); save();
+  function photoState(n, msg, bad) {
+    var e = document.querySelector('[data-st="' + n + '"]');
+    if (!e) return;
+    e.textContent = msg || '';
+    e.style.color = bad ? '#b91c1c' : '#64748b';
+  }
+
+  /* 사진 한 장 넣기.
+     묶음(일일 보고서)으로 열렸을 때는 고르는 즉시 서버로 올리고 주소만 저장한다.
+     그림째로 브라우저에 담으면 저장 한도를 넘겨 사진이 사라지기 때문이다. */
+  function putPhoto(n, f) {
+    if (!f) return;
+    if (!/^image\//.test(f.type || '')) { photoState(n, '사진 파일이 아닙니다.', true); return; }
+    if (DAY) {
+      dayPhotoSave(DAY, t.id, n, f, function (st) {
+        if (st.busy) { photoState(n, '올리는 중입니다...'); return; }
+        if (st.url) { data.photos[n] = st.url; renderPhoto(n); }
+        photoState(n, st.err ? ('⚠ ' + st.err) : '올렸습니다', !!st.err);
+        var el = document.getElementById('savedAt');
+        if (el && !st.err) el.textContent = '· 일일 작업 보고서에 저장됨';
       });
+      return;
+    }
+    fileToDataURL(f, function (url) {
+      data.photos[n] = url; renderPhoto(n); save();
+      photoState(n, '넣었습니다');
+    });
+  }
+
+  document.querySelectorAll('input[type=file][data-slot],input[type=file][data-cam]').forEach(function (inp) {
+    inp.addEventListener('change', function () {
+      var f = inp.files && inp.files[0];
+      inp.value = '';                         /* 같은 사진을 다시 골라도 반응하게 */
+      putPhoto(inp.dataset.slot || inp.dataset.cam, f);
     });
   });
   document.querySelectorAll('.rp-drop').forEach(function (d) {
@@ -193,16 +304,21 @@
     });
     d.addEventListener('drop', function (ev) {
       var f = ev.dataTransfer.files && ev.dataTransfer.files[0];
-      if (!f || !/^image\//.test(f.type)) return;
-      fileToDataURL(f, function (url) { data.photos[d.dataset.slot] = url; renderPhoto(d.dataset.slot); save(); });
+      putPhoto(d.dataset.slot, f);
     });
   });
   document.querySelectorAll('.sfbtn').forEach(function (b) {
     b.addEventListener('click', function (ev) {
       ev.preventDefault();
-      var n = b.dataset.slot;
-      if (b.dataset.act === 'clear') { delete data.photos[n]; renderPhoto(n); save(); }
-      else document.querySelector('input[type=file][data-slot="' + n + '"]').click();
+      var n = b.dataset.slot, act = b.dataset.act;
+      if (act === 'clear') {
+        delete data.photos[n]; renderPhoto(n);
+        if (DAY) { dayPhotoDel(DAY, t.id, n); photoState(n, '지웠습니다'); } else save();
+      } else if (act === 'cam') {
+        document.querySelector('input[type=file][data-cam="' + n + '"]').click();
+      } else {
+        document.querySelector('input[type=file][data-slot="' + n + '"]').click();
+      }
     });
   });
 
@@ -235,7 +351,9 @@
     });
   });
 
-  /* ── 저장 / 불러오기 ── */
+  /* ── 저장 / 불러오기 ──
+     묶음(일일 작업 보고서)으로 열렸을 때는 묶음이 알아서 저장하므로 이 단추들을 만들지 않는다. */
+  if (!DAY) {
   function snapshot() {
     return {
       v: 2, task: t.id, taskName: t.name,
@@ -324,10 +442,14 @@
     store.del(KEY); location.reload();
   });
 
+  }
+
   R.slots.forEach(function (s) { renderPhoto(s.n); });
   R.signs.forEach(function (_, i) { renderSig(i); });
-  for (var ci = 0; ci < R.crewRows; ci++) renderCrewSig(ci);
-  if (store.get(KEY)) document.getElementById('savedAt').textContent = '· 이 브라우저에 저장된 내용을 불러왔습니다';
+  for (var ci = 0; ci < crewRows; ci++) renderCrewSig(ci);
+  if (DAY) document.getElementById('savedAt').textContent =
+    '· 일일 작업 보고서 ' + esc(DAY.date) + ' 의 공통 내용을 가져왔습니다';
+  else if (store.get(KEY)) document.getElementById('savedAt').textContent = '· 이 브라우저에 저장된 내용을 불러왔습니다';
 })();
 </script>
 <style>

@@ -377,6 +377,12 @@
       return { k: k, n: pg ? pg.n : k,
         url: (pg ? pg.f : location.pathname.split('/').pop()) + (id ? '?id=' + encodeURIComponent(id) : '') };
     });
+    return runUrls(urls, fmt, baseName(sel));
+  }
+
+  /* 주소 목록을 그대로 받아 한 묶음으로 만든다.
+     일일 작업 보고서처럼 '여러 작업 × 여러 페이지' 를 묶을 때 쓴다. */
+  function runUrls(urls, fmt, name) {
     var type = (fmt === 'png') ? 'png' : 'jpg';
     var q = (fmt === 'jpg') ? 0.92 : 0.95;
     busy('준비 중입니다...');
@@ -392,7 +398,6 @@
     step(0).then(function (pages) {
       if (fmt === 'print') { unbusy(); printImages(pages); return null; }
       busyMsg('파일로 만드는 중...');
-      var name = baseName(sel);
       if (fmt === 'pdf') return [{ blob: makePdf(pages), name: name + '.pdf' }];
       var ext = (fmt === 'png') ? 'png' : 'jpg';
       return Promise.all(pages.map(function (p, i) {
@@ -410,6 +415,7 @@
     });
   }
   window.__exRun = run;
+  window.__exRunUrls = runUrls;
   window.__exPages = PAGES;
   window.__exCur = curKey;
   window.__exTask = taskId;

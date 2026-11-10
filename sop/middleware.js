@@ -149,6 +149,17 @@ export default async function middleware(request) {
     }
     return undefined;
   }
+  // 결재 링크는 로그인 없이 열려야 한다.
+  // 결재권자는 이 사이트의 계정이 없는 사람일 수 있고, 링크 하나로 서명만 하면 되기 때문이다.
+  // 보고서 주소(id)가 곧 열쇠라 링크를 모르면 열 수 없다.
+  // 화면이 뜨려면 공통 파일(css · js · 그림)도 같이 열어야 한다.
+  // 로그인을 켜더라도 assets 는 열리게 되므로, 자료를 완전히 감추고 싶으면
+  // 아래 두 줄을 지우고 결재는 로그인한 사람만 하도록 바꿀 것.
+  if (path === '/approve.html' || path === '/approve' || path === '/api/day' ||
+      path.startsWith('/assets/') || path === '/favicon.svg') {
+    return undefined;
+  }
+
   const SECRET = process.env.SOP_SECRET;
   const USERS  = parseUsers(process.env.SOP_USERS);
 

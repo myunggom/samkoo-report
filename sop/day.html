@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f2544">
+<title>일일 작업 보고서 | 안전 표준운영절차</title>
+<link rel="icon" href="favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/slide.css">
+<link rel="stylesheet" href="assets/inline.css">
+<link rel="stylesheet" href="assets/export.css">
+<link rel="stylesheet" href="assets/sign.css">
+<link rel="stylesheet" href="assets/day.css">
+</head>
+<body>
+<div id="app"></div>
+
+<script src="assets/data.js"></script>
+<script src="assets/imglist.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/inline.js"></script>
+<script src="assets/html-to-image.js"></script>
+<script src="assets/export.js"></script>
+<script src="assets/sign.js"></script>
+<script src="assets/day.js"></script>
+<script src="assets/xlsx.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var R = SITE.report;
+  var id = qs('d');
+
+  function toISO(k) {
+    var m = /^(\d{4})\.(\d{1,2})\.(\d{1,2})$/.exec(String(k || ''));
+    return m ? m[1] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[3]).slice(-2) : '';
+  }
+  function fromISO(v) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(v || ''));
+    return m ? m[1] + '.' + m[2] + '.' + m[3] : '';
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     목록 화면
+     ══════════════════════════════════════════════════════════ */
+  function renderList() {
+    var a = dayList();
+    var h = topbar('일일 작업 보고서', SITE.org, 'index.html');
+    h += '<div class="wrap narrow">';
+    h += '<div class="hero"><h2>하루치 작업을 한 묶음으로</h2>' +
+      '<p>날짜를 정하고 그날 할 작업을 골라 담으면, 작업마다 ' +
+      '안전작업 지침 · 위험성평가표 · 완료보고서가 한 파일로 묶입니다. ' +
+      '서명은 한 번만 받으면 모든 장에 똑같이 들어갑니다.</p></div>';
+
+    h += '<div class="btnbar" style="margin:0 0 16px"><button class="btn primary" id="btnNew">＋ 새 보고서 만들기</button></div>';
+
+    h += '<div class="card"><div class="card-h">📋 만든 보고서</div><div class="card-b">';
+    if (!a.length) {
+      h += '<p class="hint" style="margin:0">아직 만든 보고서가 없습니다. 위의 [＋ 새 보고서 만들기] 를 누르세요.</p>';
+    } else {
+      h += '<div class="dy-list">' + a.map(function (r) {
+        var st = r.signed ? '<span class="dy-state done">결재 완료</span>'
+          : (r.sent ? '<span class="dy-state wait">결재 대기</span>'
+            : '<span class="dy-state none">작성 중</span>');
+        return '<div class="dy-item"><div class="t"><b>' + esc(r.date || '') + '　' + st + '</b>' +
+          '<span>작업 ' + (r.n || 0) + '건' + (r.place ? ' · ' + esc(r.place) : '') +
+          ' · 최종 저장 ' + esc(new Date(r.at).toLocaleString('ko-KR')) + '</span></div>' +
+          '<a class="btn" href="day.html?d=' + encodeURIComponent(r.id) + '">열기</a>' +
+          '<button class="btn ghost" data-del="' + esc(r.id) + '">삭제</button></div>';
+      }).join('') + '</div>';
+    }
+    h += '</div></div>';
+    h += '<p class="hint">보고서는 이 브라우저에 저장됩니다. 결재 링크를 만들면 서버에도 올라가 ' +
+      '결재권자가 어디서든 열어 서명할 수 있습니다.</p>';
+    h += '</div>';
+    document.getElementById('app').innerHTML = h;
+
+    document.getElementById('btnNew').addEventListener('click', function () {
+      var rec = dayNew();
+      daySet(rec);
+      location.href = 'day.html?d=' + encodeURIComponent(rec.id);
+    });
+    document.querySelectorAll('[data-del]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        if (!confirm('이 보고서를 삭제합니다. 되돌릴 수 없습니다.')) return;
+        dayDel(b.dataset.del);
+        renderList();
+      });
+    });
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     편집 화면
+     ══════════════════════════════════════════════════════════ */
+  function renderEdit(rec) {
+    var GS = taskGroups();
+
+    function save() {
+      var ok = daySet(rec);
+      var el = document.getElementById('dySaved');
+      if (el) el.textContent = ok ? '· 저장됨' : '⚠ 저장 실패 (용량 초과)';
+    }
+    /* 화면 맨 위에 짧게 알려 준다 */
+    function saved(msg) {
+      var el = document.getElementById('dySaved');
+      if (el) el.textContent = '· ' + msg;
+    }
+
+    var h = topbar('일일 작업 보고서', esc(rec.date), 'day.html');
+    h += '<div class="wrap narrow">';
+
+    /* 1. 기본 정보 */
+    h += '<div class="card"><div class="card-h">1️⃣ 기본 정보 <span id="dySaved" style="font-weight:400;font-size:12px;color:#94a3b8"></span></div>' +
+      '<div class="card-b"><div class="dy-grid">' +
+      '<label class="dy-f"><span>작업일자</span><input type="date" id="fDate" value="' + esc(toISO(rec.date)) + '"></label>' +
+      '<label class="dy-f"><span>현장명</span><input id="fSite" value="' + esc(rec.sitename || '') + '" placeholder="예) 바이오 이노베이션 허브"></label>' +
+      '<label class="dy-f"><span>작업장소</span><input id="fPlace" value="' + esc(rec.place || '') + '" placeholder="예) 지하 1층 기계실"></label>' +
+      '<label class="dy-f"><span>작업책임자</span><input id="fLeader" value="' + esc(rec.leader || '') + '" placeholder="성명"></label>' +
+      '</div></div></div>';
+
+    /* 2. 작업 고르기 */
+    h += '<div class="card"><div class="card-h">2️⃣ 오늘 할 작업 고르기 <span id="dyN" style="font-weight:400;font-size:12px;color:#94a3b8"></span></div>' +
+      '<div class="card-b">' +
+      '<div id="dyPicked" class="dy-picked" style="margin-bottom:12px"></div>' +
+      '<div class="tsearch" style="margin-bottom:8px"><input id="dyQ" type="search" autocomplete="off" placeholder="작업명 · 문서번호 · 장소로 찾기"></div>' +
+      '<div class="dy-pick" id="dyPick"></div>' +
+      '</div></div>';
+
+    /* 3. 참여자 */
+    h += '<div class="card"><div class="card-h">3️⃣ 작업 참여자 · 서명 <span style="font-weight:400;font-size:12px;color:#94a3b8">한 번만 받으면 모든 장에 들어갑니다</span></div>' +
+      '<div class="card-b"><div class="tblscroll"><table class="dy-crew" id="dyCrew"></table></div>' +
+      '<div class="btnbar" style="margin-top:10px"><button class="btn" id="btnCrewAdd">＋ 참여자 추가</button></div>' +
+      '</div></div>';
+
+    /* 4. 교육 확인 */
+    h += '<div class="card"><div class="card-h">4️⃣ ' + esc(R.checkTitle) + '</div><div class="card-b">' +
+      '<div class="dy-chk">' + R.checks.map(function (c, i) {
+        return '<label><input type="checkbox" data-chk="' + i + '"' +
+          (rec.chk && rec.chk[i] ? ' checked' : '') + '><span>' + esc(c) + '</span></label>';
+      }).join('') + '</div>' +
+      '<div style="margin-top:12px" class="dy-grid">' +
+      '<label class="dy-f"><span>' + esc(R.opinion) + '</span>' +
+      '<input id="fOpin" value="' + esc(rec.opinion || '') + '" placeholder="없으면 비워 두세요"></label>' +
+      '</div></div></div>';
+
+    /* 5. 현장 사진 — 작업마다 4장. 고르는 즉시 서버로 올라간다. */
+    h += '<div class="card"><div class="card-h">5️⃣ 현장 사진 ' +
+      '<span style="font-weight:400;font-size:12px;color:#94a3b8">완료보고서에 그대로 들어갑니다</span></div>' +
+      '<div class="card-b"><div id="dyPhotos"></div></div></div>';
+
+    /* 6. 작성자 서명 */
+    h += '<div class="card"><div class="card-h">6️⃣ 작성자 서명</div><div class="card-b">' +
+      '<div class="dy-grid">' +
+      '<label class="dy-f"><span>작성자 성명</span><input id="fWriter" value="' + esc(rec.writer || '') + '" placeholder="성명"></label>' +
+      '<div class="dy-f"><span>작성자 서명</span><div class="dy-sig big" id="sigWriter"></div></div>' +
+      '</div></div></div>';
+
+    /* 7. 결재 */
+    h += '<div class="card"><div class="card-h">7️⃣ 결재 요청</div><div class="card-b" id="dyApv"></div></div>';
+
+    /* 8. 출력 */
+    h += '<div class="card"><div class="card-h">8️⃣ 묶음 출력 ' +
+      '<span id="dyPg" style="font-weight:400;font-size:12px;color:#94a3b8"></span></div><div class="card-b">' +
+      '<p class="hint" style="margin:0 0 8px">출력할 장을 고르세요. 고른 작업마다 ' +
+      '아래 장이 차례로 이어 붙습니다.</p>' +
+      '<div class="dy-chk dy-pages">' + DAY_PAGE_ALL.map(function (p) {
+        return '<label><input type="checkbox" data-pgk="' + p.k + '"' +
+          ((rec.pages || []).indexOf(p.k) >= 0 ? ' checked' : '') + '><span>' + esc(p.n) +
+          ' <em style="font-style:normal;color:#94a3b8">· ' + p.pg + '쪽</em></span></label>';
+      }).join('') + '</div>' +
+      '<p class="hint" style="margin:8px 0 12px">여기서 고른 구성은 <b>다음에 만드는 보고서에도</b> 그대로 적용됩니다.</p>' +
+      '<div class="btnbar" style="margin:0">' +
+      '<button class="btn primary" id="btnPdf">⤓ 묶음 PDF 만들기</button>' +
+      '<button class="btn" id="btnPrint">🖨 묶음 인쇄</button>' +
+      '</div>' +
+      '<p class="hint" style="margin:14px 0 8px">위험성평가표는 엑셀 양식으로도 받을 수 있습니다. ' +
+      '고른 작업마다 한 장씩, 맨 뒤에 위험도 산정 기준표가 붙습니다.</p>' +
+      '<div class="btnbar" style="margin:0">' +
+      '<button class="btn" id="btnXls">⤓ 위험성평가 엑셀 (양식 그대로)</button>' +
+      '</div></div></div>';
+
+    h += '<div class="btnbar" style="margin:0 0 30px">' +
+      '<a class="btn" href="day.html">‹ 보고서 목록</a>' +
+      '<button class="btn ghost" id="btnDel">이 보고서 삭제</button></div>';
+    h += '</div>';
+    document.getElementById('app').innerHTML = h;
+
+    /* ── 기본 정보 ── */
+    function bind(elId, key, before) {
+      var el = document.getElementById(elId);
+      el.addEventListener('input', function () {
+        rec[key] = el.value;
+        if (before) before();   /* 저장 전에 딸린 값을 먼저 맞춘다 */
+        save();
+      });
+    }
+    document.getElementById('fDate').addEventListener('input', function () {
+      rec.date = fromISO(this.value) || rec.date; save();
+    });
+    bind('fSite', 'sitename');
+    bind('fPlace', 'place');
+    bind('fLeader', 'leader');
+    bind('fWriter', 'writer');
+    bind('fOpin', 'opinion', function () { rec.opinChk = !!rec.opinion; });
+
+    document.querySelectorAll('[data-chk]').forEach(function (el) {
+      el.addEventListener('change', function () {
+        rec.chk = rec.chk || {};
+        rec.chk[el.dataset.chk] = el.checked;
+        save();
+      });
+    });
+
+    /* ── 작업 고르기 ── */
+    var picked = document.getElementById('dyPicked');
+    var pick = document.getElementById('dyPick');
+    var qEl = document.getElementById('dyQ');
+
+    function drawPicked() {
+      document.getElementById('dyN').textContent = rec.tasks.length
+        ? rec.tasks.length + '건 선택됨' : '아직 고르지 않았습니다';
+      if (!rec.tasks.length) {
+        picked.innerHTML = '<p class="hint" style="margin:0">아래 목록에서 작업을 고르세요.</p>';
+        return;
+      }
+      var dq = '&day=' + encodeURIComponent(rec.id);
+      picked.innerHTML = rec.tasks.map(function (tid) {
+        var t = TASKS[tid]; if (!t) return '';
+        return '<div class="dy-chip" style="--tc:' + (t.color || '#1d4ed8') + '">' +
+          '<b>' + esc(t.name) + '</b>' +
+          '<span class="lk">' +
+          '<a href="guide.html?id=' + tid + dq + '">지침</a>' +
+          '<a href="risk.html?id=' + tid + dq + '">평가</a>' +
+          '<a href="report.html?id=' + tid + dq + '">보고서</a>' +
+          '</span>' +
+          '<button type="button" class="x" data-un="' + tid + '" title="빼기">✕</button></div>';
+      }).join('');
+      picked.querySelectorAll('[data-un]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          rec.tasks = rec.tasks.filter(function (x) { return x !== b.dataset.un; });
+          save(); drawPicked(); drawPick(); drawPhotos(); drawPages();
+        });
+      });
+    }
+
+    function drawPick() {
+      var v = qEl.value.trim().toLowerCase();
+      var out = '';
+      GS.forEach(function (g) {
+        var rows = '';
+        g.chapters.forEach(function (c) {
+          c.tasks.forEach(function (tid) {
+            var t = TASKS[tid]; if (!t) return;
+            if (v) {
+              var hay = (t.no + ' ' + t.name + ' ' + t.docNo + ' ' + t.place).toLowerCase();
+              if (hay.indexOf(v) < 0) return;
+            }
+            var on = rec.tasks.indexOf(tid) >= 0;
+            rows += '<label class="dy-row"><input type="checkbox" data-pk="' + tid + '"' +
+              (on ? ' checked' : '') + '>' +
+              '<span class="nm">' + esc(t.name) + '</span>' +
+              '<span class="mt">' + esc(t.place || '') + '</span></label>';
+          });
+        });
+        if (rows) out += '<h5>' + esc(g.title) + '</h5>' + rows;
+      });
+      pick.innerHTML = out || '<p class="hint" style="margin:0;padding:14px">찾는 작업이 없습니다.</p>';
+      pick.querySelectorAll('[data-pk]').forEach(function (cb) {
+        cb.addEventListener('change', function () {
+          var tid = cb.dataset.pk;
+          if (cb.checked) { if (rec.tasks.indexOf(tid) < 0) rec.tasks.push(tid); }
+          else rec.tasks = rec.tasks.filter(function (x) { return x !== tid; });
+          save(); drawPicked(); drawPhotos(); drawPages();
+        });
+      });
+    }
+    qEl.addEventListener('input', drawPick);
+
+    /* ── 참여자 ── */
+    var crewEl = document.getElementById('dyCrew');
+    function drawCrew() {
+      if (!rec.crew.length) rec.crew = [{ org: '', name: '', sig: '' }];
+      var h2 = '<tr><th style="width:38px">연번</th><th>소속</th><th>성명</th>' +
+        '<th class="sigcell">확인 서명</th><th class="xcell"></th></tr>';
+      rec.crew.forEach(function (c, i) {
+        h2 += '<tr><th>' + (i + 1) + '</th>' +
+          '<td><input data-cw="org" data-i="' + i + '" value="' + esc(c.org || '') + '"></td>' +
+          '<td><input data-cw="name" data-i="' + i + '" value="' + esc(c.name || '') + '"></td>' +
+          '<td class="sigcell"><div class="dy-sig" data-csig="' + i + '">' +
+          (c.sig ? '<img src="' + c.sig + '" alt="서명">' : '<span class="ph">눌러서 서명</span>') +
+          '</div></td>' +
+          '<td class="xcell"><button type="button" class="x" data-cx="' + i + '" title="줄 삭제">✕</button></td></tr>';
+      });
+      crewEl.innerHTML = h2;
+
+      crewEl.querySelectorAll('[data-cw]').forEach(function (inp) {
+        inp.addEventListener('input', function () {
+          rec.crew[+inp.dataset.i][inp.dataset.cw] = inp.value; save();
+        });
+      });
+      crewEl.querySelectorAll('[data-csig]').forEach(function (box) {
+        box.addEventListener('click', function () {
+          var i = +box.dataset.csig;
+          signPad('참여자 ' + (i + 1) + ' 확인 서명', rec.crew[i].sig || '', function (v) {
+            if (v === undefined) return;
+            rec.crew[i].sig = (v === null) ? '' : v;
+            save(); drawCrew();
+          });
+        });
+      });
+      crewEl.querySelectorAll('[data-cx]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          rec.crew.splice(+b.dataset.cx, 1);
+          if (!rec.crew.length) rec.crew = [{ org: '', name: '', sig: '' }];
+          save(); drawCrew();
+        });
+      });
+    }
+    document.getElementById('btnCrewAdd').addEventListener('click', function () {
+      rec.crew.push({ org: '', name: '', sig: '' }); save(); drawCrew();
+    });
+
+    /* ── 작성자 서명 ── */
+    var sw = document.getElementById('sigWriter');
+    function drawWriter() {
+      var v = (rec.sigs || {}).writer;
+      sw.className = 'dy-sig big' + (v ? ' has' : '');
+      sw.innerHTML = v ? '<img src="' + v + '" alt="서명">' : '<span class="ph">눌러서 서명</span>';
+    }
+    sw.addEventListener('click', function () {
+      signPad('작성자 확인 서명', (rec.sigs || {}).writer || '', function (v) {
+        if (v === undefined) return;
+        rec.sigs = rec.sigs || {};
+        if (v === null) delete rec.sigs.writer; else rec.sigs.writer = v;
+        save(); drawWriter();
+      });
+    });
+
+    /* ── 결재 ── */
+    var apv = document.getElementById('dyApv');
+    function drawApv(msg, bad) {
+      var signed = !!(rec.sigs && rec.sigs.approver);
+      var h2 = '';
+      if (signed) {
+        h2 += '<p style="margin:0 0 10px"><span class="dy-state done">결재 완료</span> ' +
+          esc((rec.approver && rec.approver.name) || '') +
+          ((rec.approver && rec.approver.at) ? ' · ' + esc(new Date(rec.approver.at).toLocaleString('ko-KR')) : '') + '</p>' +
+          '<div class="dy-sig big has" style="max-width:220px"><img src="' + rec.sigs.approver + '" alt="결재 서명"></div>';
+      } else {
+        h2 += '<p class="hint" style="margin:0 0 10px">링크를 만들어 결재권자에게 보내면, ' +
+          '결재권자는 열어서 <b>서명만</b> 하면 됩니다. 서명은 모든 작업의 완료보고서에 함께 들어갑니다.</p>';
+      }
+      if (rec.sent) {
+        var url = dayLink(rec.id);
+        h2 += '<div class="dy-link" style="margin:10px 0"><code id="apvUrl">' + esc(url) + '</code>' +
+          '<button type="button" class="btn" id="btnCopy" style="margin-left:auto;flex:none">복사</button></div>';
+      }
+      h2 += '<div class="btnbar" style="margin:0">' +
+        '<button class="btn primary" id="btnSend">' + (rec.sent ? '서버에 다시 올리기' : '결재 링크 만들기') + '</button>' +
+        (rec.sent ? '<button class="btn" id="btnCheck">결재 확인</button>' : '') +
+        '</div>';
+      if (msg) h2 += '<p class="hint" style="margin:10px 0 0;color:' + (bad ? '#b91c1c' : '#166534') + '">' + esc(msg) + '</p>';
+      apv.innerHTML = h2;
+
+      var bc = document.getElementById('btnCopy');
+      if (bc) bc.addEventListener('click', function () {
+        var url = dayLink(rec.id);
+        (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject())
+          .then(function () { toast('링크를 복사했습니다'); })
+          .catch(function () { window.prompt('아래 주소를 복사하세요', url); });
+      });
+
+      document.getElementById('btnSend').addEventListener('click', function () {
+        if (!rec.tasks.length) { alert('작업을 먼저 고르세요.'); return; }
+        var btn = this; btn.disabled = true;
+        drawApvBusy('올리는 중입니다...');
+        dayUploadPhotos(rec, function (i, n) { drawApvBusy('사진 올리는 중 (' + i + '/' + n + ')'); })
+          .then(function () {
+            /* '보냄' 표시를 올리기 전에 찍어 둔다.
+               나중에 찍으면 서버 사본에 안 들어가고, 결재 화면이 그 사본을
+               이 브라우저에 다시 심을 때 표시가 지워진다. */
+            rec.sent = true;
+            save();
+            return dayPush(rec);
+          })
+          .then(function () {
+            drawApv('링크를 만들었습니다. 결재권자에게 보내세요.');
+          })
+          .catch(function (e) {
+            btn.disabled = false;
+            drawApv('올리지 못했습니다 : ' + (e && e.message ? e.message : e), true);
+          });
+      });
+
+      var bchk = document.getElementById('btnCheck');
+      if (bchk) bchk.addEventListener('click', function () {
+        drawApvBusy('확인 중입니다...');
+        dayPull(rec.id).then(function (j) {
+          var got = j && j.rec;
+          if (got && got.sigs && got.sigs.approver) {
+            rec.sigs = rec.sigs || {};
+            rec.sigs.approver = got.sigs.approver;
+            rec.approver = got.approver || rec.approver;
+            save();
+            drawApv('결재 서명을 받았습니다.');
+          } else {
+            drawApv('아직 결재 서명이 없습니다.');
+          }
+        }).catch(function (e) {
+          drawApv('확인하지 못했습니다 : ' + (e && e.message ? e.message : e), true);
+        });
+      });
+    }
+    function drawApvBusy(msg) {
+      apv.innerHTML = '<p class="hint" style="margin:0">' + esc(msg) + '</p>';
+    }
+
+    /* ── 현장 사진 ──────────────────────────────────────────
+       작업마다 4칸. 사진을 고르는 즉시 서버로 올리고 주소만 남긴다.
+       (그림째로 브라우저에 담으면 저장 한도를 넘겨 사진이 사라진다) */
+    var phEl = document.getElementById('dyPhotos');
+
+    function phState(tid, slot, msg, bad) {
+      var e = phEl.querySelector('[data-pst="' + tid + '-' + slot + '"]');
+      if (!e) return;
+      e.textContent = msg || '';
+      e.style.color = bad ? '#b91c1c' : '#64748b';
+    }
+    function phBox(tid, slot) {
+      var url = ((rec.photos || {})[tid] || {})[slot];
+      var box = phEl.querySelector('[data-pbox="' + tid + '-' + slot + '"]');
+      if (!box) return;
+      box.innerHTML = url ? '<img src="' + url + '" alt="">' : '<span>＋</span>';
+      box.parentNode.classList.toggle('has', !!url);
+    }
+    function phPut(tid, slot, f) {
+      if (!f) return;
+      dayPhotoSave(rec, tid, slot, f, function (st) {
+        if (st.busy) { phState(tid, slot, '올리는 중...'); return; }
+        if (st.url) phBox(tid, slot);
+        phState(tid, slot, st.err ? ('⚠ ' + st.err) : '올렸습니다', !!st.err);
+        if (!st.err) { drawPhotoCount(tid); saved('사진을 올렸습니다'); }
+      });
+    }
+    function drawPhotoCount(tid) {
+      var e = phEl.querySelector('[data-pcnt="' + tid + '"]');
+      if (e) e.textContent = dayPhotoCount(rec, tid) + ' / ' + R.slots.length + '장';
+    }
+    function drawPhotos() {
+      if (!rec.tasks.length) {
+        phEl.innerHTML = '<p class="hint" style="margin:0">작업을 먼저 고르면 사진 칸이 나옵니다.</p>';
+        return;
+      }
+      phEl.innerHTML = rec.tasks.map(function (tid) {
+        var t = TASKS[tid]; if (!t) return '';
+        return '<div class="dy-ph-task"><h4>' + esc(t.name) +
+          '<span class="cnt" data-pcnt="' + tid + '"></span></h4><div class="dy-ph-grid">' +
+          R.slots.map(function (sl) {
+            var k = tid + '-' + sl.n;
+            return '<div class="dy-ph"><b>' + sl.n + '. ' + esc(sl.name) + '</b>' +
+              '<div class="box" data-pbox="' + k + '"></div>' +
+              '<input type="file" accept="image/*" capture="environment" hidden data-pcam="' + k + '">' +
+              '<input type="file" accept="image/*" hidden data-pfile="' + k + '">' +
+              '<div class="acts">' +
+              '<button type="button" data-pact="cam" data-pk="' + k + '">📷</button>' +
+              '<button type="button" data-pact="file" data-pk="' + k + '">📁</button>' +
+              '<button type="button" data-pact="del" data-pk="' + k + '">✕</button></div>' +
+              '<em data-pst="' + k + '"></em></div>';
+          }).join('') + '</div></div>';
+      }).join('');
+
+      function split(k) { var i = k.lastIndexOf('-'); return [k.slice(0, i), k.slice(i + 1)]; }
+
+      phEl.querySelectorAll('input[type=file]').forEach(function (inp) {
+        inp.addEventListener('change', function () {
+          var k = inp.dataset.pcam || inp.dataset.pfile;
+          var f = inp.files && inp.files[0];
+          inp.value = '';
+          var a = split(k);
+          phPut(a[0], a[1], f);
+        });
+      });
+      phEl.querySelectorAll('[data-pact]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var k = b.dataset.pk, a = split(k);
+          if (b.dataset.pact === 'del') {
+            dayPhotoDel(rec, a[0], a[1]);
+            phBox(a[0], a[1]); phState(a[0], a[1], '지웠습니다'); drawPhotoCount(a[0]);
+            return;
+          }
+          var sel = b.dataset.pact === 'cam' ? 'pcam' : 'pfile';
+          phEl.querySelector('input[data-' + sel + '="' + k + '"]').click();
+        });
+      });
+      phEl.querySelectorAll('.box').forEach(function (box) {
+        box.addEventListener('click', function () {
+          phEl.querySelector('input[data-pcam="' + box.dataset.pbox + '"]').click();
+        });
+      });
+      rec.tasks.forEach(function (tid) {
+        R.slots.forEach(function (sl) { phBox(tid, sl.n); });
+        drawPhotoCount(tid);
+      });
+    }
+
+    /* ── 묶음 출력 ── */
+    function bundleUrls() { return dayBundleUrls(rec); }
+
+    /* ── 출력할 장 고르기 ── */
+    function drawPages() {
+      var el = document.getElementById('dyPg');
+      if (!el) return;
+      var c = dayPageCount(rec);
+      el.textContent = !c.names.length ? '고른 장이 없습니다'
+        : c.names.length + '종 · 작업 1건당 ' + c.per + '쪽' +
+          (c.once ? ' + 공통 ' + c.once + '쪽' : '') +
+          (c.tasks ? ' · 모두 ' + c.total + '쪽' : '');
+    }
+    document.querySelectorAll('[data-pgk]').forEach(function (cb) {
+      cb.addEventListener('change', function () {
+        var k = cb.dataset.pgk;
+        rec.pages = rec.pages || [];
+        if (cb.checked) { if (rec.pages.indexOf(k) < 0) rec.pages.push(k); }
+        else rec.pages = rec.pages.filter(function (x) { return x !== k; });
+        /* 보기 좋은 차례로 정렬해 둔다 */
+        var ord = DAY_PAGE_ALL.map(function (p) { return p.k; });
+        rec.pages.sort(function (a, b) { return ord.indexOf(a) - ord.indexOf(b); });
+        dayPagesPrefSet(rec.pages);      /* 다음 보고서의 기본값이 된다 */
+        save(); drawPages();
+      });
+    });
+    function bundleName() {
+      return ('일일작업보고서_' + (rec.date || todayStr()).replace(/[^0-9]/g, '') +
+        '_' + rec.tasks.length + '건').replace(/[\\/:*?"<>|]/g, '_');
+    }
+    function runBundle(fmt) {
+      if (!rec.tasks.length) { alert('작업을 먼저 고르세요.'); return; }
+      if (!(rec.pages || []).length) { alert('출력할 장을 하나 이상 고르세요.'); return; }
+      var urls = bundleUrls();
+      if (!urls.length) { alert('묶을 페이지가 없습니다.'); return; }
+      if (!window.__exRunUrls) { alert('출력 기능을 불러오지 못했습니다. 새로고침 후 다시 시도해 주세요.'); return; }
+      window.__exRunUrls(urls, fmt, bundleName());
+    }
+    document.getElementById('btnPdf').addEventListener('click', function () { runBundle('pdf'); });
+    document.getElementById('btnPrint').addEventListener('click', function () { runBundle('print'); });
+
+    /* 위험성평가표 엑셀 — 고른 작업마다 한 장 + 맨 뒤에 위험도 산정 기준표 */
+    document.getElementById('btnXls').addEventListener('click', function () {
+      if (!rec.tasks.length) { alert('작업을 먼저 고르세요.'); return; }
+      var btn = this, was = btn.textContent;
+      btn.disabled = true; btn.textContent = '만드는 중...';
+      try {
+        var sheets = [];
+        rec.tasks.forEach(function (tid) {
+          var t = TASKS[tid];
+          if (!t || !t.risk) return;
+          var sv = (rec.risk && rec.risk[tid]) || {};
+          var hd = { date: sv.date != null ? sv.date : (rec.date || t.risk.date),
+                     assessor: sv.assessor != null ? sv.assessor : (rec.leader || t.risk.assessor) };
+          var rr = t.risk.rows.map(function (r, k) {
+            var v = (sv.rows && sv.rows[k]) || {};
+            return { f: v.f != null ? v.f : r.f, s: v.s != null ? v.s : r.s,
+                     f2: v.f2 != null ? v.f2 : r.f2, s2: v.s2 != null ? v.s2 : r.s2,
+                     done: v.done != null ? v.done : r.done };
+          });
+          sheets.push(riskSheet(t, hd, rr));
+        });
+        if (!sheets.length) { alert('고른 작업에 위험성평가표가 없습니다.'); }
+        else {
+          sheets.push(riskMatrixSheet());
+          XL.save('위험성평가표_' + (rec.date || todayStr()).replace(/[^0-9]/g, '') +
+            '_' + rec.tasks.length + '건.xlsx', sheets);
+          saved('엑셀 파일을 내려받았습니다 (' + sheets.length + '장)');
+        }
+      } catch (e) {
+        alert('엑셀 파일을 만들지 못했습니다 : ' + (e && e.message ? e.message : e));
+      }
+      btn.disabled = false; btn.textContent = was;
+    });
+
+    document.getElementById('btnDel').addEventListener('click', function () {
+      if (!confirm('이 보고서를 삭제합니다. 되돌릴 수 없습니다.')) return;
+      dayDel(rec.id);
+      location.href = 'day.html';
+    });
+
+    drawPicked(); drawPick(); drawCrew(); drawWriter(); drawApv(); drawPhotos(); drawPages();
+  }
+
+  /* ══════════════════════════════════════════════════════════ */
+  if (!id) { renderList(); return; }
+  var rec = dayGet(id);
+  if (!rec) {
+    document.getElementById('app').innerHTML =
+      topbar('일일 작업 보고서', SITE.org, 'day.html') +
+      '<div class="wrap narrow"><div class="card"><div class="card-b">' +
+      '<p>이 브라우저에 저장된 보고서가 아닙니다.</p>' +
+      '<div class="btnbar" style="margin:10px 0 0"><a class="btn primary" href="day.html">보고서 목록</a></div>' +
+      '</div></div></div>';
+    return;
+  }
+  /* 옛 보고서에 없던 칸을 채워 둔다 */
+  var base = dayNew();
+  Object.keys(base).forEach(function (k) { if (rec[k] === undefined) rec[k] = base[k]; });
+  rec.id = id;
+  renderEdit(rec);
+})();
+</script>
+</body>
+</html>

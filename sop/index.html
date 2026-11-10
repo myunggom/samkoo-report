@@ -49,6 +49,14 @@
   h += '<div class="hero"><h2' + EA('SITE.hero.title') + '>' + esc(SITE.hero.title) + '</h2>' +
        '<p' + EA('SITE.hero.text') + '>' + esc(SITE.hero.text) + '</p></div>';
 
+  h += '<div class="card" style="border-color:#1d4ed8;margin-bottom:16px">' +
+    '<div class="card-h">🗓 일일 작업 보고서 — 하루치를 한 묶음으로</div><div class="card-b">' +
+    '<p style="margin:0 0 12px;font-size:13.5px;color:var(--ink-2)">' +
+    '날짜를 정하고 그날 할 작업을 골라 담으면, 작업마다 안전작업 지침 · 위험성평가표 · 작업 완료보고서가 ' +
+    '한 파일로 묶입니다. 서명은 한 번만 받으면 모든 장에 똑같이 들어가고, ' +
+    '결재권자는 링크를 받아 서명만 하면 됩니다.</p>' +
+    '<a class="btn primary" href="day.html">일일 작업 보고서 열기</a></div></div>';
+
   h += '<div class="navbox noprint">' +
     '<div class="tsearch"><input id="tq" type="search" autocomplete="off"' +
     ' placeholder="작업명 · 문서번호 · 장소로 찾기 (전체 ' + total + '건)">' +

@@ -20,9 +20,11 @@
 <script src="assets/inline.js"></script>
 <script src="assets/html-to-image.js"></script>
 <script src="assets/export.js"></script>
+<script src="assets/day.js"></script>
 <script>
 (function () {
   var t = currentTask(); if (!t) return;
+  var DAY = (window.dayCtx ? dayCtx() : null);
   var B = 'TASKS.' + t.id, G = t.guide || [], p = t.parts;
   document.title = t.name + ' 안전 교육자료 | 안전 표준운영절차';
 
@@ -89,9 +91,11 @@
 
   h += '</div>' + sFootE(t, B) + '</div></div>';
 
+  var DQ = DAY ? ('&day=' + encodeURIComponent(DAY.id)) : '';
   h += '<div class="btnbar noprint" style="max-width:1180px;margin:0 auto 30px;padding:0 12px">' +
     '<a class="btn" href="parts.html?id=' + t.id + '">‹ 각부 명칭</a>' +
-    '<a class="btn primary" href="risk.html?id=' + t.id + '">다음 : 위험성평가표 ›</a></div>';
+    (DAY ? '<a class="btn" href="day.html?d=' + encodeURIComponent(DAY.id) + '">일일 보고서</a>' : '') +
+    '<a class="btn primary" href="risk.html?id=' + t.id + DQ + '">다음 : 위험성평가표 ›</a></div>';
 
   document.getElementById('app').innerHTML = h;
   initInline();

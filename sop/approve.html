@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f2544">
+<title>결재 서명 | 안전 표준운영절차</title>
+<link rel="icon" href="favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/slide.css">
+<link rel="stylesheet" href="assets/inline.css">
+<link rel="stylesheet" href="assets/export.css">
+<link rel="stylesheet" href="assets/sign.css">
+<link rel="stylesheet" href="assets/day.css">
+</head>
+<body>
+<div id="app"></div>
+
+<script src="assets/data.js"></script>
+<script src="assets/imglist.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/inline.js"></script>
+<script src="assets/html-to-image.js"></script>
+<script src="assets/export.js"></script>
+<script src="assets/sign.js"></script>
+<script src="assets/day.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var R = SITE.report;
+  var id = qs('d');
+  var app = document.getElementById('app');
+  var rec = null, mySig = '';
+
+  function shell(inner) {
+    return topbar('작업 보고서 결재', SITE.org) +
+      '<div class="wrap narrow">' + inner + '</div>';
+  }
+  function note(msg) {
+    app.innerHTML = shell('<div class="card"><div class="card-b"><p style="margin:0">' + msg + '</p></div></div>');
+  }
+
+  if (!id) { note('주소가 올바르지 않습니다. 받으신 결재 링크를 다시 눌러 주세요.'); return; }
+
+  note('보고서를 불러오는 중입니다...');
+
+  dayPull(id).then(function (j) {
+    rec = j && j.rec;
+    if (!rec || !rec.id) throw new Error('보고서를 찾지 못했습니다.');
+    /* 묶음 페이지(지침·평가·보고서)가 이 보고서를 읽을 수 있도록 이 브라우저에도 넣어 둔다.
+       작성자가 자기 PC 에서 이 링크를 열 수도 있으므로, 원래 있던 표시는 지우지 않는다. */
+    var mine = dayGet(rec.id);
+    if (mine && mine.sent) rec.sent = true;
+    daySet(rec);
+    render();
+  }).catch(function (e) {
+    note('보고서를 열지 못했습니다.<br><br>' + esc(e && e.message ? e.message : String(e)) +
+      '<br><br>링크를 보내 주신 담당자에게 문의해 주세요.');
+  });
+
+  function row(k, v) {
+    return '<tr><th style="width:120px;background:#f8fafc;border:1px solid #e2e8f0;padding:7px 10px;' +
+      'font-size:12.5px;color:#475569;text-align:left">' + esc(k) + '</th>' +
+      '<td style="border:1px solid #e2e8f0;padding:7px 10px;font-size:13.5px">' + (v || '-') + '</td></tr>';
+  }
+
+  function render(msg, bad) {
+    var signed = !!(rec.sigs && rec.sigs.approver);
+    var h = '';
+
+    h += '<div class="hero"><h2>작업 보고서 결재</h2>' +
+      '<p>아래 내용을 확인하신 뒤 <b>성명을 적고 한 번만 서명</b>해 주십시오. ' +
+      '서명은 이 보고서에 담긴 모든 작업의 완료보고서에 함께 들어갑니다.</p></div>';
+
+    /* 요약 */
+    var crew = (rec.crew || []).filter(function (c) { return c && (c.name || c.org); });
+    var tnames = (rec.tasks || []).map(function (tid) {
+      var t = TASKS[tid];
+      return t ? '<li>' + esc(t.name) + (t.place ? ' <span style="color:#94a3b8">· ' + esc(t.place) + '</span>' : '') + '</li>' : '';
+    }).join('');
+    var chkOn = R.checks.filter(function (_, i) { return rec.chk && rec.chk[i]; }).length;
+
+    h += '<div class="card"><div class="card-h">📋 보고 내용</div><div class="card-b">' +
+      '<table style="width:100%;border-collapse:collapse">' +
+      row('작업일자', esc(rec.date || '')) +
+      row('현장명', esc(rec.sitename || '')) +
+      row('작업장소', esc(rec.place || '')) +
+      row('작업책임자', esc(rec.leader || '')) +
+      row('작성자', esc(rec.writer || '') +
+        ((rec.sigs && rec.sigs.writer)
+          ? ' <img src="' + rec.sigs.writer + '" alt="서명" style="height:30px;vertical-align:middle;margin-left:8px">'
+          : '')) +
+      row('작업 건수', (rec.tasks || []).length + '건') +
+      row('참여자', crew.length
+        ? esc(crew.map(function (c) { return (c.org ? c.org + ' ' : '') + c.name; }).join(', '))
+        : '') +
+      row('교육 · 평가 확인', chkOn + ' / ' + R.checks.length + '항목 확인') +
+      '</table>' +
+      (tnames ? '<p style="margin:12px 0 4px;font-size:12.5px;font-weight:700;color:#475569">대상 작업</p>' +
+        '<ul style="margin:0;padding-left:20px;font-size:13.5px;line-height:1.8">' + tnames + '</ul>' : '') +
+      '</div></div>';
+
+    /* 자세히 보기 */
+    h += '<div class="card"><div class="card-h">🔎 자세히 보기</div><div class="card-b">' +
+      '<p class="hint" style="margin:0 0 10px">작업마다 ' +
+      esc(DAY_PAGE_ALL.filter(function (p) { return (rec.pages || []).indexOf(p.k) >= 0; })
+        .map(function (p) { return p.n.split(' · ')[0]; }).join(' · ') || '선택된 장 없음') +
+      ' 를 한 파일로 묶어 볼 수 있습니다.</p>' +
+      '<div class="btnbar" style="margin:0"><button class="btn" id="btnPdf">⤓ 묶음 PDF 만들어 보기</button></div>' +
+      '</div></div>';
+
+    /* 서명 */
+    if (signed) {
+      h += '<div class="card" style="border-color:#16a34a"><div class="card-h">✅ 결재 완료</div><div class="card-b">' +
+        '<p style="margin:0 0 10px">' + esc((rec.approver && rec.approver.name) || '') +
+        ((rec.approver && rec.approver.at) ? ' · ' + esc(new Date(rec.approver.at).toLocaleString('ko-KR')) : '') +
+        '</p><div class="dy-sig big has" style="max-width:220px"><img src="' + rec.sigs.approver + '" alt="결재 서명"></div>' +
+        '<p class="hint" style="margin:10px 0 0">서명이 저장되었습니다. 창을 닫으셔도 됩니다.</p>' +
+        '</div></div>';
+    } else {
+      h += '<div class="card" style="border-color:#1d4ed8"><div class="card-h">✍ 결재 서명</div><div class="card-b">' +
+        '<div class="dy-grid">' +
+        '<label class="dy-f"><span>성명</span><input id="fName" placeholder="성명을 적어 주세요" value="' +
+        esc((rec.approver && rec.approver.name) || '') + '"></label>' +
+        '<div class="dy-f"><span>서명</span><div class="dy-sig big" id="sigBox"></div></div>' +
+        '</div>' +
+        '<div class="btnbar" style="margin:12px 0 0">' +
+        '<button class="btn primary" id="btnSign">결재 서명 제출</button></div>' +
+        '</div></div>';
+    }
+
+    if (msg) h += '<p class="hint" style="color:' + (bad ? '#b91c1c' : '#166534') + '">' + esc(msg) + '</p>';
+    h += '<p class="hint" style="margin-bottom:30px">이 링크를 아는 사람만 이 보고서를 볼 수 있습니다. 외부에 전달하지 마십시오.</p>';
+
+    app.innerHTML = shell(h);
+
+    /* 묶음 PDF */
+    document.getElementById('btnPdf').addEventListener('click', function () {
+      var urls = dayBundleUrls(rec);
+      if (!urls.length) { alert('묶을 내용이 없습니다.'); return; }
+      window.__exRunUrls(urls, 'pdf',
+        ('일일작업보고서_' + (rec.date || '').replace(/[^0-9]/g, '')).replace(/[\\/:*?"<>|]/g, '_'));
+    });
+
+    if (signed) return;
+
+    var box = document.getElementById('sigBox');
+    function drawSig() {
+      box.className = 'dy-sig big' + (mySig ? ' has' : '');
+      box.innerHTML = mySig ? '<img src="' + mySig + '" alt="서명">' : '<span class="ph">눌러서 서명</span>';
+    }
+    box.addEventListener('click', function () {
+      signPad('결재 확인 서명', mySig, function (v) {
+        if (v === undefined) return;
+        mySig = (v === null) ? '' : v;
+        drawSig();
+      });
+    });
+    drawSig();
+
+    document.getElementById('btnSign').addEventListener('click', function () {
+      var name = (document.getElementById('fName').value || '').trim();
+      if (!name) { alert('성명을 적어 주세요.'); return; }
+      if (!mySig) { alert('서명해 주세요.'); return; }
+      var btn = this; btn.disabled = true; btn.textContent = '제출 중...';
+      daySign(rec.id, name, mySig).then(function () {
+        rec.sigs = rec.sigs || {};
+        rec.sigs.approver = mySig;
+        rec.approver = { name: name, at: new Date().toISOString() };
+        daySet(rec);
+        render('결재 서명을 저장했습니다.');
+      }).catch(function (e) {
+        btn.disabled = false; btn.textContent = '결재 서명 제출';
+        render('저장하지 못했습니다 : ' + (e && e.message ? e.message : e), true);
+      });
+    });
+  }
+})();
+</script>
+</body>
+</html>
