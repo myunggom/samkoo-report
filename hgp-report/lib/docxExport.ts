@@ -7,7 +7,8 @@
 // 표 행(조치 경과·대책·사진)은 입력 개수만큼 늘어나고, 사진은 칸에 꽉 차게(cover) 들어갑니다.
 
 import type { GenReport, PlanRow, ReportKind } from "@/lib/reports";
-import { DEFAULT_SIGNOFF, KIND_BANNER, KIND_PLACE_LABEL, layoutOf } from "@/lib/reports";
+import { DEFAULT_SIGNOFF, KIND_BANNER, KIND_PLACE_LABEL, layoutOf, tableHasContent } from "@/lib/reports";
+import { tablesToXml } from "@/lib/docxTable";
 import type { PungReport } from "@/lib/pungsuhae";
 import { dotDate as pungDotDate } from "@/lib/pungsuhae";
 import { proxied } from "@/lib/client";
@@ -77,6 +78,7 @@ const TEMPLATE_BY_KIND: Record<ReportKind, string> = {
   completion: "completion.docx",
   inspection: "inspection.docx",
   repair: "repair.docx",
+  review: "review.docx",
 };
 
 // ── 글자색 자동 (템플릿의 {#prefix_tone} 조건 런과 이름 일치) ──
@@ -127,10 +129,12 @@ function planRows(list: PlanRow[]) {
 async function buildCommonData(report: GenReport, store: Map<string, Uint8Array>) {
   const photoRows = await buildPhotoRows(report.photos, store);
   const sections = report.sections
-    .filter((s) => s.heading.trim() || s.body.trim())
+    .filter((s) => s.heading.trim() || s.body.trim() || (s.tables || []).some(tableHasContent))
     .map((s, i) => ({
       no: String(i + 1),
       heading: s.heading,
+      // 화면에서 만든 표를 워드 표 XML 로 바꿔 양식의 {@tablesXml} 자리에 그대로 끼운다
+      tablesXml: tablesToXml(s.tables),
       // 본문은 줄마다 한 문단(• 글머리). 이미 기호로 시작하면 그대로.
       lines: (s.body || "")
         .split(/\r?\n/)
@@ -197,6 +201,7 @@ async function buildAccidentData(report: GenReport, store: Map<string, Uint8Arra
     조치나머지: plans.rest,
     재발첫: prevents.first,
     재발나머지: prevents.rest,
+    tablesXml: tablesToXml(report.tables),
     hasPhotos: photoRows.length > 0,
     photoRows,
     발신: report.signoff || DEFAULT_SIGNOFF,

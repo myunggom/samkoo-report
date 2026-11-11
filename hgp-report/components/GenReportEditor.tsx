@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { GenReport, ReportTextSection, AccidentFields, TimelineRow, PlanRow } from "@/lib/reports";
+import type { GenReport, ReportTextSection, AccidentFields, TimelineRow, PlanRow, ReportTable } from "@/lib/reports";
 import { ACCIDENT_GRADES, KIND_LABEL, KIND_PLACE_LABEL, PLAN_RESULTS, layoutOf, reportFileName } from "@/lib/reports";
 import { shareOrDownloadPdf, shareOrDownloadFile } from "@/lib/pdf";
 import { generateReportDocx } from "@/lib/docxExport";
 import { docxBlobToPdfBlob } from "@/lib/docxToPdf";
 import ReportPhotoField from "@/components/ReportPhotoField";
+import TableEditor from "@/components/TableEditor";
 
 export default function GenReportEditor({ initial }: { initial: GenReport }) {
   const router = useRouter();
@@ -32,7 +33,7 @@ export default function GenReportEditor({ initial }: { initial: GenReport }) {
     });
   }
   function addSection() {
-    setR((prev) => ({ ...prev, sections: [...prev.sections, { id: `s-${Date.now().toString(36)}`, heading: "새 항목", body: "" }] }));
+    setR((prev) => ({ ...prev, sections: [...prev.sections, { id: `s-${Date.now().toString(36)}`, heading: "새 항목", body: "", tables: [] }] }));
   }
   function removeSection(i: number) {
     setR((prev) => ({ ...prev, sections: prev.sections.filter((_, idx) => idx !== i) }));
@@ -166,12 +167,20 @@ export default function GenReportEditor({ initial }: { initial: GenReport }) {
                 <button onClick={() => removeSection(i)} className="rounded border border-red-200 px-2 py-1 text-xs text-red-400 hover:bg-red-50">삭제</button>
               </div>
               <textarea value={s.body} onChange={(e) => updateSection(i, { body: e.target.value })} rows={3} placeholder="내용을 입력하세요 (엔터로 줄 나눔)" className={INPUT} />
+              <div className="mt-2">
+                <TableEditor tables={s.tables} onChange={(tables: ReportTable[]) => updateSection(i, { tables })} />
+              </div>
             </div>
           ))}
           <button onClick={addSection} className={ADD_BTN}>＋ 항목 추가</button>
         </Card>
       ) : (
-        <AccidentForm a={r.accident} patch={patchAccident} />
+        <div className="space-y-4">
+          <AccidentForm a={r.accident} patch={patchAccident} />
+          <Card title="표" hint="여기에 넣은 표는 첨부사진 바로 앞에 들어갑니다.">
+            <TableEditor tables={r.tables} onChange={(tables: ReportTable[]) => patch({ tables })} />
+          </Card>
+        </div>
       )}
 
       {/* 첨부사진 */}

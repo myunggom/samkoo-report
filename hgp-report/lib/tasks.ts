@@ -111,21 +111,10 @@ function str(v: unknown): string | undefined {
   return s ? s : undefined;
 }
 
-// AI 응답에서 JSON 배열을 꺼내 형식을 맞춘다.
-// 코드펜스·앞뒤 설명은 무시하고, 값이 이상하면 버리거나 안전한 기본값으로 떨어뜨린다.
-export function parseTasksJson(raw: string): ParsedTask[] {
-  const start = raw.indexOf("[");
-  const end = raw.lastIndexOf("]");
-  if (start < 0 || end < start) throw new Error("AI 응답에서 JSON 배열을 찾지 못했습니다.");
-
-  let data: unknown;
-  try {
-    data = JSON.parse(raw.slice(start, end + 1));
-  } catch {
-    throw new Error("AI 응답의 JSON을 해석하지 못했습니다.");
-  }
-  if (!Array.isArray(data)) throw new Error("AI 응답에서 JSON 배열을 찾지 못했습니다.");
-
+// AI가 돌려준 할 일 목록의 값을 다듬는다.
+// 모양(JSON 배열인지, 키가 있는지)은 구조화 출력 스키마가 보장하므로 여기서 다시 보지 않는다.
+// 모르는 category는 "etc"로, 형식이 깨진 날짜는 버린다 — 스키마 밖의 방어선.
+export function normalizeTasks(data: unknown[]): ParsedTask[] {
   return data
     .map((entry): ParsedTask => {
       const it = (entry ?? {}) as Record<string, unknown>;

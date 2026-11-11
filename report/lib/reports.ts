@@ -9,16 +9,17 @@
 
 export type ReportPhoto = { url?: string; caption?: string };
 
-export type ReportKind = "accident" | "completion" | "inspection" | "repair";
+export type ReportKind = "accident" | "completion" | "inspection" | "repair" | "review";
 export type ReportLayout = "accident" | "common";
 
-export const REPORT_KINDS: ReportKind[] = ["accident", "completion", "inspection", "repair"];
+export const REPORT_KINDS: ReportKind[] = ["accident", "completion", "inspection", "repair", "review"];
 
 export const KIND_LABEL: Record<ReportKind, string> = {
   accident: "사고보고서",
   completion: "완료보고서",
   inspection: "점검보고서",
   repair: "보수요청서",
+  review: "검토보고서",
 };
 
 export const KIND_LAYOUT: Record<ReportKind, ReportLayout> = {
@@ -26,6 +27,7 @@ export const KIND_LAYOUT: Record<ReportKind, ReportLayout> = {
   completion: "common",
   inspection: "common",
   repair: "common",
+  review: "common",
 };
 
 export const KIND_EMOJI: Record<ReportKind, string> = {
@@ -33,6 +35,7 @@ export const KIND_EMOJI: Record<ReportKind, string> = {
   completion: "✅",
   inspection: "🔍",
   repair: "🛠",
+  review: "📝",
 };
 
 // 양식 머리에 들어가는 고정값 (바이오 이노베이션 허브 전용 앱)
@@ -45,10 +48,52 @@ export const KIND_CATEGORY: Record<ReportKind, string> = {
   completion: "작업 완료 보고",
   inspection: "설비 점검 보고",
   repair: "보수 조치 요청",
+  review: "검토 및 의견 보고",
 };
 
-// 공통 양식: 소제목+본문 섹션
-export type ReportTextSection = { id: string; heading: string; body: string };
+// ── 표 ────────────────────────────────────────────────────────────
+// 보고서 안에 직접 그려 넣는 표. 행·열을 자유롭게 늘리고 줄일 수 있다.
+// 워드로 낼 때는 lib/docxTable.ts 가 이 값을 양식과 같은 모양의 표로 바꾼다.
+export type ReportTable = {
+  id: string;
+  caption: string; // 표 위에 붙는 이름 (비워도 됨)
+  header: boolean; // 첫 줄을 머리글(연청색 칸)로 쓸지
+  widths: number[]; // 열 너비 비율. 길이는 열 개수와 같다.
+  rows: string[][]; // [행][열] 글자. 모든 행의 길이는 widths.length 와 같다.
+};
+
+export const TABLE_MAX_COLS = 8;
+export const TABLE_MAX_ROWS = 40;
+
+export function emptyTable(cols = 3, rows = 3): ReportTable {
+  const c = Math.max(1, Math.min(TABLE_MAX_COLS, cols));
+  const r = Math.max(1, Math.min(TABLE_MAX_ROWS, rows));
+  return {
+    id: `t-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+    caption: "",
+    header: true,
+    widths: Array.from({ length: c }, () => 1),
+    rows: Array.from({ length: r }, () => Array.from({ length: c }, () => "")),
+  };
+}
+
+/** 저장된 표가 찌그러져 있어도(행마다 칸 수가 다름) 네모나게 맞춰 돌려준다. */
+export function normalizeTable(t: ReportTable): ReportTable {
+  const cols = Math.max(1, Math.min(TABLE_MAX_COLS, t.widths?.length || t.rows?.[0]?.length || 1));
+  const widths = Array.from({ length: cols }, (_, i) => (t.widths?.[i] && t.widths[i] > 0 ? t.widths[i] : 1));
+  const rows = (t.rows || []).slice(0, TABLE_MAX_ROWS).map((r) =>
+    Array.from({ length: cols }, (_, i) => (r?.[i] ?? "")),
+  );
+  return { ...t, widths, rows: rows.length ? rows : [Array.from({ length: cols }, () => "")] };
+}
+
+/** 글자가 하나도 없는 표는 문서에 넣지 않는다. */
+export function tableHasContent(t: ReportTable): boolean {
+  return (t.rows || []).some((r) => r.some((c) => (c || "").trim() !== ""));
+}
+
+// 공통 양식: 소제목+본문 섹션 (+ 표는 몇 개든 붙일 수 있다)
+export type ReportTextSection = { id: string; heading: string; body: string; tables?: ReportTable[] };
 
 // 사고보고서 항목
 export type AccidentFields = {
@@ -79,6 +124,7 @@ export type GenReport = {
   date: string; // YYYY-MM-DD
   sections: ReportTextSection[]; // 공통 양식 본문
   accident: AccidentFields; // 사고 양식 항목
+  tables?: ReportTable[]; // 사고 양식에서 쓰는 표 (첨부사진 바로 앞에 들어간다)
   photos: ReportPhoto[]; // 첨부사진
   createdAt: string;
   updatedAt: string;
@@ -97,6 +143,9 @@ export function fillDefaults(r: GenReport): GenReport {
     building: r.building?.trim() || DEFAULT_BUILDING,
     category: r.category?.trim() || KIND_CATEGORY[r.kind] || "",
     author: r.author?.trim() || r.accident?.reporter?.trim() || DEFAULT_AUTHOR,
+    // 표는 나중에 생긴 기능이다. 옛 보고서에는 없으므로 빈 칸으로 채워 둔다.
+    sections: (r.sections || []).map((s) => ({ ...s, tables: (s.tables || []).map(normalizeTable) })),
+    tables: (r.tables || []).map(normalizeTable),
   };
 }
 
@@ -122,9 +171,16 @@ export function reportFileName(r: Pick<GenReport, "bracket" | "site" | "subject"
 }
 
 let _sid = 0;
-function sec(heading: string, body = ""): ReportTextSection {
+function sec(heading: string, body = "", tables: ReportTable[] = []): ReportTextSection {
   _sid += 1;
-  return { id: `s-${Date.now().toString(36)}-${_sid}`, heading, body };
+  return { id: `s-${Date.now().toString(36)}-${_sid}`, heading, body, tables };
+}
+
+/** 검토보고서의 "비교 검토"에 미리 깔아 두는 빈 비교표 */
+function compareTable(): ReportTable {
+  const t = emptyTable(4, 4);
+  t.rows[0] = ["구분", "A 안", "B 안", "비고"];
+  return t;
 }
 
 function defaultSections(kind: ReportKind): ReportTextSection[] {
@@ -135,6 +191,9 @@ function defaultSections(kind: ReportKind): ReportTextSection[] {
       return [sec("요청 배경"), sec("조치 방법"), sec("요청 사항")];
     case "completion":
       return [sec("배경"), sec("조치 내용"), sec("특이사항")];
+    case "review":
+      // 사장 결재 양식의 바탕이 된 구매검토서와 같은 흐름
+      return [sec("검토 배경"), sec("검토 내용"), sec("비교 검토", "", [compareTable()]), sec("검토 결과 및 요청사항")];
     default:
       return [sec("내용")];
   }
@@ -172,6 +231,7 @@ export function emptyGenReport(id: string, kind: ReportKind): GenReport {
     date: todayYmd(),
     sections: defaultSections(kind),
     accident: emptyAccident(),
+    tables: [],
     photos: [],
     createdAt: now,
     updatedAt: now,

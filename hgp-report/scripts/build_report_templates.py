@@ -6,12 +6,15 @@
   public/templates/accident.docx    사고보고서 (원본 구조 그대로, 값만 태그로)
   public/templates/completion.docx  완료보고서  ┐ 같은 디자인(로고 머리글·네이비 제목바·정보표·
   public/templates/inspection.docx  점검보고서  │ 번호 소제목 섹션·2열 사진표·서명)을
-  public/templates/repair.docx      보수요청서  ┘ 원본 표를 복제해 구성
+  public/templates/repair.docx      보수요청서  │ 원본 표를 복제해 구성
+  public/templates/review.docx      검토보고서  ┘
 
 태그 문법은 docxtemplater(+무료 이미지 모듈). 데이터는 lib/docxExport.ts 가 만든다.
   · {-w:tr 목록} … {/목록}  → 표 행을 개수만큼 반복(0개면 행 삭제)
   · {#tone_xx}{값}{/tone_xx} → 같은 칸에 색별 런을 두고 조건으로 하나만 보이게(글자색 자동)
   · {%c1img}                → 사진
+  · {@tablesXml}            → 화면에서 만든 표를 워드 표 XML 로 통째로 끼운다
+                              (워드 표는 열 개수가 박혀 있어 태그로는 못 늘린다)
 
 원본 양식을 바꾸면: 새 파일을 scripts/source/accident_source.docx 로 덮어쓰고
   python scripts/build_report_templates.py
@@ -356,6 +359,9 @@ def build_accident(body):
         tone_para(p, "결과", "r")
         p.append(make_run("{/%s}" % loop))
 
+    # 화면에서 만든 표 — 첨부사진 바로 앞
+    para_before(t_att, "{@tablesXml}")
+
     # 6 첨부 사진
     set_section_number(t_att, "6")
     strip_page_breaks(t_att)
@@ -436,6 +442,8 @@ def build_common(body):
     start = add(copy.deepcopy(blank))
     set_para(start, "{#sections}", rpr=None)
     add(sec)
+    tbl_slot = add(copy.deepcopy(blank))
+    set_para(tbl_slot, "{@tablesXml}", rpr=None)
     add(copy.deepcopy(blank))
     end = add(copy.deepcopy(blank))
     set_para(end, "{/sections}", rpr=None)
@@ -509,6 +517,6 @@ def build(kind):
 
 
 if __name__ == "__main__":
-    kinds = sys.argv[1:] or ["accident", "completion", "inspection", "repair"]
+    kinds = sys.argv[1:] or ["accident", "completion", "inspection", "repair", "review"]
     for k in kinds:
         build(k)

@@ -15,6 +15,7 @@ import {
   PUNG_BUILDING, PUNG_CATEGORY, PUNG_SUBTITLE, PUNG_TITLE, RESULT_LEGEND,
   dotDate as pungDotDate, effectiveCaption,
 } from "@/lib/pungsuhae";
+import { tablesToXml } from "@/lib/docxTable";
 import { proxied } from "@/lib/client";
 
 // 사진 박스(px). 양식의 사진 셀 크기에 맞춰 넣어야 표 크기가 변하지 않음.
@@ -75,6 +76,7 @@ const TEMPLATE_BY_KIND: Record<ReportKind, string> = {
   completion: "completion.docx",
   inspection: "inspection.docx",
   repair: "repair.docx",
+  review: "review.docx",
 };
 
 // 엔터로 나눈 줄 = 불릿 한 줄. 빈 줄은 버린다.
@@ -89,6 +91,8 @@ async function buildCommonData(report: GenReport, store: Map<string, Uint8Array>
     no: String(i + 1),
     heading: s.heading,
     내용: bulletLines(s.body),
+    // 화면에서 만든 표를 워드 표 XML 로 바꿔 양식의 {@tablesXml} 자리에 그대로 끼운다
+    tablesXml: tablesToXml(s.tables),
   }));
   return {
     제목: report.docTitle?.trim() || report.subject?.trim() || KIND_LABEL[report.kind],
@@ -123,6 +127,7 @@ async function buildAccidentData(report: GenReport, store: Map<string, Uint8Arra
     "피해 금액": a.damageCost,
     조치: bulletLines(a.actions),
     향후방안: bulletLines(a.followup),
+    tablesXml: tablesToXml(report.tables),
     photoRows: await buildPhotoRows(report.photos, store),
   };
 }
