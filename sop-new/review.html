@@ -62,6 +62,8 @@ select{font:inherit;padding:7px 10px;border:1px solid var(--line-2);border-radiu
 .save{margin-left:auto;font-size:13px;color:var(--ink-3)}
 .save.err{color:var(--bad);font-weight:600}
 .keys{font-size:12.5px;color:var(--ink-3)}
+.who{font:inherit;font-size:14px;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:inherit;width:9.5em}
+.by{font-size:12.5px;color:var(--ink-3)}
 
 /* 작업 묶음 */
 .task{margin-bottom:34px}
@@ -125,6 +127,7 @@ textarea:focus,select:focus{outline:2px solid var(--accent);outline-offset:1px}
   <div class="bar"><i id="barI"></i></div>
 
   <div class="ctl">
+    <input id="who" class="who" maxlength="20" placeholder="검수자 이름" aria-label="검수자 이름">
     <select id="selTask" aria-label="작업 고르기"></select>
     <div class="chips" id="chips"></div>
     <span class="keys">사진을 누르면 크게 봅니다 · 크게 볼 때 <b>1</b> 통과 <b>2</b> 문제 <b>←/→</b> 이동</span>
@@ -178,19 +181,24 @@ textarea:focus,select:focus{outline:2px solid var(--accent);outline-offset:1px}
   var R = {};                       // R[tid][n] = 기록
   var filt = { tid: "", st: "todo" };
   try { var sv = JSON.parse(localStorage.getItem("sopReviewFilt") || "null"); if (sv) filt = sv; } catch (e) {}
+  var whoEl = document.getElementById("who");
+  try { whoEl.value = localStorage.getItem("sopReviewer") || ""; } catch (e) {}
+  whoEl.oninput = function () { try { localStorage.setItem("sopReviewer", whoEl.value.trim()); } catch (e) {} };
+  whoEl.onkeydown = function (e) { e.stopPropagation(); };
   var view = null;                  // 크게 보는 사진의 순번(shown 안에서)
   var shown = [];
 
   function rec(p) { return (R[p.tid] || {})[p.n] || {}; }
   function st(p) { var r = rec(p); return r.s || "todo"; }
 
-  // ── 저장 (한 번에 하나씩 차례로 — 같은 작업 파일을 덮어쓰지 않게) ─────
+  // ── 저장 (한 번에 하나씩 차례로 보낸다. 서버는 사진마다 따로 저장해 서로 지우지 않는다) ─────
   var queue = Promise.resolve(), pending = 0;
   var saveEl = document.getElementById("save");
   function showSave(msg, err) { saveEl.textContent = msg; saveEl.className = "save" + (err ? " err" : ""); }
   function save(p) {
     var r = rec(p);
-    var payload = { tid: p.tid, n: p.n, s: r.s || "", tags: r.tags || [], note: r.note || "" };
+    var payload = { tid: p.tid, n: p.n, s: r.s || "", tags: r.tags || [], note: r.note || "", by: whoEl.value.trim() };
+    R[p.tid][p.n].by = payload.by;
     pending++; showSave("저장 중…");
     queue = queue.then(function () {
       return fetch(API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) })
@@ -220,6 +228,7 @@ textarea:focus,select:focus{outline:2px solid var(--accent);outline-offset:1px}
       btns.appendChild(x);
     });
     box.appendChild(btns);
+    if (r.s && r.by) box.appendChild(el("div", "by", "판정 : " + esc(r.by)));
     if (r.s === "bad") {
       var tg = el("div", "tags");
       TAGS.forEach(function (t) {
