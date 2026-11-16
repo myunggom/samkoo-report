@@ -8,6 +8,14 @@
     python sop_task_photos.py --plan
     python sop_task_photos.py --run
     python sop_task_photos.py --run --only 3,7
+    python sop_task_photos.py --run --task b01,b02,b03 --skip-existing
+        여러 작업을 이어서. 설비 참조가 없으면 도면부터 자동으로 만든다.
+        이미 있는 사진은 건너뛰므로 멈춘 뒤 같은 명령으로 이어 간다.
+    python sop_task_photos.py --check --task c02,c03   이미 만든 사진 검사만
+    python sop_task_photos.py --redo-flagged           검사에 걸린 것만 다시
+
+만든 직후 Flash 모델이 사진을 보고 사람이 잘렸는지 · 겹쳤는지 검사한다.
+걸리면 이유를 지시문에 붙여 두 번까지 다시 만든다 (--retries, --no-check).
 """
 import argparse
 import io
@@ -177,6 +185,13 @@ STYLE = """실제 국내 업무용 건물에서 찍은 **안전 교육용 사진
 - 아래 '이번 사진의 장면' 에 `근접` · `크게 보이는` 같은 말이 있어도
   **사람을 자르라는 뜻이 아닙니다.** 카메라를 조금 당겨서,
   그 부품이 잘 보이면서 **사람도 통째로** 들어오게 잡으세요.
+- **팔만 · 손만 · 상반신만 · 하반신만 나오는 사진은 실패작입니다.**
+  사람이 나오는 사진은 **반드시 머리부터 발끝까지 전신**입니다.
+  사람이 조금 작게 나와도 괜찮습니다. **잘리는 것보다 작은 것이 훨씬
+  낫습니다.** 망설여지면 카메라를 뒤로 물리세요.
+- 사람이 둘이면 **서로 한 팔 길이 이상 떨어져** 서고, 몸이 겹치지
+  않습니다. 한 사람이 다른 사람을 가리지 않습니다. **둘 다**
+  머리부터 발까지 보입니다.
 - 카메라는 **사람 가슴 높이**에서 수평으로 봅니다. 바닥에 붙은 시점이나
   천장에서 내려다보는 시점은 쓰지 마세요.
 - **사진은 한 장입니다.** 화면을 좌우나 위아래로 갈라 두 장면을 나란히
@@ -468,7 +483,7 @@ def 복장만들기(tid, t):
 되풀이장면 = {
     "개인보호구 착용": (
         "**보호구를 손으로 매만지며 하나씩 갖추어 착용하고** 있습니다. "
-        "안전모 턱끈을 조이는 손이 보입니다. 상반신 위주로 크게 잡습니다.", False),
+        "안전모 턱끈을 조이는 손이 보입니다. 주인공의 안전모부터 안전화까지 한 화면에 들어옵니다.", False),
     "2인 1조 작업": (
         "**나란히 서서 작업하고** 있습니다. 한 사람이 설비를 다루고 "
         "다른 한 사람은 옆에서 지켜봅니다. 둘 다 얼굴과 상반신이 보입니다.", True),
@@ -517,7 +532,7 @@ def 복장만들기(tid, t):
      "깨끗합니다. 전신이 보이는 구도입니다."),
     (("착용", "보호구", "복장"),
      "**보호구를 손으로 매만지며 갖추어 착용하고** 있습니다. "
-     "상반신 위주로 크게 잡습니다."),
+     "주인공의 안전모부터 안전화까지 한 화면에 들어옵니다."),
     (("표지판", "명판", "게시", "안내문"),
      "**표지판을 제자리에 세워 걸고** 있습니다. 표지판 면이 화면 쪽을 향해 "
      "또렷하게 보입니다."),
@@ -570,14 +585,14 @@ def 자세고르기(제목, 불릿):
 # 자세만 돌리면 12장이 모두 '서서 들여다보는' 같은 그림이 된다.
 # 조치 번호로 돌려 써서 옆 번호끼리 절대 같은 구도가 되지 않게 한다.
 구도표 = [
-    "가슴 위 **상반신을 크게** 잡습니다.",
+    "**전신이 다 들어오는 구도**입니다. 안전모부터 안전화까지 보입니다.",
     "**전신이 다 들어오는 넓은 구도**입니다. 바닥부터 머리까지 보입니다.",
     "**손과 다루는 물건이 또렷이 보이고, 주인공의 안전모부터 안전화까지 한 화면에 들어옵니다**.",
     "**옆에서 본 구도**입니다. 사람과 대상이 나란히 보입니다.",
-    "**어깨 너머로 보는 구도**입니다. 사람 뒤쪽에서 대상이 함께 보입니다.",
+    "**비스듬히 옆에서 본 구도**입니다. 사람 전신과 대상이 함께 보이고 얼굴 옆이 드러납니다.",
     "조금 떨어져 **사람과 주변이 같이 보이는 구도**입니다.",
     "**무릎을 굽힌 낮은 자세를 아래쪽에서** 잡습니다.",
-    "**비스듬히 위에서 내려다보는 구도**입니다.",
+    "조금 떨어져 **사람 전신과 주변이 같이 보이는 구도**입니다.",
 ]
 
 # 세부 문구 끝말 → 동작으로 바꾸는 법. 세부 문구가 곧 '무엇을 하는가' 이므로
@@ -748,7 +763,7 @@ SCENES_ALL = {"s05": {
          False, "3:2"),
 }, "e01": {
     1: ("주인공이 **닫힌 큐비클 앞 통로에 서서 절연장갑을 양손에 끼며** 보호구를 "
-        "갖추고 있습니다. 상반신 위주로 크게 잡습니다. "
+        "갖추고 있습니다. 주인공의 안전모부터 안전화까지 한 화면에 들어옵니다. "
         "**바닥에 벗어 놓은 신발·장갑·안전모를 절대 넣지 마세요.**",
         False, "3:2"),
     2: ("주인공이 큐비클 조작부 앞에 서고, **보조자는 판넬에서 두세 걸음 떨어져 "
@@ -784,7 +799,7 @@ SCENES_ALL = {"s05": {
          "다른 손에 점검 일지를 들었습니다. 통로가 깨끗합니다.", False, "3:2"),
 }, "m06": {
     1: ("주인공이 냉동기 앞에서 **내열장갑을 양손에 끼며** 보호구를 갖추고 "
-        "있습니다. 허리춤에 귀마개를 걸었습니다. 상반신 위주로 크게 잡습니다.",
+        "있습니다. 허리춤에 귀마개를 걸었습니다. 주인공의 안전모부터 안전화까지 한 화면에 들어옵니다.",
         False, "3:2"),
     2: ("주인공이 냉동기 본체 앞에서 점검하고, **보조자는 벽면 MCC 판넬 옆에 "
         "서서 지켜보고** 있습니다. 두 사람 사이가 떨어져 있어 둘 다 보입니다.",
@@ -817,7 +832,7 @@ SCENES_ALL = {"s05": {
 }, "c02": {
     1: ("주인공이 사다리 앞에 서서 **안전모 턱끈을 양손으로 조이고** 있습니다. "
         "안전대(전신 안전벨트)를 이미 착용했고 고리가 허리 옆에 걸려 있습니다. "
-        "상반신 위주로 크게 잡습니다.", False, "3:2"),
+        "주인공의 안전모부터 안전화까지 한 화면에 들어옵니다.", False, "3:2"),
     2: ("주인공이 사다리 세 번째 발판에 올라서 있고, **보조자가 바닥에 서서 "
         "양손으로 사다리 기둥을 잡고** 있습니다. 보조자는 주인공을 올려다봅니다. "
         "두 사람과 사다리 전체가 한 화면에 들어옵니다.", True, "3:2"),
@@ -1120,9 +1135,13 @@ def 돌려도되나(a, t, items, 장면표):
     # 사람이 없으므로 이 관문을 지나가며, 조치와 대표 사진에만 건다.
     자름말 = ("근접 구도", "클로즈업", "화면 절반을 차지",
             "손바닥만 하게 크게", "상반신 구도", "손만 ", "발만 ",
-            "크게 잡", "가슴 위를", "가슴 위 상반신", "접사", "얼굴만")
+            "크게 잡", "가슴 위를", "가슴 위 상반신", "접사", "얼굴만",
+            "내려다본 구도", "내려다보는 구도", "바닥만 크게", "뒤통수",
+            "뒷모습만")
     걸림 = []
     for n, 칸 in sorted(장면표.items(), key=lambda x: str(x[0])):
+        if n == "fig":
+            continue                 # 도면에는 사람이 없다. 위에서 본 구도여도 된다.
         글 = 칸[0] if isinstance(칸, (list, tuple)) and 칸 else ""
         말 = [w for w in 자름말 if w in 글]
         if 말:
@@ -1145,51 +1164,273 @@ def 돌려도되나(a, t, items, 장면표):
     return 탈
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--run", action="store_true")
-    ap.add_argument("--plan", action="store_true")
-    ap.add_argument("--only", help="번호 (예: 3,7)")
-    ap.add_argument("--fig", action="store_true",
-                    help="도면 사진(각부 명칭 · 지침 대표)을 만든다")
-    ap.add_argument("--model", default=MODEL)
-    ap.add_argument("--saver", default=SAVER)
-    ap.add_argument("--mix", action="store_true",
-                    help="사람이 크게 나오는 장면만 Pro, 나머지는 싼 모델")
-    ap.add_argument("--task", default=TASK, help="작업 id (예: m06)")
-    a = ap.parse_args()
+# ── 만든 뒤 기계 눈으로 검사한다 ─────────────────────────────────
+# 사장 지적(2026-11-16) : "팔만 있다 · 사람이 겹친다 · 상체만 · 하체만".
+# 지시문만으로는 못 막는다는 것을 세 번 겪었다. 그래서 **만든 직후 Flash
+# 모델이 사진을 보고** 사람이 잘렸는지 · 겹쳤는지 판정하고, 걸리면 그 이유를
+# 지시문에 붙여 다시 만든다. 검사는 장당 1원이 안 든다(입력 1,300토큰).
+# 다시 만드는 것은 장당 190원이므로 횟수를 둔다.
+점검모델 = "gemini-3.8-flash"
+다시횟수 = 2            # 검사에 걸리면 이만큼 더 만들어 본다
+점검파일 = os.path.join(ROOT, ".tmp", "sop_check.json")
 
-    t = task(a.task)
-    장면표 = 장면표만들기(a.task, t)
-    if a.fig:
-        장면표 = {}
-    설비 = 설비글만들기(a.task)
-    장갑, 더 = 복장만들기(a.task, t)
+점검질문 = """이 사진은 안전교육용 사진입니다. 아래 JSON 형식으로만 답하세요.
+기준은 **사진 가장자리에서 잘려 나갔는가**입니다. 몸이나 물건에 가려져 안 보이는 것, 무릎을 꿇거나 쪼그려 앉아 접힌 것은 잘린 것이 **아닙니다**.
+people: 사진에 보이는 사람 수.
+persons: 사람마다 {head: 머리(안전모 꼭대기)가 화면 위 가장자리에 걸리거나 잘려 나가지 않았으면 true, feet: 발(신발)이 화면 아래·옆 가장자리에 걸리거나 잘려 나가지 않았으면 true (가려지거나 접혀 안 보이는 발은 true), face: 얼굴 앞 또는 옆이 보임, limbs: 보이는 팔다리가 몸에 붙어 있고 손가락 모양이 정상이면 true (가려진 것은 이상이 아님)}.
+partial: 사진이 사람의 일부만 담았을 때만 — arm_only(팔·손만) | upper_only(허리 위만) | lower_only(허리 아래·발만) | other(그 밖의 일부만). 사람이 머리부터 발까지 화면 안에 있으면 none.
+overlap: 한 사람이 다른 사람 뒤에 가려져 몸 일부만 보이거나, 두 사람 몸이 겹쳐 붙어 누구 팔인지 불분명하면 true. 서로 떨어져 각자 전신이 보이면 false.
+split: 화면이 둘 이상의 칸·장면으로 나뉘어 있으면 true.
+fake_text: 읽을 수 없는 가짜 글자·간판이 보이면 true.
+note: 한 줄 메모(한국어)."""
+
+점검틀 = {
+    "type": "OBJECT",
+    "properties": {
+        "people": {"type": "INTEGER"},
+        "persons": {"type": "ARRAY", "items": {
+            "type": "OBJECT",
+            "properties": {"head": {"type": "BOOLEAN"},
+                           "feet": {"type": "BOOLEAN"},
+                           "face": {"type": "BOOLEAN"},
+                           "limbs": {"type": "BOOLEAN"}},
+            "required": ["head", "feet", "face", "limbs"]}},
+        "partial": {"type": "STRING",
+                    "enum": ["none", "arm_only", "upper_only", "lower_only",
+                             "other"]},
+        "overlap": {"type": "BOOLEAN"},
+        "split": {"type": "BOOLEAN"},
+        "fake_text": {"type": "BOOLEAN"},
+        "note": {"type": "STRING"},
+    },
+    "required": ["people", "persons", "partial", "overlap", "split",
+                 "fake_text", "note"],
+}
+
+사람더있어도되는말 = ("운전자", "운전석", "행인", "방문", "입주", "외부인",
+               "지나가", "구경", "민원", "침입", "시위", "집회", "군중",
+               "사람들", "직원들", "근로자들", "차량에 탄", "탑승자")
+
+부분말 = {"arm_only": "팔 · 손만 나왔습니다",
+       "upper_only": "상반신만 나왔습니다",
+       "lower_only": "하반신만 나왔습니다",
+       "other": "사람 일부만 나왔습니다"}
+
+
+class 돈끊김(Exception):
+    """API 가 돈 · 할당량 때문에 계속 거절한다. 더 돌려도 소용없다."""
+
+
+def 돈때문인가(e):
+    s = str(e)
+    return any(w in s for w in ("429", "RESOURCE_EXHAUSTED", "quota", "Quota",
+                                "billing", "Billing", "PERMISSION_DENIED",
+                                "403"))
+
+
+def 사진점검(client, path, 기대인원, 혼자, 장면글=""):
+    """만든 사진을 Flash 모델이 보고 판정한다.
+
+    (통과, 다시 만들 사유[], 눈으로 볼 메모[]) 를 돌려준다.
+    사유가 하나라도 있으면 그 사진은 다시 만든다. 메모는 다시 만들 정도는
+    아니지만 사장이 열어 볼 때 참고할 것들이다.
+    점검 자체가 실패하면(모델 오류) 막지 않고 메모만 남긴다.
+    """
+    from google.genai import types
+    from PIL import Image
+    im = Image.open(path).convert("RGB")
+    im.thumbnail((1024, 1024))
+    try:
+        res = client.models.generate_content(
+            model=점검모델, contents=[점검질문, im],
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=점검틀))
+        r = json.loads(res.text)
+    except Exception as e:                                   # noqa: BLE001
+        if 돈때문인가(e):
+            raise 돈끊김(str(e)[:150])
+        return True, [], ["점검 못 함 : %s" % str(e)[:60]]
+
+    사유, 메모 = [], []
+    사람수 = int(r.get("people") or 0)
+    if 혼자:
+        if 사람수:
+            사유.append("설비만 나와야 하는데 사람 %d명이 있습니다" % 사람수)
+    else:
+        if 사람수 == 0:
+            사유.append("사람이 한 명도 없습니다")
+        elif 기대인원 == 2 and 사람수 < 2:
+            사유.append("두 사람이어야 하는데 %d명입니다" % 사람수)
+        elif 사람수 > 기대인원:
+            # 장면 글이 운전자 · 행인처럼 다른 사람을 부른 경우만 봐준다.
+            # 그 밖에 사람이 더 나온 것은 겹침 · 유령 인물이라 다시 만든다.
+            if any(w in 장면글 for w in 사람더있어도되는말):
+                메모.append("기대 %d명인데 %d명 (장면이 부른 사람일 수 있음)"
+                          % (기대인원, 사람수))
+            else:
+                사유.append("기대 %d명인데 %d명이 나왔습니다 — 사람이 더 있습니다"
+                          % (기대인원, 사람수))
+        for i, p in enumerate(r.get("persons") or [], 1):
+            if not p.get("head"):
+                사유.append("%d번째 사람 머리가 잘렸습니다" % i)
+            if not p.get("feet"):
+                사유.append("%d번째 사람 발이 잘렸습니다" % i)
+            if not p.get("limbs"):
+                사유.append("%d번째 사람 팔다리 · 손이 이상합니다" % i)
+            if not p.get("face"):
+                메모.append("%d번째 사람 얼굴이 안 보임" % i)
+        부분 = r.get("partial") or "none"
+        if 부분 != "none":
+            사유.append(부분말.get(부분, 부분말["other"]))
+        if r.get("overlap"):
+            사유.append("두 사람 몸이 겹쳐 있습니다")
+    if r.get("split"):
+        사유.append("화면이 여러 칸으로 나뉘었습니다")
+    if r.get("fake_text"):
+        메모.append("가짜 글자 · 간판이 보임")
+    if r.get("note"):
+        메모.append(str(r["note"])[:80])
+    # 같은 사유가 두 번 들어가지 않게
+    사유 = list(dict.fromkeys(사유))
+    return not 사유, 사유, 메모
+
+
+def 다시지시(사유들):
+    """검사에 걸린 이유를 **다음 시도의 지시문 꼬리**로 만든다."""
+    줄 = ["## 바로 앞 시도가 **실패**한 이유 — 이번에는 꼭 고치세요", ""]
+    줄 += ["- " + s for s in 사유들]
+    줄 += ["",
+          "- 카메라를 **뒤로 더 물려** 사람 위아래에 여백을 두세요. "
+          "사람이 작게 나와도 됩니다. 잘리는 것보다 작은 것이 낫습니다.",
+          "- 사람은 **안전모 꼭대기부터 안전화 끝까지 전신**으로 나옵니다. "
+          "팔 · 손 · 상반신 · 하반신만 크게 잡은 그림은 쓸 수 없습니다.",
+          "- 사람이 둘이면 **서로 한 팔 길이 이상 떨어져** 서서 몸이 겹치지 "
+          "않게 하세요. 둘 다 머리부터 발까지 보입니다.",
+          "- 사람 수는 위 '등장 인원' 그대로입니다. 배경에 사람을 더 넣지 "
+          "마세요."]
+    return "\n".join(줄)
+
+
+def 그리기(client, 모델, 글, ref_imgs, 비율, 크기):
+    """한 장을 만들어 그림 바이트를 돌려준다(없으면 None).
+
+    돈 · 할당량 거절(429 등)이면 60초씩 쉬며 다섯 번까지 다시 해 본다.
+    잠깐의 속도 제한이면 그 사이에 풀리고, 정말 돈이 끊긴 것이면 5분 뒤
+    돈끊김 으로 멈춘다. 그 밖의 오류는 그대로 올린다.
+    """
+    import time
+    from google.genai import types
+    for 시도 in range(5):
+        try:
+            res = client.models.generate_content(
+                model=모델, contents=[글] + ref_imgs,
+                config=types.GenerateContentConfig(
+                    response_modalities=["IMAGE"],
+                    image_config=types.ImageConfig(aspect_ratio=비율,
+                                                   image_size=크기),
+                ),
+            )
+        except Exception as e:                               # noqa: BLE001
+            if 돈때문인가(e):
+                if 시도 < 4:
+                    print("        … 돈 · 할당량 때문에 거절 (%s). 60초 쉬고 "
+                          "다시 합니다 (%d/5)" % (str(e)[:40], 시도 + 1))
+                    time.sleep(60)
+                    continue
+                raise 돈끊김(str(e)[:150])
+            raise
+        for cand in res.candidates or []:
+            for part in (cand.content.parts or []):
+                blob = getattr(part, "inline_data", None)
+                if blob and blob.data:
+                    return blob.data
+        return None
+    return None
+
+
+def 한장만들기(client, a, 글, ref_imgs, 비율, 모델, path, 기대인원, 혼자,
+            금지사진, 장면글=""):
+    """한 칸의 사진을 **검사에 통과할 때까지** 만든다(횟수 제한).
+
+    (통과했나, 남은 사유[], 메모[], 만든 횟수) 를 돌려준다.
+    끝까지 통과 못 하면 **가장 덜 깨진 것**을 남기고 통과 안 했다고 알린다.
+    금지 마크는 검사가 끝난 **뒤에** 얹는다 (마크가 사람을 가려 검사를
+    흐린다).
+    """
+    크기 = "2K" if 모델 == a.model else "1K"
+    시도들, 지시 = [], 글
+    횟수 = 1 + (0 if a.no_check else a.retries)
+    for 번 in range(횟수):
+        데이터 = 그리기(client, 모델, 지시, ref_imgs, 비율, 크기)
+        if not 데이터:
+            시도들.append((99, None, ["그림 없음"], []))
+            print("        ↳ %d차 : 그림이 안 왔습니다" % (번 + 1))
+            continue
+        저장(데이터, path)
+        if a.no_check:
+            if 금지사진:
+                금지마크(path)
+            return True, [], [], 번 + 1
+        통과, 사유, 메모 = 사진점검(client, path, 기대인원, 혼자, 장면글)
+        시도들.append((len(사유), 데이터, 사유, 메모))
+        if 통과:
+            if 금지사진:
+                금지마크(path)
+            return True, [], 메모, 번 + 1
+        print("        ↳ %d차 검사 탈락 : %s" % (번 + 1, " / ".join(사유)))
+        지시 = 글 + "\n\n" + 다시지시(사유)
+    # 다 실패 → 제일 덜 깨진 것을 남긴다
+    남길 = min((x for x in 시도들 if x[1]), key=lambda x: x[0], default=None)
+    if 남길 is None:
+        return False, ["그림 없음"], [], len(시도들)
+    저장(남길[1], path)
+    if 금지사진:
+        금지마크(path)
+    return False, 남길[2], 남길[3], len(시도들)
+
+
+def 번호로(x):
+    x = x.strip()
+    return int(x) if x.isdigit() else x       # 도면은 fig · gfig
+
+
+def 사진이름(tid, it):
+    """사이트에 올릴 파일 이름. 원본 PNG 는 2.5MB 라 JPEG 로 줄여 올린다.
+
+    s08 · s09 · s10 은 자료에 img 칸이 아예 없다. it["img"] 로 읽으면
+    KeyError 로 터져 그 작업 36장을 한 장도 못 만든다.
+    """
+    return os.path.splitext(it.get("img")
+                            or "%s_g%02d" % (tid, it["n"]))[0] + ".jpg"
+
+
+def 할일모으기(a, tid, 도면모드):
+    """그 작업에서 만들 사진 목록과 지시문 재료를 모은다. 돈은 안 든다."""
+    t = task(tid)
+    장면표 = {} if 도면모드 else 장면표만들기(tid, t)
+    설비 = 설비글만들기(tid)
+    장갑, 더 = 복장만들기(tid, t)
     배경 = 배경고르기((t.get("place") or "").strip())
     items = [(it, sec["title"]) for sec in t["guide"] for it in sec["items"]]
-    if a.fig:
-        쪽 = 도면장면.get(a.task) or {}
-        items = [({"n": k, "name": {"fig": "각부 명칭 도면",
-                                    "gfig": "지침 대표 사진"}[k],
-                   "img": "%s_%s.png" % (a.task, k), "bullets": []}, "도면")
-                 for k in ("fig",) if k in 쪽]
+    if 도면모드:
+        쪽 = 도면장면.get(tid) or {}
+        items = ([({"n": "fig", "name": "각부 명칭 도면",
+                    "img": "%s_fig.png" % tid, "bullets": []}, "도면")]
+                 if "fig" in 쪽 else [])
         장면표 = {k: (v[0], False, v[1]) for k, v in 쪽.items()}
     else:
         # 지침 대표 사진은 **먼저 만든 각부 명칭 도면을 참조로 받아야** 한다.
         # 예전에는 --fig 가 도면과 대표 사진을 같은 판에 만들어서, 도면이
         # 아직 없는 상태로 대표 사진이 만들어졌다. 그래서 c01 대표 사진에
         # BT 비계가 아니라 전혀 다른 기계가 나왔다.
-        대표 = (도면장면.get(a.task) or {}).get("gfig")
+        대표 = (도면장면.get(tid) or {}).get("gfig")
         if 대표:
             items.append(({"n": "gfig", "name": "안전작업 지침 대표 사진",
-                           "img": "%s_gfig.jpg" % a.task, "bullets": []},
+                           "img": "%s_gfig.jpg" % tid, "bullets": []},
                           "지침"))
             장면표["gfig"] = (대표[0], False, 대표[1])
     if a.only:
-        def 번호로(x):
-            x = x.strip()
-            return int(x) if x.isdigit() else x       # 도면은 fig · gfig
-
         want = {번호로(x) for x in a.only.split(",")}
         items = [x for x in items if x[0]["n"] in want]
 
@@ -1198,45 +1439,75 @@ def main():
     def 장면있나(n):
         return bool((장면표.get(n) or ("",))[0])
 
-    빠진번호 = [it["n"] for it, _ in items if not 장면있나(it["n"])]
+    빠진 = [it["n"] for it, _ in items if not 장면있나(it["n"])]
     items = [x for x in items if 장면있나(x[0]["n"])]
+    return t, 장면표, 설비, 장갑, 더, 배경, items, 빠진
 
-    # --mix 는 "사람이 크게 나오는 장면만 Pro" 인데, 그 목록이 없는 작업에
-    # 쓰면 12장이 조용히 전부 싼 모델로 간다. 글자가 깨진 사진이 나온다.
-    if a.mix and a.task not in 프로장면:
+
+def 도면부터해야하나(tid):
+    """실물 설비 사진도, 먼저 만든 도면도 없는 작업인가. 그러면 도면부터."""
+    return (not 설비사진.get(tid) and not 도면참조있나(tid)
+            and "fig" in (도면장면.get(tid) or {}))
+
+
+def 한작업(a, client, tid, 도면모드, 통계):
+    """작업 하나(조치 12장 + 대표, 또는 도면 1장)를 만든다.
+
+    돈끊김 은 여기서 잡지 않고 위로 올린다. 그 밖의 실패는 장 단위로
+    적고 다음 장으로 넘어간다.
+    """
+    import argparse as _ap
+    t, 장면표, 설비, 장갑, 더, 배경, items, 빠진 = 할일모으기(a, tid, 도면모드)
+
+    # 이어 만들기 : 이미 폴더에 있는 사진은 건너뛴다. 돈이 끊겨 멈춘 뒤
+    # 같은 명령을 다시 돌리면 남은 것만 만든다.
+    건너뜀 = 0
+    if a.skip_existing and not 도면모드:
+        남 = []
+        for it, sec in items:
+            if os.path.exists(os.path.join(OUT_DIR, 사진이름(tid, it))):
+                건너뜀 += 1
+            else:
+                남.append((it, sec))
+        items = 남
+
+    if a.mix and tid not in 프로장면:
         sys.exit("--mix 는 %s 에만 쓸 수 있습니다. 이 작업은 그냥 --run "
                  "(전부 Pro) 으로 하세요." % ", ".join(sorted(프로장면)))
-    프로 = 프로장면.get(a.task, set()) if a.mix else None
+    프로 = 프로장면.get(tid, set()) if a.mix else None
 
     def 고른모델(n):
         """(모델, 장당 비용). --mix 가 아니면 전부 Pro."""
-        if 프로 is None or a.fig or not isinstance(n, int):
+        if 프로 is None or 도면모드 or not isinstance(n, int):
             return a.model, 190        # 도면 · 대표 사진은 늘 Pro
         return (a.model, 190) if n in 프로 else (a.saver, 48)
 
     돈 = sum(고른모델(it["n"])[1] for it, _ in items)
-    if a.fig:
-        돈 = len(items) * 190
-    print("작업 : %s (%s)" % (t["name"], a.task))
+    print()
+    print("=" * 64)
+    print("작업 : %s (%s)%s" % (t["name"], tid, "  — 각부 명칭 도면" if 도면모드 else ""))
     print("대본 : %s" % ("손으로 쓴 것 (sop_scenes.json)"
-                       if a.task in _파일장면 else
-                       "손으로 쓴 것 (코드 안)" if a.task in SCENES_ALL else
+                       if tid in _파일장면 else
+                       "손으로 쓴 것 (코드 안)" if tid in SCENES_ALL else
                        "※ 기계로 뽑은 것 — 쓰기 전에 읽어 보세요"))
     if a.mix:
         비싼 = ",".join(str(it["n"]) for it, _ in items if it["n"] in 프로)
         print("모델 : 섞어 쓰기 — Pro %s번 / 나머지 %s" % (비싼, a.saver))
     else:
-        print("모델 : %s" % a.model)
-    print("만들 사진 : %d장  (약 %d원)" % (len(items), 돈))
-    if 빠진번호:
-        print("장면이 없어 빼는 것 : %s번"
-              % ",".join(str(x) for x in 빠진번호))
-    if not a.fig:
+        print("모델 : %s  (검사 : %s)" % (a.model, "안 함" if a.no_check
+                                         else "%s, 걸리면 %d번까지 다시"
+                                         % (점검모델, a.retries)))
+    print("만들 사진 : %d장  (약 %d원, 다시 만드는 몫 빼고)" % (len(items), 돈))
+    if 건너뜀:
+        print("이미 있어 건너뛰는 것 : %d장" % 건너뜀)
+    if 빠진:
+        print("장면이 없어 빼는 것 : %s번" % ",".join(str(x) for x in 빠진))
+    if not 도면모드:
         print("설비 참조 : %s"
-              % ("우리 건물 실물 사진 %d장" % len(설비사진.get(a.task) or [])
-                 if 설비사진.get(a.task) else
-                 "먼저 만든 각부 명칭 도면 (%s_fig.jpg)" % a.task
-                 if 도면참조있나(a.task) else
+              % ("우리 건물 실물 사진 %d장" % len(설비사진.get(tid) or [])
+                 if 설비사진.get(tid) else
+                 "먼저 만든 각부 명칭 도면 (%s_fig.jpg)" % tid
+                 if 도면참조있나(tid) else
                  "※ 없음 — 장비가 사진마다 달라질 수 있습니다. "
                  "--fig 로 도면을 먼저 만드세요"))
     print("저장 : %s" % OUT_DIR)
@@ -1245,32 +1516,31 @@ def main():
             어떤, 값 = 고른모델(it["n"])
             print("  %4s. %-18s %-22s %4d원"
                   % (it["n"], it["name"][:18], 어떤, 값))
-        print("\n(계획만 봤습니다. 실제로 만들려면 --run)")
         return
 
-    막음 = 돌려도되나(a, t, items, 장면표)
+    if not items:
+        print("만들 것이 없습니다.")
+        return
+
+    막음 = 돌려도되나(_ap.Namespace(task=tid, fig=도면모드), t, items, 장면표)
     if 막음:
         print()
         for 줄 in 막음:
             print("※ " + 줄)
-        sys.exit("\n돌리지 않았습니다. 위를 고치고 다시 하세요. "
-                 "(한 장도 만들지 않았으므로 돈은 들지 않았습니다.)")
+        print("→ 이 작업은 돌리지 않았습니다. (한 장도 만들지 않았으므로 돈은 "
+              "들지 않았습니다.)")
+        통계["막힘"].append(tid)
+        return
 
-    from google import genai
-    from google.genai import types
-
-    client = genai.Client(api_key=load_key())
     print()
-    됨, 실패, 만든것 = 0, [], []
+    됨, 실패, 만든것, 미심쩍음 = 0, [], [], []
     for it, sec in items:
         n = it["n"]
         칸 = 장면표.get(n) or ("", False, "3:2")
         장면, two, 비율 = 칸[0], 칸[1], 칸[2]
         금지사진 = len(칸) > 3 and bool(칸[3])
-        if not 장면:
-            continue
-        혼자 = (a.fig and n == "fig")
-        ref_imgs, got = refs(two, a.task, 도면만들기=혼자)
+        혼자 = (도면모드 and n == "fig")
+        ref_imgs, got = refs(two, tid, 도면만들기=혼자)
         설비장수 = sum(1 for g in got if g.startswith("설비:"))
         인원 = ("## 등장 인원 : **아무도 나오지 않습니다.** 설비만 찍습니다."
               if 혼자 else
@@ -1279,12 +1549,21 @@ def main():
               if two else
               "## 등장 인원 : **한 사람**. 주인공 혼자입니다."
               " 다른 사람을 넣지 마세요.")
+        # 대본 714칸에는 '전신' 이라는 말이 없다. 장면마다 같은 꼬리를 붙여
+        # 사람을 자르지 말라는 말이 **장면 글 바로 옆**에 오게 한다.
+        구도확인 = "" if 혼자 else (
+            "(구도 확인 : 등장하는 사람 **모두** 안전모 꼭대기부터 안전화 "
+            "끝까지 화면 안에 다 들어옵니다. 팔 · 손 · 상반신 · 하반신만 "
+            "나오는 사진이 아닙니다.%s)"
+            % (" 두 사람은 서로 떨어져 서서 몸이 겹치지 않습니다." if two
+               else ""))
         글 = "\n".join([
             STYLE.format(설비=설비, 장갑=장갑, 더=더, 배경=배경),
             인원,
             "",
             "## 이번 사진의 장면",
             장면,
+            구도확인,
             "",
             "## 이 장면이 가르치려는 것",
             "제목 : %s" % it["name"],
@@ -1292,63 +1571,197 @@ def main():
             금지안내 if 금지사진 else "",
             옛도면안내 if (혼자 and 설비장수) else "",
         ])
-        # 사이트에 올릴 파일은 가볍게. 원본 PNG 는 2.5MB 라 현장에서 안 열린다.
-        # s08 · s09 · s10 은 자료에 img 칸이 아예 없다. it["img"] 로 읽으면
-        # KeyError 로 터져 그 작업 36장을 한 장도 못 만든다.
-        이름 = os.path.splitext(it.get("img")
-                              or "%s_g%02d" % (a.task, n))[0] + ".jpg"
+        이름 = 사진이름(tid, it)
         path = os.path.join(OUT_DIR, 이름)
+        쓸모델, 값 = 고른모델(n)
+        기대인원 = 2 if two else 1
         try:
-            쓸모델, _ = 고른모델(n)
-            크기 = "2K" if 쓸모델 == a.model else "1K"
-            res = client.models.generate_content(
-                model=쓸모델, contents=[글] + ref_imgs,
-                config=types.GenerateContentConfig(
-                    response_modalities=["IMAGE"],
-                    image_config=types.ImageConfig(aspect_ratio=비율,
-                                                   image_size=크기),
-                ),
-            )
-            데이터 = None
-            for cand in res.candidates or []:
-                for part in (cand.content.parts or []):
-                    blob = getattr(part, "inline_data", None)
-                    if blob and blob.data:
-                        데이터 = blob.data
-                        break
-                if 데이터:
-                    break
-            if not 데이터:
-                실패.append((n, "그림 없음"))
-                print("  %4s. %-20s 실패 (그림 없음)" % (n, it["name"][:20]))
-                continue
-            저장(데이터, path)
-            if 금지사진:
-                금지마크(path)
-            만든것.append((n, path))
-            print("  %4s. %-18s 완료 %-16s %-22s (참조 %d장, 설비 %d장)"
-                  % (n, it["name"][:18], 이름, 쓸모델,
-                     len(ref_imgs), 설비장수))
-            됨 += 1
-        except Exception as e:
+            됐나, 사유, 메모, 횟수 = 한장만들기(
+                client, a, 글, ref_imgs, 비율, 쓸모델, path, 기대인원, 혼자,
+                금지사진, 장면)
+        except 돈끊김:
+            raise
+        except Exception as e:                               # noqa: BLE001
             실패.append((n, str(e)[:70]))
             print("  %4s. %-20s 실패 %s" % (n, it["name"][:20], str(e)[:50]))
+            continue
+        통계["돈"] += 값 * 횟수
+        통계["장수"] += 1
+        if 됐나:
+            됨 += 1
+            print("  %4s. %-18s 완료 %-16s %s (참조 %d장, 설비 %d장)"
+                  % (n, it["name"][:18], 이름,
+                     "검사 통과" if a.no_check or 횟수 == 1
+                     else "검사 통과 — %d차에" % 횟수,
+                     len(ref_imgs), 설비장수))
+        else:
+            미심쩍음.append((n, 사유))
+            print("  %4s. %-18s 남김 %-16s ※ %d번 모두 검사 탈락 — 눈으로 "
+                  "보세요 : %s" % (n, it["name"][:18], 이름, 횟수,
+                                 " / ".join(사유)))
+        if 메모:
+            print("        메모 : %s" % " · ".join(메모))
+        만든것.append((n, path))
 
-    print("\n만든 것 %d장 / 실패 %d장" % (됨, len(실패)))
+    print("\n만든 것 %d장 (검사 통과 %d · 미심쩍음 %d) / 실패 %d장"
+          % (len(만든것), 됨, len(미심쩍음), len(실패)))
+    for n, 사유 in 미심쩍음:
+        통계["미심쩍음"].append("%s %s번 — %s" % (tid, n, " / ".join(사유)))
+    for n, why in 실패:
+        통계["실패"].append("%s %s번 — %s" % (tid, n, why))
 
-    # 사람이 잘린 사진에 돈을 쓰고도 모르고 넘어간 적이 있다. 끝나자마자
-    # 한 번 세어, 눈으로 볼 것이 있으면 여기서 말한다.
+    # 옷 색으로 세는 옛 방식도 남겨 둔다. 검사 모델과 둘 다 지적하면 더 확실하다.
     볼것 = 사람봤나(만든것)
     if 볼것:
+        print("※ 옷 색 기준으로도 눈여겨볼 것 : " + " / ".join(볼것))
+
+
+def 점검만(a, client, tids):
+    """이미 만든 사진을 **돈 안 들이고(장당 1원 미만)** 검사만 한다.
+
+    걸린 것을 .tmp/sop_check.json 에 적는다. --redo-flagged 가 그것을 읽어
+    다시 만든다.
+    """
+    걸림, 메모들, 본장수 = [], [], 0
+    for tid in tids:
+        t = task(tid)
+        장면표 = 장면표만들기(tid, t)
+        목록 = [(it["n"], 사진이름(tid, it), 2 if (장면표.get(it["n"]) or
+                                                 ("", False))[1] else 1, False,
+                 (장면표.get(it["n"]) or ("",))[0])
+              for sec in t["guide"] for it in sec["items"]]
+        목록.append(("gfig", "%s_gfig.jpg" % tid, 1, False, ""))
+        목록.append(("fig", "%s_fig.jpg" % tid, 0, True, ""))
+        for n, 이름, 기대인원, 혼자, 장면글 in 목록:
+            path = os.path.join(OUT_DIR, 이름)
+            if not os.path.exists(path):
+                continue
+            # 금지 마크가 얹힌 사진은 마크가 사람을 가린다. 검사는 하되
+            # '사람 일부' 판정은 마크 때문일 수 있으니 메모로만 남긴다.
+            본장수 += 1
+            통과, 사유, 메모 = 사진점검(client, path, 기대인원, 혼자, 장면글)
+            if 통과:
+                print("  %s %-4s 통과   %s" % (tid, n, " · ".join(메모)[:70]))
+            else:
+                걸림.append({"task": tid, "n": n, "파일": 이름, "사유": 사유})
+                print("  %s %-4s ※ 걸림 %s" % (tid, n, " / ".join(사유)))
+            for m in 메모:
+                if "가짜 글자" in m:
+                    메모들.append("%s %s번 — %s" % (tid, n, m))
+    os.makedirs(os.path.dirname(점검파일), exist_ok=True)
+    io.open(점검파일, "w", encoding="utf-8").write(
+        json.dumps({"작업": tids, "본장수": 본장수, "걸림": 걸림,
+                    "메모": 메모들}, ensure_ascii=False, indent=1))
+    print("\n본 것 %d장 / 걸린 것 %d장 → %s" % (본장수, len(걸림), 점검파일))
+    for x in 걸림:
+        print("   %s %s번 : %s" % (x["task"], x["n"], " / ".join(x["사유"])))
+    if 메모들:
+        print("가짜 글자 메모 %d건 (다시 만들지는 않음) :" % len(메모들))
+        for m in 메모들:
+            print("   " + m)
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--run", action="store_true")
+    ap.add_argument("--plan", action="store_true")
+    ap.add_argument("--only", help="번호 (예: 3,7)")
+    ap.add_argument("--fig", action="store_true",
+                    help="도면 사진(각부 명칭)만 만든다")
+    ap.add_argument("--model", default=MODEL)
+    ap.add_argument("--saver", default=SAVER)
+    ap.add_argument("--mix", action="store_true",
+                    help="사람이 크게 나오는 장면만 Pro, 나머지는 싼 모델")
+    ap.add_argument("--task", default=None,
+                    help="작업 id. 쉼표로 여러 개 (예: m06 또는 b01,b02,b03)")
+    ap.add_argument("--skip-existing", action="store_true",
+                    help="폴더에 이미 있는 사진은 건너뛴다 (이어 만들기)")
+    ap.add_argument("--retries", type=int, default=다시횟수,
+                    help="검사에 걸리면 몇 번까지 다시 만들지 (기본 %d)" % 다시횟수)
+    ap.add_argument("--no-check", action="store_true",
+                    help="만든 뒤 검사를 하지 않는다 (예전 방식)")
+    ap.add_argument("--check", action="store_true",
+                    help="이미 만든 사진을 검사만 한다 (돈 거의 안 듦)")
+    ap.add_argument("--redo-flagged", action="store_true",
+                    help="--check 에서 걸린 사진만 다시 만든다")
+    a = ap.parse_args()
+
+    tids = [x.strip() for x in (a.task or TASK).split(",") if x.strip()]
+    if a.check or a.redo_flagged or a.run:
+        from google import genai
+        client = genai.Client(api_key=load_key())
+    else:
+        client = None
+
+    if a.check:
+        if not a.task:
+            # 작업을 안 적었으면 사진이 있는 작업 전부
+            tids = sorted({f.split("_")[0] for f in os.listdir(OUT_DIR)
+                           if "_g" in f} - {"ppe"})
+        점검만(a, client, tids)
+        return
+
+    통계 = {"돈": 0, "장수": 0, "막힘": [], "미심쩍음": [], "실패": []}
+    할일 = []            # (tid, 도면모드, only)
+    if a.redo_flagged:
+        if not os.path.exists(점검파일):
+            sys.exit("먼저 --check 를 돌리세요. %s 가 없습니다." % 점검파일)
+        d = json.loads(io.open(점검파일, encoding="utf-8").read())
+        묶음 = {}
+        for x in d.get("걸림") or []:
+            묶음.setdefault((x["task"], x["n"] == "fig"), []).append(str(x["n"]))
+        for (tid, 도면), ns in sorted(묶음.items()):
+            할일.append((tid, 도면, ",".join(ns)))
+        if not 할일:
+            print("걸린 사진이 없습니다. 다시 만들 것이 없습니다.")
+            return
+        a.run = True
+        a.skip_existing = False
+        print("검사에 걸린 사진 %d장을 다시 만듭니다 (%d개 작업)."
+              % (len(d["걸림"]), len(묶음)))
+    else:
+        for tid in tids:
+            if a.fig:
+                할일.append((tid, True, a.only))
+            else:
+                # 설비 참조가 아무것도 없으면 도면부터 만들고 그것을 참조로 쓴다.
+                if 도면부터해야하나(tid):
+                    할일.append((tid, True, None))
+                할일.append((tid, False, a.only))
+
+    try:
+        for tid, 도면모드, only in 할일:
+            a.only = only
+            한작업(a, client, tid, 도면모드, 통계)
+    except 돈끊김 as e:
         print()
-        print("※ 아래 %d장은 **눈으로 열어 보세요.** 사람이 잘렸을 수 "
-              "있습니다." % len(볼것))
-        for 줄 in 볼것:
-            print("   - " + 줄)
-        print("   (흰 보호복을 입는 작업이면 그냥 그렇게 나옵니다. "
-              "열어 보고 멀쩡하면 넘어가세요.)")
-    for n, why in 실패:
-        print("   %s : %s" % (n, why))
+        print("※ 돈 · 할당량 때문에 API 가 계속 거절합니다 : %s" % e)
+        print("  여기까지 만든 사진은 폴더에 그대로 있습니다. 같은 명령에 "
+              "--skip-existing 을 붙여 다시 돌리면 이어서 만듭니다.")
+        요약(a, 통계)
+        sys.exit(3)
+
+    if not a.run:
+        print("\n(계획만 봤습니다. 실제로 만들려면 --run)")
+        return
+    요약(a, 통계)
+
+
+def 요약(a, 통계):
+    print()
+    print("#" * 64)
+    print("만든 사진 %d장 · 쓴 돈 약 %d원 (다시 만든 몫 포함)"
+          % (통계["장수"], 통계["돈"]))
+    if 통계["막힘"]:
+        print("관문에 걸려 안 돌린 작업 : %s" % ", ".join(통계["막힘"]))
+    if 통계["미심쩍음"]:
+        print("검사를 끝내 못 넘긴 사진 %d장 — 눈으로 보세요 :" % len(통계["미심쩍음"]))
+        for x in 통계["미심쩍음"]:
+            print("   - " + x)
+    if 통계["실패"]:
+        print("만들지 못한 사진 %d장 :" % len(통계["실패"]))
+        for x in 통계["실패"]:
+            print("   - " + x)
 
 
 if __name__ == "__main__":
