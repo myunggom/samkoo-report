@@ -13,6 +13,8 @@
         이미 있는 사진은 건너뛰므로 멈춘 뒤 같은 명령으로 이어 간다.
     python sop_task_photos.py --check --task c02,c03   이미 만든 사진 검사만
     python sop_task_photos.py --redo-flagged           검사에 걸린 것만 다시
+    python sop_task_photos.py --redo-reviewed          사장 검수(review.html)에서
+        '문제' 로 표시한 사진만, 고른 항목과 적은 글을 지시문에 넣어 다시 만든다.
 
 만든 직후 Flash 모델이 사진을 보고 사람이 잘렸는지 · 겹쳤는지 검사한다.
 걸리면 이유를 지시문에 붙여 두 번까지 다시 만든다 (--retries, --no-check).
@@ -23,6 +25,7 @@ import json
 import os
 import re
 import sys
+import time
 
 # 한글 윈도우 콘솔은 cp949 라서 '—' · '※' 같은 글자를 못 찍고 그 자리에서
 # 터진다. 설비 참조가 없는 작업은 안내문에 '—' 가 들어가므로, 예전에는
@@ -728,7 +731,7 @@ SCENES_ALL = {"s05": {
     # 차량은 '회사 순찰용 흰색 소형 승용차' 로 통일한다.
     1: ("주인공이 **순찰 차량 운전석 문 옆에 서서 안전모 턱끈을 조이며** 보호구를 "
         "갖추고 있습니다. 차 문이 열려 있고 운전석이 보입니다. "
-        "가슴 위 상반신을 크게 잡습니다.", False, "3:2"),
+        "주인공의 안전모부터 안전화까지 한 화면에 들어옵니다.", False, "3:2"),
     2: ("주인공이 운전석에, **보조자가 조수석 쪽에 서서 무전기를 들고** 있습니다. "
         "차량 앞쪽에서 두 사람과 차가 한 화면에 들어옵니다.", True, "3:2"),
     3: ("주인공이 **운전면허증을 두 손으로 들어 확인하고** 있습니다. 뒤로 순찰 "
@@ -1564,6 +1567,7 @@ def 한작업(a, client, tid, 도면모드, 통계):
             "## 이번 사진의 장면",
             장면,
             구도확인,
+            검수지적.get((tid, str(n)), ""),
             "",
             "## 이 장면이 가르치려는 것",
             "제목 : %s" % it["name"],
@@ -1661,6 +1665,54 @@ def 점검만(a, client, tids):
             print("   " + m)
 
 
+# ── 사장 검수(review.html) 기록으로 다시 만들기 ─────────────────────
+# 검수 화면은 samkoo-report-sop-new.vercel.app/review.html. 기록은 그 사이트의
+# /api/review 가 Blob 에 둔다. 읽기 · '다시 만들었음' 표시 모두 열쇠가 필요 없다.
+검수주소 = "https://samkoo-report-sop-new.vercel.app/api/review"
+검수지적 = {}          # (작업, 번호) → 지시문에 붙일 글. --redo-reviewed 때만 찬다.
+항목지시 = {
+    "팔·손만": "팔이나 손만 나왔습니다. 사람 **전신**이 머리부터 발끝까지 나오게 카메라를 뒤로 물리세요.",
+    "상반신만": "상반신만 나왔습니다. **안전화까지** 화면 안에 들어오게 하세요.",
+    "하반신만": "하반신만 나왔습니다. **안전모 꼭대기까지** 화면 안에 들어오게 하세요.",
+    "머리 잘림": "머리가 사진 위쪽에서 잘렸습니다. 머리 위로 여백을 두세요.",
+    "발 잘림": "발이 사진 아래쪽에서 잘렸습니다. 발 밑으로 바닥이 보이게 하세요.",
+    "사람 겹침": "사람이 서로 겹치거나 한 사람이 다른 사람 뒤에 가려졌습니다. 서로 **한 팔 이상 떨어져** 둘 다 전신이 보이게 하세요.",
+    "사람 수 틀림": "등장 인원이 틀렸습니다. 위 '등장 인원' 에 적힌 수만큼만 넣으세요.",
+    "설비가 다름": "설비가 첨부 참조 사진과 다릅니다. **참조 사진의 설비 모양 · 색 · 구조를 그대로** 따르세요.",
+    "보호구 틀림": "보호구가 틀렸습니다. 안전모 · 작업복 · 장갑 · 안전화를 첨부 인물 사진과 똑같이 갖추세요.",
+    "동작이 내용과 다름": "사람이 하는 동작이 이 장면의 제목 · 내용과 맞지 않습니다. 제목에 적힌 행동을 **분명하게** 하고 있어야 합니다.",
+    "가짜 글자": "읽을 수 없는 가짜 글자 · 간판이 들어갔습니다. 글자를 넣지 마세요.",
+    "화면 나뉨": "사진이 여러 칸으로 나뉘었거나 작은 사진이 끼어 있습니다. **한 장면 한 장**으로 만드세요.",
+    "어색함": "전체적으로 어색합니다. 실제 현장 사진처럼 자연스럽게 만드세요.",
+}
+
+
+def 검수기록읽기():
+    import urllib.request
+    with urllib.request.urlopen(검수주소 + "?t=%d" % time.time(), timeout=30) as r:
+        return json.loads(r.read().decode("utf-8")).get("reviews") or {}
+
+
+def 검수다시만듦표시(tid, n):
+    import urllib.request
+    req = urllib.request.Request(
+        검수주소 + "?act=redone", method="POST",
+        data=json.dumps({"tid": tid, "n": str(n)}).encode("utf-8"),
+        headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        r.read()
+
+
+def 검수지적글(r):
+    줄 = [항목지시[t] for t in (r.get("tags") or []) if t in 항목지시]
+    if (r.get("note") or "").strip():
+        줄.append("검수자 메모 : " + r["note"].strip())
+    if not 줄:
+        줄.append("검수자가 이 사진을 쓸 수 없다고 했습니다. 장면 글을 더 충실히 따르세요.")
+    return ("\n## 사장님이 지난 사진을 보고 지적한 것 — **이번에는 반드시 고치세요**\n"
+            + "\n".join("- " + x for x in 줄))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--run", action="store_true")
@@ -1682,12 +1734,14 @@ def main():
                     help="만든 뒤 검사를 하지 않는다 (예전 방식)")
     ap.add_argument("--check", action="store_true",
                     help="이미 만든 사진을 검사만 한다 (돈 거의 안 듦)")
+    ap.add_argument("--redo-reviewed", action="store_true",
+                    help="사장 검수에서 '문제' 로 표시한 사진만 다시 만든다")
     ap.add_argument("--redo-flagged", action="store_true",
                     help="--check 에서 걸린 사진만 다시 만든다")
     a = ap.parse_args()
 
     tids = [x.strip() for x in (a.task or TASK).split(",") if x.strip()]
-    if a.check or a.redo_flagged or a.run:
+    if a.check or a.redo_flagged or a.redo_reviewed or a.run:
         from google import genai
         client = genai.Client(api_key=load_key())
     else:
@@ -1703,7 +1757,41 @@ def main():
 
     통계 = {"돈": 0, "장수": 0, "막힘": [], "미심쩍음": [], "실패": []}
     할일 = []            # (tid, 도면모드, only)
-    if a.redo_flagged:
+    검수묶음 = {}
+    if a.redo_reviewed:
+        기록 = 검수기록읽기()
+        for tid, 칸 in sorted(기록.items()):
+            if a.task and tid not in tids:
+                continue
+            for n, r in 칸.items():
+                if r.get("s") == "bad":
+                    검수지적[(tid, str(n))] = 검수지적글(r)
+                    검수묶음.setdefault((tid, n == "fig"), []).append(str(n))
+        if not 검수묶음:
+            print("검수에서 '문제' 로 표시한 사진이 없습니다.")
+            return
+        for (tid, 도면), ns in sorted(검수묶음.items()):
+            할일.append((tid, 도면, ",".join(ns)))
+        a.run = True
+        a.skip_existing = False
+        print("검수에서 '문제' 로 표시한 사진 %d장을 다시 만듭니다 (%d개 묶음)."
+              % (len(검수지적), len(검수묶음)))
+        for (tid, n), 글 in sorted(검수지적.items()):
+            print("  - %s %s번 : %s" % (tid, n, 글.split(chr(10), 2)[-1].replace(chr(10), " / ")[:150]))
+        # 덮어쓰기 전에 옛 사진을 남겨 둔다
+        뒤 = os.path.join(ROOT, ".tmp", "sop_review_backup",
+                         time.strftime("%Y%m%d_%H%M%S"))
+        os.makedirs(뒤, exist_ok=True)
+        import shutil
+        for f in os.listdir(OUT_DIR):
+            k = f.rsplit(".", 1)[0].split("_", 1)
+            if len(k) == 2:
+                n = k[1][1:] if k[1].startswith("g") and k[1][1:].isdigit() else k[1]
+                n = str(int(n)) if n.isdigit() else n
+                if (k[0], n) in 검수지적:
+                    shutil.copy2(os.path.join(OUT_DIR, f), 뒤)
+        print("  옛 사진 백업 : " + 뒤)
+    elif a.redo_flagged:
         if not os.path.exists(점검파일):
             sys.exit("먼저 --check 를 돌리세요. %s 가 없습니다." % 점검파일)
         d = json.loads(io.open(점검파일, encoding="utf-8").read())
@@ -1732,7 +1820,10 @@ def main():
     try:
         for tid, 도면모드, only in 할일:
             a.only = only
+            시작 = time.time()
             한작업(a, client, tid, 도면모드, 통계)
+            if a.redo_reviewed:
+                검수표시(tid, only, 시작)
     except 돈끊김 as e:
         print()
         print("※ 돈 · 할당량 때문에 API 가 계속 거절합니다 : %s" % e)
@@ -1745,6 +1836,20 @@ def main():
         print("\n(계획만 봤습니다. 실제로 만들려면 --run)")
         return
     요약(a, 통계)
+
+
+def 검수표시(tid, only, 시작):
+    """방금 새로 저장된 사진만 검수 화면에 '다시 만듦' 으로 알린다."""
+    for n in only.split(","):
+        it = {"n": 번호로(n)}
+        if n in ("fig", "gfig"):
+            it["img"] = "%s_%s.jpg" % (tid, n)
+        p = os.path.join(OUT_DIR, 사진이름(tid, it))
+        if os.path.exists(p) and os.path.getmtime(p) >= 시작:
+            try:
+                검수다시만듦표시(tid, n)
+            except Exception as e:                           # noqa: BLE001
+                print("  ※ 검수 화면에 표시 못 함 (%s %s) : %s" % (tid, n, e))
 
 
 def 요약(a, 통계):

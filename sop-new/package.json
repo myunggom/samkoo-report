@@ -1,0 +1,9 @@
+{
+  "name": "samkoo-report-sop-new",
+  "private": true,
+  "type": "module",
+  "description": "안전 SOP 새 사이트. 화면은 정적 HTML 이고 api/ 폴더(사진 검수 기록)만 서버에서 돈다.",
+  "dependencies": {
+    "@vercel/blob": "^2.8.0"
+  }
+}
