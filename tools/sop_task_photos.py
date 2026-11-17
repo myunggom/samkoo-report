@@ -15,6 +15,9 @@
     python sop_task_photos.py --redo-flagged           검사에 걸린 것만 다시
     python sop_task_photos.py --redo-reviewed          사장 검수(review.html)에서
         '문제' 로 표시한 사진만, 고른 항목과 적은 글을 지시문에 넣어 다시 만든다.
+    python sop_task_photos.py --mark-redone            **배포한 뒤에** 검수 화면에
+        '다시 만듦' 을 표시한다 (다시 만든 목록은 .tmp/sop_review_pending.json).
+        ※ 만들자마자 표시하면 배포 전 옛 사진을 보고 또 '문제' 를 누른다 (11-17 실제로 35장).
 
 만든 직후 Flash 모델이 사진을 보고 사람이 잘렸는지 · 겹쳤는지 검사한다.
 걸리면 이유를 지시문에 붙여 두 번까지 다시 만든다 (--retries, --no-check).
@@ -1736,9 +1739,15 @@ def main():
                     help="이미 만든 사진을 검사만 한다 (돈 거의 안 듦)")
     ap.add_argument("--redo-reviewed", action="store_true",
                     help="사장 검수에서 '문제' 로 표시한 사진만 다시 만든다")
+    ap.add_argument("--mark-redone", action="store_true",
+                    help="배포한 뒤에 : 다시 만든 사진을 검수 화면에 '다시 만듦' 으로 표시")
     ap.add_argument("--redo-flagged", action="store_true",
                     help="--check 에서 걸린 사진만 다시 만든다")
     a = ap.parse_args()
+
+    if a.mark_redone:
+        검수표시보내기()
+        return
 
     tids = [x.strip() for x in (a.task or TASK).split(",") if x.strip()]
     if a.check or a.redo_flagged or a.redo_reviewed or a.run:
@@ -1825,6 +1834,8 @@ def main():
             if a.redo_reviewed:
                 검수표시(tid, only, 시작)
     except 돈끊김 as e:
+        if a.redo_reviewed:          # 돈이 끊긴 작업도 그때까지 만든 것은 목록에 넣는다
+            검수표시(tid, only, 시작)
         print()
         print("※ 돈 · 할당량 때문에 API 가 계속 거절합니다 : %s" % e)
         print("  여기까지 만든 사진은 폴더에 그대로 있습니다. 같은 명령에 "
@@ -1846,10 +1857,37 @@ def 검수표시(tid, only, 시작):
             it["img"] = "%s_%s.jpg" % (tid, n)
         p = os.path.join(OUT_DIR, 사진이름(tid, it))
         if os.path.exists(p) and os.path.getmtime(p) >= 시작:
-            try:
-                검수다시만듦표시(tid, n)
-            except Exception as e:                           # noqa: BLE001
-                print("  ※ 검수 화면에 표시 못 함 (%s %s) : %s" % (tid, n, e))
+            # 바로 표시하지 않는다 — 배포 뒤 --mark-redone 이 보낸다.
+            d = 검수대기읽기()
+            if [tid, n] not in d:
+                d.append([tid, n])
+            io.open(검수대기파일, "w", encoding="utf-8").write(json.dumps(d, ensure_ascii=False))
+
+
+검수대기파일 = os.path.join(ROOT, ".tmp", "sop_review_pending.json")
+
+
+def 검수대기읽기():
+    try:
+        return json.loads(io.open(검수대기파일, encoding="utf-8").read())
+    except Exception:                                        # noqa: BLE001
+        return []
+
+
+def 검수표시보내기():
+    d = 검수대기읽기()
+    if not d:
+        print("검수 화면에 표시할 '다시 만든 사진' 이 없습니다.")
+        return
+    남은 = []
+    for tid, n in d:
+        try:
+            검수다시만듦표시(tid, n)
+        except Exception as e:                               # noqa: BLE001
+            print("  ※ 검수 화면에 표시 못 함 (%s %s) : %s" % (tid, n, e))
+            남은.append([tid, n])
+    io.open(검수대기파일, "w", encoding="utf-8").write(json.dumps(남은, ensure_ascii=False))
+    print("검수 화면에 '다시 만듦' 표시 : %d장 (실패 %d장)" % (len(d) - len(남은), len(남은)))
 
 
 def 요약(a, 통계):
