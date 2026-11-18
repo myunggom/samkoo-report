@@ -1244,6 +1244,27 @@ def 돈때문인가(e):
                                 "403"))
 
 
+def 키점검(client):
+    """돌리기 전에 아주 작은 요청 하나로 키 · 크레딧을 확인한다 (1원 미만).
+
+    ※ 2026-11-18 : .env 의 키 뒤에 글자가 더 붙어(39 → 61글자) 모든 사진이
+      '400 API key not valid' 로 실패했는데, 도구는 사진마다 실패만 찍으며
+      끝까지 돌았다. 이제 시작할 때 막는다.
+    """
+    try:
+        client.models.generate_content(model=점검모델, contents=["ok"])
+    except Exception as e:                                   # noqa: BLE001
+        s = str(e)
+        if "API_KEY_INVALID" in s or "API key not valid" in s:
+            sys.exit("구글 AI 키가 틀렸습니다 (.env 의 GEMINI_API_KEY). "
+                     "키는 보통 AIza 로 시작하는 39글자입니다. 다시 붙여 넣어 주세요.")
+        if "402" in s or "credits are depleted" in s:
+            sys.exit("구글 AI 선불 크레딧이 0원입니다. AI Studio 에서 충전한 뒤 다시 돌리세요.")
+        if 돈때문인가(e):
+            sys.exit("구글 AI 가 할당량 · 결제 문제로 거절합니다 : %s" % s[:120])
+        print("(키 확인 요청이 실패했지만 계속합니다 : %s)" % s[:80])
+
+
 def 사진점검(client, path, 기대인원, 혼자, 장면글=""):
     """만든 사진을 Flash 모델이 보고 판정한다.
 
@@ -1769,6 +1790,7 @@ def main():
     if a.check or a.redo_flagged or a.redo_reviewed or a.run:
         from google import genai
         client = genai.Client(api_key=load_key())
+        키점검(client)
     else:
         client = None
 
