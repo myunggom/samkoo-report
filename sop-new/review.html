@@ -96,6 +96,14 @@ select{font:inherit;padding:7px 10px;border:1px solid var(--line-2);border-radiu
 textarea{font:inherit;font-size:13.5px;width:100%;min-height:62px;resize:vertical;border:1px solid var(--line-2);border-radius:8px;padding:7px 9px;background:var(--card);color:var(--ink)}
 textarea:focus,select:focus{outline:2px solid var(--accent);outline-offset:1px}
 .hint{font-size:12px;color:var(--ink-3)}
+.refs{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.refs .lbl{font-size:12.5px;font-weight:600;color:var(--ink-2,var(--ink));width:100%}
+.ref{position:relative;width:68px;height:68px}
+.ref img{width:100%;height:100%;object-fit:cover;border-radius:8px;border:1px solid var(--line-2);cursor:zoom-in}
+.ref button{position:absolute;top:-7px;right:-7px;width:22px;height:22px;border-radius:50%;border:0;background:var(--bad);color:#fff;font-size:13px;line-height:22px;cursor:pointer;padding:0}
+.addref{display:grid;place-items:center;width:68px;height:68px;border:1.5px dashed var(--line-2);border-radius:8px;font-size:12px;color:var(--ink-3);cursor:pointer;text-align:center;line-height:1.3}
+.addref:hover{border-color:var(--accent);color:var(--accent)}
+.addref input{display:none}
 .empty{padding:60px 0;text-align:center;color:var(--ink-3)}
 
 /* 크게 보기 */
@@ -200,7 +208,7 @@ textarea:focus,select:focus{outline:2px solid var(--accent);outline-offset:1px}
   function showSave(msg, err) { saveEl.textContent = msg; saveEl.className = "save" + (err ? " err" : ""); }
   function save(p) {
     var r = rec(p);
-    var payload = { tid: p.tid, n: p.n, s: r.s || "", tags: r.tags || [], note: r.note || "", by: whoEl.value.trim() };
+    var payload = { tid: p.tid, n: p.n, s: r.s || "", tags: r.tags || [], note: r.note || "", refs: r.refs || [], by: whoEl.value.trim() };
     R[p.tid][p.n].by = payload.by;
     pending++; showSave("저장 중…");
     queue = queue.then(function () {
@@ -214,6 +222,65 @@ textarea:focus,select:focus{outline:2px solid var(--accent);outline-offset:1px}
     R[p.tid] = R[p.tid] || {};
     var r = R[p.tid][p.n] = Object.assign({}, R[p.tid][p.n] || {}, patch);
     if (r.s !== "bad") r.tags = [];
+  }
+
+  // ── 예시 사진 : 줄여서(긴 변 1600px JPEG) 올리고 주소를 기록에 넣는다 ──
+  function shrink(file) {
+    return new Promise(function (ok, no) {
+      var url = URL.createObjectURL(file), im = new Image();
+      im.onload = function () {
+        var k = Math.min(1, 1600 / Math.max(im.naturalWidth, im.naturalHeight));
+        var c = document.createElement("canvas");
+        c.width = Math.round(im.naturalWidth * k); c.height = Math.round(im.naturalHeight * k);
+        var g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height);
+        g.drawImage(im, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        ok(c.toDataURL("image/jpeg", 0.85));
+      };
+      im.onerror = function () { URL.revokeObjectURL(url); no(new Error("사진을 열 수 없습니다 (JPG · PNG 로 올려 주세요)")); };
+      im.src = url;
+    });
+  }
+  function addRefs(p, files, onChange) {
+    var list = Array.prototype.slice.call(files || []);
+    var room = 3 - (rec(p).refs || []).length;
+    if (!list.length) return;
+    if (room <= 0) { showSave("예시 사진은 한 장에 3장까지입니다", true); return; }
+    list = list.slice(0, room);
+    pending++; showSave("예시 사진 올리는 중…");
+    var chain = Promise.resolve();
+    list.forEach(function (f) {
+      chain = chain.then(function () { return shrink(f); }).then(function (data) {
+        return fetch(API + "?act=upload", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tid: p.tid, n: p.n, data: data }) })
+          .then(function (res) { return res.json().then(function (j) { if (!res.ok) throw new Error(j.error || res.status); return j; }); })
+          .then(function (j) { setRec(p, { refs: (rec(p).refs || []).concat([j.url]).slice(0, 3) }); });
+      });
+    });
+    chain.then(function () { pending--; save(p); onChange(); })
+      .catch(function (e) { pending--; showSave("예시 사진 실패 — " + e.message, true); save(p); onChange(); });
+  }
+  function refBox(p, onChange) {
+    var r = rec(p), box = el("div", "refs");
+    box.appendChild(el("div", "lbl", "예시 사진 (" + (r.refs || []).length + "/3) — 설비 모양을 이 사진대로 고칩니다"));
+    (r.refs || []).forEach(function (u, i) {
+      var w = el("div", "ref"), im = el("img");
+      im.src = u; im.alt = "예시 사진 " + (i + 1); im.loading = "lazy";
+      im.onclick = function (e) { e.stopPropagation(); window.open(u, "_blank"); };
+      var x = el("button", null, "×"); x.type = "button"; x.title = "이 예시 사진 빼기";
+      x.onclick = function (e) {
+        e.stopPropagation();
+        var cur = (rec(p).refs || []).slice(); cur.splice(i, 1);
+        setRec(p, { refs: cur }); save(p); onChange();
+      };
+      w.appendChild(im); w.appendChild(x); box.appendChild(w);
+    });
+    if ((r.refs || []).length < 3) {
+      var lab = el("label", "addref", "＋<br>사진 넣기"), inp = el("input");
+      inp.type = "file"; inp.accept = "image/*"; inp.multiple = true;
+      inp.onchange = function () { addRefs(p, inp.files, onChange); inp.value = ""; };
+      lab.appendChild(inp); box.appendChild(lab);
+    }
+    return box;
   }
 
   // ── 판정 칸 (카드와 크게 보기에서 같이 쓴다) ───────────────
@@ -256,7 +323,8 @@ textarea:focus,select:focus{outline:2px solid var(--accent);outline-offset:1px}
       ta.onblur = function () { if (tmr) { clearTimeout(tmr); tmr = null; save(p); } };
       ta.onkeydown = function (e) { e.stopPropagation(); };
       box.appendChild(ta);
-      if (r.s === "bad") box.appendChild(el("div", "hint", "적은 글이 그대로 사진 지시문에 들어갑니다. 장비 모양이 틀렸으면 <b>설비가 다름</b>도 꼭 골라 주세요. 그래야 도면부터 고쳐 그립니다."));
+      if (r.s === "bad") box.appendChild(refBox(p, onChange));
+      if (r.s === "bad") box.appendChild(el("div", "hint", "적은 글이 그대로 사진 지시문에 들어갑니다. 장비 모양이 틀렸으면 <b>설비가 다름</b>도 꼭 골라 주세요. 그래야 도면부터 고쳐 그립니다. 말로 설명하기 어려운 설비(발신기 등)는 실물 <b>예시 사진</b>을 넣어 주세요."));
     }
     return box;
   }

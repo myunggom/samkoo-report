@@ -15,6 +15,14 @@
 //                                       s = "ok"(통과) | "bad"(문제) | ""(지움)
 //    POST /api/review?act=redone        다시 만들었음 표시 { tid, n }
 //                                       → 지난 판정은 history 로 옮기고 '다시 볼 것' 으로
+//    POST /api/review?act=upload        예시 사진 올리기 { tid, n, data: "data:image/jpeg;base64,…" }
+//                                       → { url }. 판정 기록의 refs 에 넣어 저장한다.
+//
+//  예시 사진 (2026-11-18 추가)
+//    '발신기' 처럼 말로는 모양이 전달 안 되는 설비가 있어, 검수자가 실물 사진을
+//    붙이면 사진 도구(--redo-reviewed)가 그 사진을 참조로 넣어 다시 그린다.
+//    reviewref/<작업>/<번호>/<시각>-<난수>.jpg 에 둔다 (review/ 아래에 두면 GET 이
+//    목록을 훑을 때 그림까지 섞인다).
 //
 //  저장 모양 (2026-11-16 바꿈)
 //    review/v/<작업>/<번호>/<시각>-<난수>.json   사진 한 장, 저장할 때마다 새 파일
@@ -30,6 +38,10 @@
 const OLD = "review/";
 const NEW = "review/v/";
 const KEEP = 3; // 사진마다 남길 옛 판 수
+const REF = "reviewref/";
+const MAX_REFS = 3;
+const MAX_REF_BYTES = 3 * 1024 * 1024;
+const REF_URL_RE = /^https:\/\/[a-z0-9-]+\.public\.blob\.vercel-storage\.com\/reviewref\/[a-z0-9]+\/[a-z0-9]+\/[\w.-]+\.jpg$/i;
 const TID_RE = /^[a-z][a-z0-9]{1,11}$/;
 const N_RE = /^(\d{1,2}|fig|gfig)$/;
 const TAGS = new Set([
@@ -179,13 +191,25 @@ export default async function handler(req, res) {
     if (!TID_RE.test(tid) || !N_RE.test(n)) return bad(res, 400, "작업 · 번호가 이상합니다.");
 
     const act = String((req.query && req.query.act) || "");
+
+    if (act === "upload") {
+      const m = /^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/.exec(String(b.data || ""));
+      if (!m) return bad(res, 400, "JPEG 사진만 올릴 수 있습니다.");
+      const buf = Buffer.from(m[1], "base64");
+      if (buf.length > MAX_REF_BYTES) return bad(res, 400, "사진이 너무 큽니다 (3MB 까지).");
+      if (buf[0] !== 0xff || buf[1] !== 0xd8) return bad(res, 400, "JPEG 사진이 아닙니다.");
+      const { put } = await import("@vercel/blob");
+      const name = REF + tid + "/" + n + "/" + Date.now() + "-" + Math.random().toString(36).slice(2, 8) + ".jpg";
+      const r = await put(name, buf, { access: "public", contentType: "image/jpeg", addRandomSuffix: false });
+      return res.status(200).json({ ok: true, url: r.url });
+    }
     const { rec: 전, vs } = await readOne(tid, n);
     const now = new Date().toISOString();
 
     if (act === "redone") {
       const history = (전.history || []).slice(-9);
-      if (전.s) history.push({ s: 전.s, tags: 전.tags || [], note: 전.note || "", at: 전.at || "", by: 전.by || "" });
-      const rec = { s: "", tags: [], note: "", at: "", by: "", redo: (전.redo || 0) + 1, redoneAt: now, history };
+      if (전.s) history.push({ s: 전.s, tags: 전.tags || [], note: 전.note || "", refs: 전.refs || [], at: 전.at || "", by: 전.by || "" });
+      const rec = { s: "", tags: [], note: "", refs: [], at: "", by: "", redo: (전.redo || 0) + 1, redoneAt: now, history };
       await writeOne(tid, n, rec, vs);
       return res.status(200).json({ ok: true, rec });
     }
@@ -196,7 +220,11 @@ export default async function handler(req, res) {
     const note = String(b.note || "").slice(0, 600);
     const by = String(b.by || "").trim().slice(0, 20);
 
-    const rec = { ...전, s, tags: s === "bad" ? tags : [], note, at: now, by };
+    const refs = Array.isArray(b.refs)
+      ? b.refs.map(String).filter((u) => REF_URL_RE.test(u)).slice(0, MAX_REFS)
+      : 전.refs || [];
+
+    const rec = { ...전, s, tags: s === "bad" ? tags : [], note, refs, at: now, by };
     await writeOne(tid, n, rec, vs);
     return res.status(200).json({ ok: true, rec });
   } catch (e) {

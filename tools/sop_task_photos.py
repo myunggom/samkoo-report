@@ -1579,6 +1579,21 @@ def 한작업(a, client, tid, 도면모드, 통계):
         혼자 = (도면모드 and n == "fig")
         ref_imgs, got = refs(two, tid, 도면만들기=혼자)
         설비장수 = sum(1 for g in got if g.startswith("설비:"))
+        예시 = []
+        for f in 검수예시.get((tid, str(n))) or []:
+            try:
+                from PIL import Image
+                im = Image.open(f).convert("RGB")
+                im.thumbnail((1280, 1280))
+                예시.append(im)
+            except Exception:                                # noqa: BLE001
+                pass
+        if 예시:
+            # API 는 참조를 14장까지 받는다. 넘치면 설비 참조(맨 뒤)부터 덜어 낸다.
+            넘침 = len(ref_imgs) + len(예시) - 14
+            if 넘침 > 0:
+                ref_imgs = ref_imgs[:-넘침]
+            ref_imgs = ref_imgs + 예시
         인원 = ("## 등장 인원 : **아무도 나오지 않습니다.** 설비만 찍습니다."
               if 혼자 else
               "## 등장 인원 : **두 사람**. 주인공 1명 + 보조자 1명."
@@ -1608,6 +1623,7 @@ def 한작업(a, client, tid, 도면모드, 통계):
             "\n".join("- " + b for b in it.get("bullets") or []),
             금지안내 if 금지사진 else "",
             옛도면안내 if (혼자 and 설비장수) else "",
+            예시안내(len(예시)) if 예시 else "",
         ])
         이름 = 사진이름(tid, it)
         path = os.path.join(OUT_DIR, 이름)
@@ -1706,6 +1722,37 @@ def 점검만(a, client, tids):
 설비다시 = set()       # 장비 생김새 지적이 있어 도면부터 새로 그릴 작업 (--redo-reviewed)
 강제다시그림 = set()   # --equip-redraw : 실물 사진도 빼고 지적대로 새로 그릴 작업
 검수지적 = {}          # (작업, 번호) → 지시문에 붙일 글. --redo-reviewed 때만 찬다.
+검수예시 = {}          # (작업, 번호) → 검수자가 붙인 예시 사진 파일들 (내려받은 것)
+예시폴더 = os.path.join(ROOT, ".tmp", "review_refs")
+
+
+def 예시받기(tid, n, urls):
+    """검수자가 올린 예시 사진을 내려받는다. 실패한 것은 건너뛴다."""
+    import urllib.request
+    os.makedirs(예시폴더, exist_ok=True)
+    out = []
+    for u in urls[:3]:
+        if not str(u).startswith("https://") or "/reviewref/" not in str(u):
+            continue
+        f = os.path.join(예시폴더, "%s_%s_%s" % (tid, n, os.path.basename(u)))
+        try:
+            if not os.path.exists(f):
+                with urllib.request.urlopen(u, timeout=60) as r, open(f, "wb") as w:
+                    w.write(r.read())
+            out.append(f)
+        except Exception as e:                               # noqa: BLE001
+            print("  (예시 사진 못 받음 %s %s번 : %s)" % (tid, n, str(e)[:60]))
+    return out
+
+
+def 예시안내(장수):
+    return ("\n## 검수자가 붙인 **예시 사진** — 첨부 그림 중 **마지막 %d장**\n"
+            "- 이 장면의 설비 · 물건은 **예시 사진의 모양 · 색 · 구조 · 크기 비율을 그대로** 따르세요. "
+            "글로 된 설명보다 예시 사진이 우선입니다.\n"
+            "- 예시 사진의 **사람 · 배경 · 글자 · 상표는 따라 하지 마세요.** "
+            "사람과 보호구는 첨부 인물 사진, 배경은 위 지시를 따릅니다." % 장수)
+
+
 항목지시 = {
     "팔·손만": "팔이나 손만 나왔습니다. 사람 **전신**이 머리부터 발끝까지 나오게 카메라를 뒤로 물리세요.",
     "상반신만": "상반신만 나왔습니다. **안전화까지** 화면 안에 들어오게 하세요.",
@@ -1820,6 +1867,10 @@ def main():
                 if r.get("s") != "bad":
                     continue
                 검수지적[(tid, str(n))] = 검수지적글(r)
+                if r.get("refs"):
+                    받은 = 예시받기(tid, n, r["refs"])
+                    if 받은:
+                        검수예시[(tid, str(n))] = 받은
                 검수묶음.setdefault((tid, n == "fig"), []).append(str(n))
                 # 장비 생김새 지적 = '설비가 다름' 표시, 또는 --equip-redraw 로 지정한 작업.
                 # (도면에 '각부 명칭 표시' 같은 글자 지적만 있을 때 실물 참조를 빼면
@@ -1830,6 +1881,12 @@ def main():
                     설비글.append(메모)
                 if 장비:
                     설비다시.add(tid)
+                    # 장비 지적에 붙은 예시 사진은 **도면에도** 붙인다 (사진들이 도면을 보고 그린다)
+                    if 검수예시.get((tid, str(n))) and str(n) != "fig":
+                        도예 = 검수예시.setdefault((tid, "fig#장비"), [])
+                        for f in 검수예시[(tid, str(n))]:
+                            if f not in 도예:
+                                도예.append(f)
             if tid in 설비다시 and (도면장면.get(tid) or {}).get("fig"):
                 # 장비가 틀렸으면 **도면부터** 새로 그린다. 사진들이 도면을 보고 그리기 때문이다.
                 if (tid, "fig") not in 검수지적:
@@ -1840,6 +1897,17 @@ def main():
                         "\n## 이 작업의 사진들에서 **장비 생김새**에 대해 지적된 것 — 도면에서 반드시 고치세요\n"
                         "(이 도면을 보고 사진 12장을 다시 그립니다. 도면이 틀리면 12장이 다 틀립니다.)\n"
                         + "\n".join("- " + x.replace("\n", " ") for x in 설비글))
+        # 도면 예시 = 도면에 직접 붙인 것 + 장비 지적 사진들에 붙은 것 (3장까지)
+        for (tid, k) in [x for x in list(검수예시) if x[1] == "fig#장비"]:
+            합 = list(검수예시.get((tid, "fig")) or [])
+            for f in 검수예시.pop((tid, k)):
+                if f not in 합:
+                    합.append(f)
+            if (tid, "fig") in 검수지적:
+                검수예시[(tid, "fig")] = 합[:3]
+        if 검수예시:
+            print("검수자 예시 사진을 참조로 넣는 사진 : "
+                  + " ".join("%s/%s(%d장)" % (t, n, len(v)) for (t, n), v in sorted(검수예시.items())))
         if not 검수묶음:
             print("검수에서 '문제' 로 표시한 사진이 없습니다.")
             return
