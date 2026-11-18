@@ -54,11 +54,38 @@ async function listAll(prefix) {
   return out;
 }
 
+// 한 파일 읽기 — 잠깐 끊겨도 3번까지 다시 해 본다
 async function fetchJson(url) {
-  const r = await fetch(url + (url.includes("?") ? "&" : "?") + "t=" + Date.now(), {
-    cache: "no-store",
-  });
-  return r.ok ? r.json() : null;
+  let last;
+  for (let i = 0; i < 3; i++) {
+    try {
+      const r = await fetch(url + (url.includes("?") ? "&" : "?") + "t=" + Date.now(), {
+        cache: "no-store",
+      });
+      if (r.ok) return await r.json();
+      if (r.status === 404) return null;
+      last = new Error("HTTP " + r.status);
+    } catch (e) {
+      last = e;
+    }
+    await new Promise((ok) => setTimeout(ok, 300 * (i + 1)));
+  }
+  throw last;
+}
+
+// 여러 개를 한 번에 LIMIT 개씩만 읽는다.
+// ※ 2026-11-18 : 검수 기록이 1,000장을 넘자 전부 동시에 읽다가 "fetch failed" 로
+//   검수 화면이 통째로 안 열렸다. 동시에 여는 연결 수를 묶어 둔다.
+const LIMIT = 32;
+async function pool(items, fn) {
+  let i = 0;
+  const run = async () => {
+    while (i < items.length) {
+      const k = i++;
+      await fn(items[k]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(LIMIT, items.length) }, run));
 }
 
 // 파일 이름이 시각으로 시작하므로 이름 순 = 시간 순
@@ -128,23 +155,19 @@ export default async function handler(req, res) {
       const reviews = {};
       // 1) 옛 모양을 바탕으로
       const olds = all.filter((b) => b.pathname.startsWith(OLD) && !b.pathname.startsWith(NEW));
-      await Promise.all(
-        olds.map(async (b) => {
+      await pool(olds, async (b) => {
           const tid = b.pathname.slice(OLD.length).replace(/\.json$/, "");
           if (!TID_RE.test(tid)) return;
           const d = (await fetchJson(b.url)) || {};
           for (const n in d) if (N_RE.test(n)) (reviews[tid] ||= {})[n] = d[n];
-        })
-      );
+        });
       // 2) 새 모양(사진마다 마지막 판)이 이긴다
       const g = groupNew(all.filter((b) => b.pathname.startsWith(NEW)));
-      await Promise.all(
-        Object.entries(g).map(async ([k, vs]) => {
+      await pool(Object.entries(g), async ([k, vs]) => {
           const [tid, n] = k.split("/");
           const rec = await fetchJson(vs[vs.length - 1].url);
           if (rec) (reviews[tid] ||= {})[n] = rec;
-        })
-      );
+        });
       return res.status(200).json({ reviews });
     }
 
@@ -177,6 +200,6 @@ export default async function handler(req, res) {
     await writeOne(tid, n, rec, vs);
     return res.status(200).json({ ok: true, rec });
   } catch (e) {
-    return bad(res, 500, "저장 중 오류 : " + String((e && e.message) || e).slice(0, 200));
+    return bad(res, 500, (req.method === "GET" ? "불러오기" : "저장") + " 중 오류 : " + String((e && e.message) || e).slice(0, 200));
   }
 }
