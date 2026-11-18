@@ -1,0 +1,17 @@
+{
+  "rewrites": [
+    { "source": "/p/:name", "destination": "/index.html" },
+    { "source": "/c/:id", "destination": "/check.html" },
+    { "source": "/t/:id", "destination": "/check.html" },
+    { "source": "/me", "destination": "/check.html" },
+    { "source": "/admin", "destination": "/admin.html" },
+    { "source": "/about", "destination": "/about.html" },
+    { "source": "/qr", "destination": "/qr.html" }
+  ],
+  "headers": [
+    { "source": "/(.*)", "headers": [
+      { "key": "X-Robots-Tag", "value": "noindex, nofollow" },
+      { "key": "Cache-Control", "value": "private, no-cache" }
+    ] }
+  ]
+}

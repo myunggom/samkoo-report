@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>QR 라벨 인쇄</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#14171c;--sub:#5b6370;--line:#d9dde3;--accent:#0a66d8}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){--bg:#0e1013;--card:#171a1f;--ink:#e9ecf1;--sub:#9aa3af;--line:#2a2f37;--accent:#5aa2ff}
+}
+:root[data-theme="dark"]{--bg:#0e1013;--card:#171a1f;--ink:#e9ecf1;--sub:#9aa3af;--line:#2a2f37;--accent:#5aa2ff}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:"Pretendard","Malgun Gothic","Apple SD Gothic Neo",system-ui,sans-serif}
+.bar{max-width:1000px;margin:0 auto;padding:20px 16px 8px;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.bar h1{font-size:20px;margin-right:auto}
+.bar a{color:var(--accent);text-decoration:none;font-size:14px}
+.tabs{max-width:1000px;margin:0 auto;padding:0 16px;display:flex;gap:4px;border-bottom:1px solid var(--line);overflow-x:auto}
+.tab{padding:10px 14px;font-size:15px;border:0;background:none;color:var(--sub);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
+.tab.on{color:var(--ink);border-bottom-color:var(--accent);font-weight:700}
+.tools{max-width:1000px;margin:0 auto;padding:12px 16px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.tools input,.tools select{flex:1;min-width:140px;font-size:16px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink)}
+.tools button{font-size:15px;padding:10px 16px;border:0;border-radius:8px;background:var(--accent);color:#fff;cursor:pointer}
+.note{max-width:1000px;margin:0 auto;padding:0 16px 12px;font-size:13px;color:var(--sub)}
+.sheet{max-width:1000px;margin:0 auto;padding:0 16px 40px;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.lab{background:#fff;color:#000;border:1px solid #bbb;border-radius:6px;padding:10px;text-align:center;break-inside:avoid}
+.lab svg{width:100%;height:auto;display:block}
+.lab .k{display:inline-block;font-size:11px;font-weight:700;color:#fff;background:#333;border-radius:4px;padding:1px 6px;margin-top:6px}
+.lab .k.patrol{background:#1d4ed8}.lab .k.clean{background:#0f766e}.lab .k.me{background:#9333ea}.lab .k.panel{background:#444}
+.lab b{display:block;font-size:16px;margin-top:4px;overflow-wrap:anywhere}
+.lab span.s{display:block;font-size:11px;color:#555;margin-top:2px}
+.warn{max-width:1000px;margin:0 auto 12px;padding:10px 16px;color:#b4531a;font-size:14px}
+@media print{
+  @page{size:A4;margin:10mm}
+  body{background:#fff}
+  .bar,.tabs,.tools,.note,.warn{display:none}
+  .sheet{max-width:none;padding:0;grid-template-columns:repeat(4,1fr);gap:4mm}
+  .lab{border:1px dashed #999;border-radius:0;padding:3mm}
+  .lab b{font-size:12pt}
+}
+</style>
+</head>
+<body>
+<div class="bar">
+  <h1>QR 라벨 인쇄</h1>
+  <a href="/about">소개</a><a href="/admin">현황</a><a href="/">회로표</a>
+</div>
+<div class="tabs" id="tabs">
+  <button class="tab on" data-t="demo">시연 세트</button>
+  <button class="tab" data-t="panel">분전반</button>
+  <button class="tab" data-t="patrol">순찰 지점</button>
+  <button class="tab" data-t="clean">화장실</button>
+  <button class="tab" data-t="me">개인 카드</button>
+</div>
+<div class="tools">
+  <input id="q" type="search" placeholder="이름으로 거르기" autocomplete="off">
+  <select id="ty"><option value="">전체</option><option value="LN">전등·전열</option><option value="MCC">동력(MCC)</option></select>
+  <button onclick="window.print()">인쇄</button>
+</div>
+<p class="note" id="note"></p>
+<div id="warn" class="warn" hidden></div>
+<div id="sheet" class="sheet"></div>
+<script>
+(function(){
+  // QR 안에 접속 키를 넣는다. 키는 처음 접속할 때 받은 쿠키에 들어 있다.
+  var m = document.cookie.match(/(?:^|;\s*)pk=([^;]+)/);
+  var key = m ? decodeURIComponent(m[1]) : "";
+  if (!key) {
+    var w = document.getElementById("warn");
+    w.hidden = false;
+    w.textContent = "접속 키를 찾지 못했습니다. 키가 들어 있는 주소(…?k=키)로 한 번 접속한 뒤 다시 열어 주세요.";
+  }
+  var sheet = document.getElementById("sheet"), q = document.getElementById("q"), ty = document.getElementById("ty"), note = document.getElementById("note");
+  var PANELS = [], CFG = null, tab = "demo";
+  var NOTES = {
+    demo: "시연에 필요한 QR을 한 장에 모았습니다. 개인 카드 이름은 위 칸에서 바꿀 수 있습니다 (기본: 대표). 순찰 지점은 실제 순찰 기록으로 남으니, 시연 뒤 기록이 신경 쓰이면 말씀해 주세요.",
+    panel: "분전반 문 안쪽에 붙이세요. 찍으면 그 분전반 회로표가 열립니다. A4 한 장에 16개(4×4)씩 인쇄됩니다.",
+    patrol: "순찰 지점에 붙이세요. 찍는 순간 시각과 순찰자가 기록됩니다. 지점 목록은 config.json에서 바꿉니다.",
+    clean: "화장실 입구 안쪽에 붙이세요. 찍으면 청소 항목 체크 화면이 열립니다.",
+    me: "직원마다 한 장씩 나눠 주세요. 근무 시작 때 한 번 찍으면, 그 기기에서 하는 기록에 이름이 붙습니다. 이름을 쉼표로 나눠 여러 명을 넣으세요."
+  };
+  function svgFor(text){
+    var qr = qrcode(0, "M");
+    qr.addData(text);
+    qr.make();
+    return qr.createSvgTag({cellSize:4, margin:2, scalable:true});
+  }
+  function esc(s){ return String(s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
+  function url(path, extra){
+    var p = new URLSearchParams(extra || {});
+    if (key) p.set("k", key);
+    var s = p.toString();
+    return location.origin + path + (s ? "?" + s : "");
+  }
+  function lab(kind, kindLabel, name, sub, link){
+    return '<div class="lab">' + svgFor(link) + '<span class="k ' + kind + '">' + kindLabel + '</span><b>' + esc(name) + '</b><span class="s">' + esc(sub) + '</span></div>';
+  }
+  function panelLab(p){ return lab("panel", p.type === "MCC" ? "동력반" : "분전반", p.name, "회로표 · 스캔하세요", url("/p/" + encodeURIComponent(p.name))); }
+  function patrolLab(c){ return lab("patrol", "순찰", c.name, c.id + " · 스캔하세요", url("/c/" + encodeURIComponent(c.id))); }
+  function cleanLab(r){ return lab("clean", "화장실 점검", r.name, r.id + " · 스캔하세요", url("/t/" + encodeURIComponent(r.id))); }
+  function meLab(n){ return lab("me", "개인 카드", n, "근무 시작 때 한 번 스캔", url("/me", {n:n})); }
+
+  function draw(){
+    var s = q.value.trim(), S = s.toUpperCase(), h = "";
+    note.textContent = NOTES[tab];
+    ty.style.display = tab === "panel" ? "" : "none";
+    q.placeholder = tab === "me" ? "직원 이름 (쉼표로 여러 명: 홍길동, 김철수)" : tab === "demo" ? "개인 카드 이름 (기본: 대표)" : "이름으로 거르기";
+    function hit(name){ return !S || name.toUpperCase().indexOf(S) >= 0; }
+    if (tab === "demo") {
+      var who = s || "대표";
+      h += meLab(who);
+      CFG.checkpoints.slice(0, 2).forEach(function(c){ h += patrolLab(c); });
+      h += cleanLab(CFG.restrooms.find(function(r){ return r.id === "T-1F-M"; }) || CFG.restrooms[0]);
+      var p = PANELS.find(function(x){ return x.name === "LN-GY-B2A"; }) || PANELS[0];
+      if (p) h += panelLab(p);
+    } else if (tab === "panel") {
+      PANELS.filter(function(p){ return (!ty.value || p.type === ty.value) && hit(p.name); }).forEach(function(p){ h += panelLab(p); });
+    } else if (tab === "patrol") {
+      CFG.checkpoints.filter(function(c){ return hit(c.name) || hit(c.id); }).forEach(function(c){ h += patrolLab(c); });
+    } else if (tab === "clean") {
+      CFG.restrooms.filter(function(r){ return hit(r.name) || hit(r.id); }).forEach(function(r){ h += cleanLab(r); });
+    } else if (tab === "me") {
+      var names = s.split(/[,，]/).map(function(x){ return x.trim().slice(0, 30); }).filter(Boolean);
+      if (!names.length) names = ["대표", "순찰자1", "미화1"];
+      names.forEach(function(n){ h += meLab(n); });
+    }
+    sheet.innerHTML = h;
+  }
+  document.querySelectorAll(".tab").forEach(function(b){
+    b.addEventListener("click", function(){
+      document.querySelectorAll(".tab").forEach(function(x){ x.classList.remove("on"); });
+      b.classList.add("on"); tab = b.getAttribute("data-t"); q.value = ""; draw();
+    });
+  });
+  Promise.all([
+    fetch("/data.json", {credentials:"same-origin"}).then(function(r){ return r.json(); }),
+    fetch("/config.json", {credentials:"same-origin"}).then(function(r){ return r.json(); })
+  ]).then(function(res){
+    PANELS = res[0].panels; CFG = res[1];
+    var t0 = new URLSearchParams(location.search).get("tab");
+    var b = t0 && document.querySelector('.tab[data-t="' + t0 + '"]');
+    if (b) b.click(); else draw();
+  });
+  q.addEventListener("input", draw);
+  ty.addEventListener("change", draw);
+})();
+</script>
+</body>
+</html>

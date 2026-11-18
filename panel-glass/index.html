@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#000000">
+<title>분전반 회로표</title>
+<style>
+:root{
+  --bg:#f6f7f9; --card:#ffffff; --ink:#14171c; --sub:#5b6370; --line:#e3e6eb;
+  --accent:#0a66d8; --spare:#9aa1ab; --warn:#b4531a; --warnbg:#fff3e8;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0e1013; --card:#171a1f; --ink:#e9ecf1; --sub:#9aa3af; --line:#2a2f37;
+    --accent:#5aa2ff; --spare:#5f6772; --warn:#ffb072; --warnbg:#2b1d12;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0e1013; --card:#171a1f; --ink:#e9ecf1; --sub:#9aa3af; --line:#2a2f37;
+  --accent:#5aa2ff; --spare:#5f6772; --warn:#ffb072; --warnbg:#2b1d12;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);
+  font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",system-ui,sans-serif;
+  -webkit-text-size-adjust:100%}
+
+/* ---------- 일반 화면 (휴대폰·PC) ---------- */
+.wrap{max-width:860px;margin:0 auto;padding:20px 16px 48px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
+.top h1{font-size:22px;letter-spacing:-.02em}
+.top a{color:var(--accent);text-decoration:none;font-size:14px;white-space:nowrap}
+.search{width:100%;font-size:17px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;
+  background:var(--card);color:var(--ink);margin-bottom:14px}
+.group-t{font-size:13px;color:var(--sub);margin:18px 2px 8px;font-weight:600}
+.plist{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px}
+.plist a{display:block;background:var(--card);border:1px solid var(--line);border-radius:10px;
+  padding:12px;color:var(--ink);text-decoration:none}
+.plist a b{display:block;font-size:15px;word-break:keep-all;overflow-wrap:anywhere}
+.plist a span{font-size:12px;color:var(--sub)}
+.back{display:inline-block;color:var(--accent);text-decoration:none;font-size:14px;margin-bottom:10px}
+.ph{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px}
+.ph h1{font-size:26px;letter-spacing:-.02em;overflow-wrap:anywhere}
+.ph p{color:var(--sub);font-size:14px;margin-top:6px}
+.flag{background:var(--warnbg);color:var(--warn);border-radius:8px;padding:8px 10px;font-size:13px;margin-top:10px}
+.glink{display:inline-block;margin-top:12px;font-size:14px;color:var(--accent);text-decoration:none}
+table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:14px}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);font-size:14px}
+th{font-size:12px;color:var(--sub);font-weight:600;white-space:nowrap}
+td.n{color:var(--sub);width:42px;font-variant-numeric:tabular-nums}
+td.nm{font-weight:600;overflow-wrap:anywhere}
+td.sp{font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.spare td{color:var(--spare)}
+tr.spare td.nm{font-weight:400}
+.cap{font-size:15px;font-weight:700;margin:16px 2px 8px}
+.empty{color:var(--sub);padding:24px 4px}
+
+/* ---------- 스마트글래스 화면 (Vuzix M400, 640x360 가로) ---------- */
+body.glass{background:#000;color:#fff;overflow:hidden;user-select:none;-webkit-user-select:none}
+.g{position:fixed;inset:0;display:flex;flex-direction:column;background:#000}
+.g-head{height:19vh;display:flex;align-items:center;justify-content:space-between;gap:3vw;
+  padding:0 3.5vw;border-bottom:.5vh solid #1c1c1c}
+.g-title{font-size:9.5vh;font-weight:800;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.g-pg{font-size:6.5vh;color:#9a9a9a;white-space:nowrap;font-variant-numeric:tabular-nums}
+.g-body{flex:1;display:flex;flex-direction:column;padding:1vh 3.5vw 0;min-height:0}
+.g-sec{font-size:6vh;color:#ffd24a;font-weight:700;height:9vh;display:flex;align-items:center}
+.g-row{flex:1;display:flex;align-items:center;gap:3vw;border-bottom:.4vh solid #161616;min-height:0}
+.g-row:last-child{border-bottom:0}
+.g-no{width:11vw;font-size:7.5vh;color:#7fb8ff;font-weight:700;font-variant-numeric:tabular-nums;flex:none}
+.g-nm{flex:1;font-size:9vh;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.g-nm small{font-size:5.5vh;color:#9a9a9a;font-weight:500;margin-left:1.5vw}
+.g-spec{font-size:7vh;color:#d6d6d6;white-space:nowrap;font-variant-numeric:tabular-nums;flex:none}
+.g-row.spare .g-nm,.g-row.spare .g-spec{color:#5c5c5c}
+.g-row.spare .g-nm{font-weight:500}
+.g-foot{height:10vh;display:flex;align-items:center;justify-content:space-between;padding:0 3.5vw;
+  font-size:5vh;color:#7a7a7a;border-top:.4vh solid #161616}
+.g-sum{flex:1;display:flex;flex-direction:column;justify-content:center;gap:2.5vh;padding:0 3.5vw}
+.g-big{font-size:8vh;font-weight:700}
+.g-big em{font-style:normal;color:#7fb8ff}
+.g-mid{font-size:6.5vh;color:#cfcfcf}
+.g-warn{font-size:6vh;color:#ffb072}
+.g-center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3vh;text-align:center;padding:0 5vw}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+(function(){
+"use strict";
+var app = document.getElementById("app");
+var qs = new URLSearchParams(location.search);
+var DATA = null;
+var PER = 4;                 // 글래스 한 화면에 보이는 회로 수
+
+// 글래스로 볼지: ?mode=glass / ?mode=list 로 강제, 아니면 화면 모양으로 판단
+function isGlass(){
+  var m = qs.get("mode");
+  if (m === "glass") return true;
+  if (m === "list") return false;
+  var w = window.innerWidth, h = window.innerHeight;
+  return h <= 480 && w / h >= 1.45;
+}
+
+function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){
+  return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
+
+function brk(c){
+  // 차단기 표기: ELB 2P 30/20A
+  var a = [];
+  if (c.kind) a.push(c.kind);
+  if (c.pole) a.push(c.pole);
+  if (c.af != null || c.at != null) a.push((c.af != null ? c.af : "?") + "/" + (c.at != null ? c.at : "?") + "A");
+  return a.join(" ");
+}
+function brkShort(c){
+  var a = [];
+  if (c.pole) a.push(c.pole);
+  if (c.af != null || c.at != null) a.push((c.af != null ? c.af : "?") + "/" + (c.at != null ? c.at : "?") + "A");
+  return a.join(" ");
+}
+function sideLabel(s){ return s === "좌" ? "좌측 열" : s === "우" ? "우측 열" : (s || "회로"); }
+
+function panelPath(name){ return "/p/" + encodeURIComponent(name); }
+
+function currentPanelName(){
+  var m = location.pathname.match(/^\/p\/(.+)$/);
+  if (!m) return null;
+  try { return decodeURIComponent(m[1]); } catch(e){ return m[1]; }
+}
+
+function groups(p){
+  // 열(좌/우/3열…) 순서대로 묶기
+  var order = [], map = {};
+  p.circuits.forEach(function(c){
+    var k = c.side || "";
+    if (!map[k]) { map[k] = []; order.push(k); }
+    map[k].push(c);
+  });
+  return order.map(function(k){ return {side:k, list:map[k]}; });
+}
+
+/* ================= 일반 화면 ================= */
+function renderHome(){
+  document.body.className = "";
+  var ln = DATA.panels.filter(function(p){ return p.type === "LN"; });
+  var mcc = DATA.panels.filter(function(p){ return p.type === "MCC"; });
+  app.innerHTML =
+    '<div class="wrap">' +
+    '<div class="top"><h1>분전반 회로표</h1><span style="display:flex;gap:14px;flex-wrap:wrap">' +
+    '<a href="/about">소개·체험</a><a href="/admin">순찰·점검 현황</a><a href="/qr?tab=panel">QR 인쇄</a></span></div>' +
+    '<input class="search" id="q" type="search" placeholder="분전반 이름 검색 (예: B1, LN-C)" autocomplete="off">' +
+    '<div id="list"></div></div>';
+  var q = document.getElementById("q"), list = document.getElementById("list");
+  function draw(){
+    var t = q.value.trim().toUpperCase();
+    function f(arr){ return arr.filter(function(p){ return !t || p.name.toUpperCase().indexOf(t) >= 0; }); }
+    function cards(arr){
+      return '<div class="plist">' + arr.map(function(p){
+        var spare = p.circuits.filter(function(c){ return c.spare; }).length;
+        return '<a href="' + panelPath(p.name) + '"><b>' + esc(p.name) + '</b><span>회로 ' +
+          p.circuits.length + '개 · 예비 ' + spare + '</span></a>';
+      }).join("") + '</div>';
+    }
+    var a = f(ln), b = f(mcc), h = "";
+    if (a.length) h += '<div class="group-t">전등·전열 분전반 ' + a.length + '</div>' + cards(a);
+    if (b.length) h += '<div class="group-t">동력(MCC) 반 ' + b.length + '</div>' + cards(b);
+    list.innerHTML = h || '<p class="empty">검색 결과가 없습니다.</p>';
+  }
+  q.addEventListener("input", draw);
+  draw();
+}
+
+function renderPanelList(p){
+  document.body.className = "";
+  document.title = p.name + " · 분전반 회로표";
+  var h = '<div class="wrap"><a class="back" href="/">← 전체 분전반</a>';
+  h += '<div class="ph"><h1>' + esc(p.name) + '</h1>';
+  if (p.main) h += '<p>주차단기 ' + esc(brk(p.main)) + (p.main.ka ? ' · ' + esc(p.main.ka) : '') + '</p>';
+  h += '<p>회로 ' + p.circuits.length + '개 · 예비 ' + p.circuits.filter(function(c){return c.spare;}).length +
+       '개 · 도면 ' + esc(p.dwg || "") + '</p>';
+  if (p.flag) h += '<div class="flag">⚠ ' + esc(p.flag) + ' (도면 원본과 대조 필요)</div>';
+  h += '<a class="glink" href="' + panelPath(p.name) + '?mode=glass">스마트글래스 화면 미리보기 →</a></div>';
+
+  if (p.type === "MCC") {
+    h += '<table><thead><tr><th>번호</th><th>부하</th><th>차단기</th><th>용량</th></tr></thead><tbody>';
+    p.circuits.forEach(function(c){
+      h += '<tr' + (c.spare ? ' class="spare"' : '') + '><td class="n">' + esc(c.no) + '</td><td class="nm">' +
+        esc(c.name) + (c.equip ? ' <span style="color:var(--sub);font-weight:400">' + esc(c.equip) + '</span>' : '') +
+        '</td><td class="sp">' + esc(brkShort(c)) + '</td><td class="sp">' + (c.kw != null ? esc(c.kw) + 'kW' : '') + '</td></tr>';
+    });
+    h += '</tbody></table>';
+  } else {
+    groups(p).forEach(function(g){
+      h += '<div class="cap">' + esc(sideLabel(g.side)) + ' · ' + g.list.length + '회로</div>';
+      h += '<table><thead><tr><th>번호</th><th>부하명</th><th>차단기</th><th>비고</th></tr></thead><tbody>';
+      g.list.forEach(function(c){
+        h += '<tr' + (c.spare ? ' class="spare"' : '') + '><td class="n">' + esc(c.no) + '</td><td class="nm">' +
+          esc(c.spare ? "예비" : (c.name || "(이름 없음)")) + '</td><td class="sp">' + esc(brk(c)) + '</td><td>' + esc(c.note) + '</td></tr>';
+      });
+      h += '</tbody></table>';
+    });
+  }
+  h += '</div>';
+  app.innerHTML = h;
+}
+
+/* ================= 스마트글래스 화면 ================= */
+var G = null;   // {p, cards, i}
+
+function buildCards(p){
+  var cards = [{kind:"sum"}];
+  if (p.type === "MCC") {
+    for (var i = 0; i < p.circuits.length; i += PER)
+      cards.push({kind:"rows", sec:"동력 회로", rows:p.circuits.slice(i, i + PER), from:i + 1, total:p.circuits.length, start:i === 0});
+  } else {
+    groups(p).forEach(function(g){
+      for (var i = 0; i < g.list.length; i += PER)
+        cards.push({kind:"rows", sec:sideLabel(g.side), rows:g.list.slice(i, i + PER), from:i + 1, total:g.list.length, start:i === 0});
+    });
+  }
+  return cards;
+}
+
+function glassFrame(title, right, body, foot){
+  return '<div class="g"><div class="g-head"><div class="g-title">' + esc(title) + '</div><div class="g-pg">' +
+    right + '</div></div>' + body + '<div class="g-foot">' + foot + '</div></div>';
+}
+
+function renderGlassHome(){
+  document.body.className = "glass";
+  G = null;
+  app.innerHTML = glassFrame("분전반 회로표", "", '<div class="g-center"><div class="g-big">분전반의 <em>QR</em>을 스캔하세요</div>' +
+    '<div class="g-mid">전등·전열 ' + DATA.panels.filter(function(p){return p.type==="LN";}).length +
+    ' · 동력 ' + DATA.panels.filter(function(p){return p.type==="MCC";}).length + '개 등록</div></div>',
+    '<span>Vuzix M400</span><span></span>');
+}
+
+function renderGlass(){
+  var p = G.p, c = G.cards[G.i], n = G.cards.length;
+  var pg = (G.i + 1) + " / " + n, body;
+  if (c.kind === "sum") {
+    var spare = p.circuits.filter(function(x){ return x.spare; }).length;
+    body = '<div class="g-sum">';
+    if (p.main) body += '<div class="g-big">주차단기 <em>' + esc(brk(p.main)) + '</em></div>';
+    body += '<div class="g-mid">회로 ' + p.circuits.length + '개 · 예비 ' + spare + '개</div>';
+    if (p.type !== "MCC") {
+      body += '<div class="g-mid">' + groups(p).map(function(g){ return esc(sideLabel(g.side)) + ' ' + g.list.length; }).join(" · ") + '</div>';
+    }
+    if (p.flag) body += '<div class="g-warn">⚠ ' + esc(p.flag) + '</div>';
+    body += '</div>';
+  } else {
+    var to = c.from + c.rows.length - 1;
+    body = '<div class="g-body"><div class="g-sec">' + esc(c.sec) + ' &nbsp;' + c.from + '–' + to + ' / ' + c.total + '</div>';
+    c.rows.forEach(function(r){
+      var nm = r.spare ? "예비" : (r.name || "(이름 없음)");
+      var sub = (p.type === "MCC" && r.kw != null) ? '<small>' + esc(r.kw) + 'kW</small>' : '';
+      body += '<div class="g-row' + (r.spare ? ' spare' : '') + '"><div class="g-no">' + esc(r.no) +
+        '</div><div class="g-nm">' + esc(nm) + sub + '</div><div class="g-spec">' + esc(p.type === "MCC" ? brkShort(r) : brk(r)) + '</div></div>';
+    });
+    for (var k = c.rows.length; k < PER; k++) body += '<div class="g-row"></div>';
+    body += '</div>';
+  }
+  var foot = G.i === 0 ? '<span>밀어서 회로 보기 ▶</span><span>탭: 다음 열</span>'
+                       : '<span>◀ 이전 · 다음 ▶</span><span>탭: 다음 열 · 두 손가락: 처음</span>';
+  app.innerHTML = glassFrame(p.name, pg, body, foot);
+}
+
+function go(i){
+  if (!G) return;
+  G.i = Math.max(0, Math.min(G.cards.length - 1, i));
+  renderGlass();
+}
+function nextSection(){
+  if (!G) return;
+  for (var i = G.i + 1; i < G.cards.length; i++) if (G.cards[i].start) return go(i);
+  go(0);    // 마지막 열이면 처음으로
+}
+
+// Vuzix M400 터치패드: 앞뒤로 밀기 = 방향키, 탭 = Enter, 두 손가락 탭 = 뒤로(Escape)
+document.addEventListener("keydown", function(e){
+  if (!G) return;
+  var k = e.key;
+  if (k === "ArrowRight" || k === "ArrowDown" || k === "PageDown" || (k === "Tab" && !e.shiftKey) || k === " ") { go(G.i + 1); e.preventDefault(); }
+  else if (k === "ArrowLeft" || k === "ArrowUp" || k === "PageUp" || (k === "Tab" && e.shiftKey)) { go(G.i - 1); e.preventDefault(); }
+  else if (k === "Enter") { nextSection(); e.preventDefault(); }
+  else if (k === "Escape" || k === "Backspace" || k === "BrowserBack" || k === "GoBack") {
+    if (G.i !== 0) { go(0); e.preventDefault(); }
+  }
+});
+// 휴대폰을 가로로 들고 볼 때: 왼쪽 1/3 누르면 이전, 나머지는 다음 / 좌우로 쓸기
+var tx = null;
+document.addEventListener("touchstart", function(e){ if (G) tx = e.touches[0].clientX; }, {passive:true});
+document.addEventListener("touchend", function(e){
+  if (!G || tx == null) return;
+  var dx = e.changedTouches[0].clientX - tx; tx = null;
+  if (Math.abs(dx) > 40) { go(G.i + (dx < 0 ? 1 : -1)); e.preventDefault(); }
+});
+document.addEventListener("click", function(e){
+  if (!G) return;
+  go(G.i + (e.clientX < window.innerWidth / 3 ? -1 : 1));
+});
+
+/* ================= 시작 ================= */
+function route(){
+  var name = currentPanelName();
+  var glass = isGlass();
+  if (!name) return glass ? renderGlassHome() : renderHome();
+  var p = DATA.panels.find(function(x){ return x.name === name; }) ||
+          DATA.panels.find(function(x){ return x.name.toUpperCase() === name.toUpperCase(); });
+  if (!p) {
+    document.body.className = glass ? "glass" : "";
+    G = null;
+    app.innerHTML = glass
+      ? glassFrame("찾을 수 없음", "", '<div class="g-center"><div class="g-big">' + esc(name) + '</div><div class="g-mid">등록되지 않은 분전반입니다</div></div>', "")
+      : '<div class="wrap"><a class="back" href="/">← 전체 분전반</a><p class="empty">"' + esc(name) + '" 분전반을 찾을 수 없습니다.</p></div>';
+    return;
+  }
+  if (glass) {
+    document.body.className = "glass";
+    document.title = p.name;
+    var keep = G && G.p === p ? G.i : 0;
+    G = {p:p, cards:buildCards(p), i:0};
+    go(keep);
+  } else {
+    G = null;
+    renderPanelList(p);
+  }
+}
+
+fetch("/data.json", {cache:"no-cache", credentials:"same-origin"})
+  .then(function(r){ if (!r.ok) throw new Error(r.status); return r.json(); })
+  .then(function(d){ DATA = d; route(); })
+  .catch(function(){
+    app.innerHTML = '<div class="wrap"><p class="empty">회로표 자료를 불러오지 못했습니다. QR을 다시 스캔해 주세요.</p></div>';
+  });
+
+var lastGlass = null;
+window.addEventListener("resize", function(){
+  if (!DATA) return;
+  var gl = isGlass();
+  if (gl !== lastGlass) { lastGlass = gl; route(); }
+});
+lastGlass = isGlass();
+})();
+</script>
+</body>
+</html>

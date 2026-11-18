@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>스마트글래스 현장 업무</title>
+<style>
+:root{--bg:#f4f5f7;--card:#fff;--ink:#14171c;--sub:#5b6370;--line:#e1e4e9;--accent:#0a66d8;--accentbg:#e8f1fc;
+  --ok:#1a8a4a;--okbg:#e7f6ec;--bad:#c0392b;--badbg:#fdecea;--warn:#b4531a;--warnbg:#fff3e8;--a:#8a94a3;--b:#0a66d8}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0e1013;--card:#171a1f;--ink:#e9ecf1;--sub:#9aa3af;--line:#2a2f37;--accent:#5aa2ff;--accentbg:#14243a;
+  --ok:#5be08a;--okbg:#12291b;--bad:#ff7a6b;--badbg:#2e1513;--warn:#ffb072;--warnbg:#2b1d12;--a:#6b7480;--b:#5aa2ff}}
+:root[data-theme="dark"]{--bg:#0e1013;--card:#171a1f;--ink:#e9ecf1;--sub:#9aa3af;--line:#2a2f37;--accent:#5aa2ff;--accentbg:#14243a;
+  --ok:#5be08a;--okbg:#12291b;--bad:#ff7a6b;--badbg:#2e1513;--warn:#ffb072;--warnbg:#2b1d12;--a:#6b7480;--b:#5aa2ff}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:"Pretendard","Malgun Gothic","Apple SD Gothic Neo",system-ui,sans-serif;line-height:1.6}
+a{color:var(--accent)}
+.wrap{max-width:980px;margin:0 auto;padding:0 16px}
+nav{display:flex;gap:14px;align-items:center;padding:16px 0;font-size:14px;flex-wrap:wrap}
+nav b{margin-right:auto;font-size:15px}
+nav a{text-decoration:none}
+header{padding:36px 0 28px}
+header .eyebrow{font-size:13px;color:var(--accent);font-weight:700;letter-spacing:.04em}
+header h1{font-size:clamp(28px,5vw,42px);line-height:1.2;letter-spacing:-.03em;margin:8px 0 12px;word-break:keep-all}
+header p{font-size:17px;color:var(--sub);max-width:640px;word-break:keep-all}
+section{padding:28px 0;border-top:1px solid var(--line)}
+h2{font-size:22px;letter-spacing:-.02em;margin-bottom:6px;word-break:keep-all}
+.lead{color:var(--sub);margin-bottom:18px;word-break:keep-all}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px}
+.card h3{font-size:17px;margin-bottom:6px}
+.card p{font-size:14px;color:var(--sub);word-break:keep-all}
+.card .who{font-size:12px;font-weight:700;color:var(--accent);margin-bottom:6px;display:block}
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;counter-reset:s}
+.step{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;position:relative}
+.step::before{counter-increment:s;content:counter(s);display:inline-flex;width:28px;height:28px;border-radius:50%;background:var(--accentbg);color:var(--accent);
+  font-weight:800;align-items:center;justify-content:center;margin-bottom:8px}
+.step b{display:block;font-size:16px}
+.step span{font-size:14px;color:var(--sub);word-break:keep-all}
+/* 시뮬레이터 */
+.simtabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.simtabs button{font-size:14px;padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+.simtabs button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.simbox{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:760px){.simbox{grid-template-columns:1fr}}
+.lens{background:#111;border-radius:18px;padding:14px;box-shadow:inset 0 0 0 1px #2a2a2a}
+.screen{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;border-radius:6px;background:#000}
+.screen iframe{position:absolute;left:0;top:0;width:640px;height:360px;border:0;transform-origin:0 0}
+.pad{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}
+.pad button{font-size:14px;padding:10px 4px;border-radius:10px;border:1px solid #333;background:#1b1b1b;color:#eee;cursor:pointer;line-height:1.3}
+.pad button small{display:block;font-size:11px;color:#9a9a9a}
+.pad button:active{background:#2a2a2a}
+.simdesc h3{font-size:18px;margin-bottom:8px}
+.simdesc p,.simdesc li{font-size:14px;color:var(--sub);word-break:keep-all}
+.simdesc ul{padding-left:18px;margin-top:8px}
+.simdesc .note{margin-top:12px;font-size:13px;background:var(--accentbg);color:var(--ink);border-radius:10px;padding:10px 12px}
+/* 비용 */
+.cost{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:18px;align-items:start}
+@media (max-width:760px){.cost{grid-template-columns:1fr}}
+.form{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
+.form h3{font-size:15px;margin:4px 0 10px}
+.form h3:not(:first-child){margin-top:18px}
+.f{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;font-size:14px}
+.f span{color:var(--sub);word-break:keep-all}
+.f input[type=number]{width:120px;font-size:15px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);text-align:right;font-variant-numeric:tabular-nums}
+.chk{display:flex;gap:8px;align-items:center;font-size:14px;margin:6px 0 10px}
+.res{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px}
+.big{font-size:clamp(28px,5vw,38px);font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.big.ok{color:var(--ok)}
+.bars{margin:18px 0 8px;display:flex;flex-direction:column;gap:12px}
+.bar label{display:flex;justify-content:space-between;font-size:14px;margin-bottom:4px}
+.bar label b{font-variant-numeric:tabular-nums}
+.track{height:22px;background:var(--bg);border-radius:6px;overflow:hidden;display:flex}
+.seg{height:100%}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--sub);flex-wrap:wrap}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+table{width:100%;border-collapse:collapse;margin-top:14px}
+td,th{padding:7px 4px;border-bottom:1px solid var(--line);font-size:13px;text-align:right;font-variant-numeric:tabular-nums}
+td:first-child,th:first-child{text-align:left;color:var(--sub)}
+th{font-size:12px;color:var(--sub);font-weight:600}
+.src{font-size:12px;color:var(--sub);margin-top:12px;word-break:keep-all}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
+.two .card ul{padding-left:18px;font-size:14px;color:var(--sub)}
+.two .card li{margin-bottom:6px;word-break:keep-all}
+.two .card li b{color:var(--ink)}
+ol.demo{padding-left:20px}
+ol.demo li{margin-bottom:10px;word-break:keep-all}
+ol.demo li span{color:var(--sub);font-size:14px;display:block}
+.links{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+.links a{display:inline-block;padding:10px 16px;border-radius:10px;background:var(--card);border:1px solid var(--line);text-decoration:none;font-size:14px;font-weight:600}
+.links a.pri{background:var(--accent);color:#fff;border-color:var(--accent)}
+footer{padding:30px 0 50px;color:var(--sub);font-size:13px;border-top:1px solid var(--line)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav><b>스마트글래스 현장 업무</b><a href="#sim">화면 체험</a><a href="#cost">비용 비교</a><a href="#demo">시연 순서</a><a href="/admin">현황 화면</a></nav>
+
+<header>
+  <div class="eyebrow">VUZIX M400 · 시범 운영</div>
+  <h1>QR 하나 붙이고, 글래스로 찍으면<br>현장 자료가 눈앞에 뜹니다</h1>
+  <p>스마트글래스가 없는 분도 이 페이지에서 실제 화면을 그대로 눌러 볼 수 있습니다. 시설관리, 보안, 미화 세 분야에 하나씩 만들었습니다.</p>
+</header>
+
+<section>
+  <h2>무엇을 만들었나</h2>
+  <p class="lead">세 기능 모두 같은 사이트에 있습니다. 같은 QR을 휴대폰으로 찍어도 작동합니다.</p>
+  <div class="grid3">
+    <div class="card"><span class="who">시설관리</span><h3>분전반 회로표</h3><p>분전반 문에 붙은 QR을 찍으면 그 분전반의 회로 이름과 차단기 용량이 4줄씩 뜹니다. 도면을 찾으러 가거나 손전등을 비춰 가며 읽을 필요가 없습니다. 분전반 120개, 회로 2,468개가 등록돼 있습니다.</p></div>
+    <div class="card"><span class="who">보안</span><h3>순찰 체크포인트</h3><p>순찰 지점의 QR을 찍는 순간 시각과 순찰자가 기록됩니다. 이상이 있으면 그 자리에서 종류를 골라 보고합니다. 태그기를 뽑아서 출력할 필요 없이, 사무실 화면에 실시간으로 올라옵니다.</p></div>
+    <div class="card"><span class="who">미화</span><h3>화장실 구역 점검</h3><p>화장실 QR을 찍고 청소 항목을 하나씩 체크합니다. 소모품 부족이나 막힘 같은 이상도 같이 보고합니다. 관리자는 어느 화장실을 언제 누가 점검했는지, 빠진 항목은 무엇인지 바로 확인합니다.</p></div>
+  </div>
+</section>
+
+<section>
+  <h2>어떻게 돌아가나</h2>
+  <p class="lead">별도 장비나 서버 구입 없이, 종이 QR과 웹사이트만으로 돌아갑니다.</p>
+  <div class="steps">
+    <div class="step"><b>QR 라벨 부착</b><span>사이트에서 A4로 인쇄해 분전반, 순찰 지점, 화장실에 붙입니다. 장당 16개씩 나옵니다.</span></div>
+    <div class="step"><b>개인 카드 한 번 스캔</b><span>근무 시작 때 본인 이름 QR 카드를 한 번 찍으면, 이후 기록에 이름이 자동으로 붙습니다.</span></div>
+    <div class="step"><b>현장에서 스캔</b><span>글래스의 스캐너로 찍으면 화면이 뜹니다. 터치패드로 넘기고, 탭해서 선택합니다.</span></div>
+    <div class="step"><b>사무실에서 확인</b><span>현황 화면에 5초마다 반영됩니다. 날짜별 일지 출력과 엑셀 다운로드도 됩니다.</span></div>
+  </div>
+</section>
+
+<section id="sim">
+  <h2>글래스 화면 체험</h2>
+  <p class="lead">아래는 M400 화면(640×360)과 똑같은 실제 화면입니다. 버튼은 M400 오른쪽 다리의 터치패드 동작과 같습니다. 체험용이라 눌러도 기록은 남지 않습니다.</p>
+  <div class="simtabs" id="simtabs">
+    <button class="on" data-i="0">분전반 회로표</button>
+    <button data-i="1">보안 순찰</button>
+    <button data-i="2">화장실 점검</button>
+  </div>
+  <div class="simbox">
+    <div>
+      <div class="lens"><div class="screen" id="screen"><iframe id="sim-frame" title="스마트글래스 화면" src="about:blank"></iframe></div>
+        <div class="pad">
+          <button data-k="ArrowLeft">◀ 뒤로 밀기<small>이전</small></button>
+          <button data-k="ArrowRight">앞으로 밀기 ▶<small>다음</small></button>
+          <button data-k="Enter">한 손가락 탭<small>선택</small></button>
+          <button data-k="Escape">두 손가락 탭<small>처음·취소</small></button>
+        </div>
+      </div>
+    </div>
+    <div class="simdesc" id="simdesc"></div>
+  </div>
+</section>
+
+<section id="cost">
+  <h2>태그기(RFID) 방식과 비용 비교</h2>
+  <p class="lead">숫자는 아래 칸에서 바로 바꿀 수 있습니다. 기본값은 인터넷 판매가와 2026년 최저시급 기준입니다. 견적을 받으면 그 금액으로 바꿔 보세요.</p>
+  <div class="cost">
+    <div class="form" id="form">
+      <h3>공통</h3>
+      <div class="f"><span>순찰 지점 수</span><input type="number" id="pts" min="1" value="12"></div>
+      <div class="f"><span>비교 기간 (년)</span><input type="number" id="yrs" min="1" max="10" value="3"></div>
+      <div class="f"><span>시급 (원)</span><input type="number" id="wage" step="10" value="10320"></div>
+      <h3>지금 방식: RFID 태그기</h3>
+      <label class="chk"><input type="checkbox" id="owned"> 이미 갖고 있음 (장비 구입비 빼고 계산)</label>
+      <div class="f"><span>순찰기 대수</span><input type="number" id="readers" min="0" value="2"></div>
+      <div class="f"><span>순찰기 1대 (원)</span><input type="number" id="readerP" step="1000" value="220000"></div>
+      <div class="f"><span>지점 칩 1개 (원)</span><input type="number" id="chipP" step="100" value="3340"></div>
+      <div class="f"><span>순찰자 태그 개수</span><input type="number" id="tags" min="0" value="4"></div>
+      <div class="f"><span>순찰자 태그 1개 (원)</span><input type="number" id="tagP" step="100" value="1600"></div>
+      <div class="f"><span>연 유지비 1대당 (배터리·수리)</span><input type="number" id="maint" step="1000" value="30000"></div>
+      <div class="f"><span>하루 뽑기·출력·정리 시간 (분)</span><input type="number" id="minT" min="0" value="20"></div>
+      <h3>새 방식: QR</h3>
+      <div class="f"><span>QR 라벨 1장 (코팅, 원)</span><input type="number" id="labelP" step="100" value="500"></div>
+      <div class="f"><span>라벨 교체 (연 몇 번)</span><input type="number" id="relabel" min="0" value="1"></div>
+      <div class="f"><span>하루 확인·출력 시간 (분)</span><input type="number" id="minQ" min="0" value="3"></div>
+    </div>
+    <div class="res">
+      <div style="font-size:14px;color:var(--sub)" id="r-cap">3년 동안 아낄 수 있는 금액</div>
+      <div class="big ok" id="r-save">—</div>
+      <div class="bars">
+        <div class="bar"><label><span>RFID 태그기</span><b id="r-a">—</b></label><div class="track" id="t-a"></div></div>
+        <div class="bar"><label><span>QR (스마트글래스·휴대폰)</span><b id="r-b">—</b></label><div class="track" id="t-b"></div></div>
+      </div>
+      <div class="legend"><span><i style="background:var(--a)"></i>장비·소모품</span><span><i style="background:var(--b)"></i>사람 시간 (출력·정리)</span></div>
+      <table>
+        <thead><tr><th></th><th>RFID 태그기</th><th>QR</th></tr></thead>
+        <tbody id="r-tbl"></tbody>
+      </table>
+      <p class="src" id="r-note"></p>
+      <p class="src">가격 출처 (2026년 11월 인터넷 판매가):
+        순찰기 <a href="https://www.ssg.com/item/itemView.ssg?itemId=1000530917401" target="_blank" rel="noopener">코파스 T-3000 164,990원</a> ~
+        <a href="https://www.ssg.com/item/itemView.ssg?itemId=1000027979744" target="_blank" rel="noopener">T-6000 278,000원</a>,
+        <a href="http://itempage3.auction.co.kr/DetailView.aspx?itemno=B454399727" target="_blank" rel="noopener">RFID 지점 칩 3,340원</a>,
+        <a href="https://nowwin.co.kr/product/%EC%88%9C%EC%B0%B0%EC%9E%90%ED%83%9C%EA%B7%B8-em-t-4/21/" target="_blank" rel="noopener">순찰자 태그 1,600원</a>.
+        QR 쪽 서버·저장 비용은 지금 쓰는 사이트 계정 안에서 처리되어 따로 들지 않습니다. 스마트글래스는 이미 구입한 장비라 넣지 않았고, 휴대폰으로도 됩니다.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>좋은 점과 한계</h2>
+  <p class="lead">이번 시범에서 확인한 내용입니다.</p>
+  <div class="two">
+    <div class="card"><h3 style="color:var(--ok)">좋은 점</h3><ul>
+      <li><b>손이 자유롭습니다.</b> 사다리 위나 분전반 앞에서 휴대폰을 꺼내지 않아도 됩니다.</li>
+      <li><b>기록이 실시간입니다.</b> 태그기를 뽑아 출력할 때까지 기다리지 않습니다.</li>
+      <li><b>이상 보고가 바로 됩니다.</b> 따로 일지를 쓰지 않아도 순찰 기록과 같이 남습니다.</li>
+      <li><b>장비비가 거의 없습니다.</b> 종이 QR과 기존 휴대폰으로도 돌아갑니다.</li>
+      <li><b>한 번 만든 틀을 계속 씁니다.</b> SOP, 설비 이력, 비상 매뉴얼도 같은 방식으로 늘릴 수 있습니다.</li>
+    </ul></div>
+    <div class="card"><h3 style="color:var(--warn)">한계와 대책</h3><ul>
+      <li><b>QR은 사진으로 베낄 수 있습니다.</b> 지점 사이 이동 시간이 비정상적이면 표시하고, QR을 주기적으로 바꿉니다. 꼭 막아야 하는 곳은 태그기를 함께 씁니다.</li>
+      <li><b>지하는 인터넷이 약할 수 있습니다.</b> 기기에 먼저 저장해 두고, 연결되면 자동으로 보냅니다.</li>
+      <li><b>글래스 화면이 작습니다.</b> 일반 웹페이지는 못 읽습니다. 그래서 큰 글씨 전용 화면을 따로 만들었습니다.</li>
+      <li><b>배터리와 착용감이 아쉽습니다.</b> 하루 종일보다는 순찰, 점검 시간에만 쓰는 게 맞습니다.</li>
+      <li><b>한국어 음성 명령은 약합니다.</b> 터치패드만으로 쓰도록 만들었습니다.</li>
+    </ul></div>
+  </div>
+</section>
+
+<section id="demo">
+  <h2>시연 순서 (약 5분)</h2>
+  <p class="lead">QR 인쇄 화면의 「시연 세트」를 한 장 뽑아 두면 바로 할 수 있습니다.</p>
+  <ol class="demo">
+    <li><b>큰 화면에 현황 화면을 띄웁니다.</b><span>노트북이나 TV에 /admin을 열어 둡니다. 5초마다 자동으로 바뀝니다.</span></li>
+    <li><b>글래스로 개인 카드를 찍습니다.</b><span>"대표 님 등록" 같은 확인 화면이 뜹니다.</span></li>
+    <li><b>순찰 QR 두 장을 차례로 찍습니다.</b><span>찍자마자 현황 화면에 순찰 시각이 올라옵니다. 두 번째 지점에서 「이상 있음 → 누수」를 고르면 빨간 표시가 뜹니다.</span></li>
+    <li><b>화장실 QR을 찍고 항목을 체크합니다.</b><span>터치패드로 넘기고, 탭으로 체크한 뒤 「저장하고 완료」를 누릅니다. 현황 화면 「화장실 점검」 탭에 반영됩니다.</span></li>
+    <li><b>분전반 QR을 찍습니다.</b><span>회로표가 뜹니다. 밀어서 넘기고, 탭으로 좌측 열에서 우측 열로 건너뜁니다.</span></li>
+    <li><b>현황 화면에서 「일지 출력」을 누릅니다.</b><span>태그기 출력물을 대신하는 일지가 바로 나옵니다.</span></li>
+  </ol>
+  <div class="links" style="margin-top:16px">
+    <a class="pri" href="/admin">현황 화면 열기</a>
+    <a href="/qr">QR 라벨·시연 세트 인쇄</a>
+    <a href="/">분전반 회로표</a>
+  </div>
+</section>
+
+<footer>시범 운영 사이트입니다. 접속 키가 있어야 열리며, 검색에 노출되지 않습니다.</footer>
+</div>
+
+<script>
+(function(){
+"use strict";
+/* ---------- 글래스 화면 체험 ---------- */
+var SIMS = [
+  {src:"/p/LN-GY-B2A?mode=glass", title:"분전반 회로표",
+   body:"<p>분전반 문에 붙은 QR을 찍었을 때의 화면입니다.</p><ul><li>첫 화면: 주차단기와 회로 수</li><li>앞으로 밀기: 회로 4개씩 넘김</li><li>탭: 좌측 열에서 우측 열로 건너뜀</li><li>예비 회로는 흐리게 표시</li></ul><div class='note'>같은 QR을 휴대폰으로 찍으면 일반 표 화면이 나옵니다.</div>"},
+  {src:"/c/P05?mode=glass&demo=1", title:"보안 순찰",
+   body:"<p>순찰 지점(B1 전기실) QR을 찍은 순간입니다. 이미 시각과 순찰자가 기록된 상태입니다.</p><ul><li>탭: 「이상 없음 · 완료」</li><li>앞으로 밀기 후 탭: 「이상 있음 보고」를 누르고 종류 선택</li><li>완료하면 오늘 순찰한 지점 수가 표시됨</li></ul><div class='note'>실제로 찍으면 사무실 현황 화면에 5초 안에 올라옵니다.</div>"},
+  {src:"/t/T-1F-M?mode=glass&demo=1", title:"화장실 점검",
+   body:"<p>화장실 QR을 찍으면 점검 항목이 나옵니다.</p><ul><li>밀기: 항목 이동 (노란 테두리)</li><li>탭: 체크 / 해제</li><li>「전체 체크」로 한 번에 체크</li><li>「이상 있음 보고」: 소모품 없음, 막힘, 고장 등</li><li>「저장하고 완료」: 빠진 항목까지 함께 저장</li></ul>"}
+];
+var frame = document.getElementById("sim-frame"), screen = document.getElementById("screen"), desc = document.getElementById("simdesc");
+function fit(){ frame.style.transform = "scale(" + (screen.clientWidth / 640) + ")"; }
+if (window.ResizeObserver) new ResizeObserver(fit).observe(screen); else addEventListener("resize", fit);
+function show(i){
+  frame.src = SIMS[i].src;
+  desc.innerHTML = "<h3>" + SIMS[i].title + "</h3>" + SIMS[i].body;
+  document.querySelectorAll("#simtabs button").forEach(function(b){ b.classList.toggle("on", +b.getAttribute("data-i") === i); });
+  fit();
+}
+document.querySelectorAll("#simtabs button").forEach(function(b){ b.addEventListener("click", function(){ show(+b.getAttribute("data-i")); }); });
+document.querySelectorAll(".pad button").forEach(function(b){
+  b.addEventListener("click", function(){
+    try {
+      var w = frame.contentWindow;
+      w.document.dispatchEvent(new w.KeyboardEvent("keydown", {key:b.getAttribute("data-k"), bubbles:true, cancelable:true}));
+    } catch(e){}
+  });
+});
+show(0);
+
+/* ---------- 비용 비교 ---------- */
+var ids = ["pts","yrs","wage","readers","readerP","chipP","tags","tagP","maint","minT","labelP","relabel","minQ"];
+function v(id){ var n = parseFloat(document.getElementById(id).value); return isFinite(n) && n >= 0 ? n : 0; }
+function won(n){ return Math.round(n).toLocaleString("ko-KR") + "원"; }
+function man(n){ var m = Math.round(n / 10000); return m.toLocaleString("ko-KR") + "만원"; }
+function calc(){
+  var y = Math.max(1, v("yrs")), owned = document.getElementById("owned").checked;
+  var aEquip = owned ? 0 : v("readers") * v("readerP") + v("pts") * v("chipP") + v("tags") * v("tagP");
+  var aMaint = v("readers") * v("maint") * y;
+  var aLabor = v("minT") / 60 * 365 * y * v("wage");
+  var bLabel = v("pts") * v("labelP") * (1 + v("relabel") * y);
+  var bLabor = v("minQ") / 60 * 365 * y * v("wage");
+  var A = aEquip + aMaint + aLabor, B = bLabel + bLabor, max = Math.max(A, B, 1);
+  document.getElementById("r-cap").textContent = y + "년 동안 아낄 수 있는 금액";
+  var save = A - B;
+  var el = document.getElementById("r-save");
+  el.textContent = (save >= 0 ? "" : "−") + won(Math.abs(save));
+  el.className = "big" + (save >= 0 ? " ok" : "");
+  document.getElementById("r-a").textContent = won(A);
+  document.getElementById("r-b").textContent = won(B);
+  function segs(e, l){ return '<div class="seg" style="width:' + (e / max * 100) + '%;background:var(--a)"></div><div class="seg" style="width:' + (l / max * 100) + '%;background:var(--b)"></div>'; }
+  document.getElementById("t-a").innerHTML = segs(aEquip + aMaint, aLabor);
+  document.getElementById("t-b").innerHTML = segs(bLabel, bLabor);
+  document.getElementById("r-tbl").innerHTML =
+    "<tr><td>장비 구입</td><td>" + won(aEquip) + "</td><td>0원</td></tr>" +
+    "<tr><td>유지비 (" + y + "년)</td><td>" + won(aMaint) + "</td><td>" + won(bLabel) + "<br><span style='font-size:11px;color:var(--sub)'>QR 라벨·교체</span></td></tr>" +
+    "<tr><td>사람 시간 (" + y + "년)</td><td>" + won(aLabor) + "<br><span style='font-size:11px;color:var(--sub)'>" + Math.round(v("minT") / 60 * 365 * y) + "시간</span></td><td>" + won(bLabor) +
+      "<br><span style='font-size:11px;color:var(--sub)'>" + Math.round(v("minQ") / 60 * 365 * y) + "시간</span></td></tr>" +
+    "<tr><td><b style='color:var(--ink)'>합계</b></td><td><b>" + won(A) + "</b></td><td><b>" + won(B) + "</b></td></tr>";
+  var equipShare = (aEquip + aMaint) - bLabel, laborShare = aLabor - bLabor;
+  document.getElementById("r-note").innerHTML = "장비·소모품에서 약 <b>" + man(equipShare) + "</b>, 사람 시간에서 약 <b>" + man(laborShare) +
+    "</b> 차이가 납니다. 장비값 차이보다 <b>매일 태그기를 뽑아 출력하고 정리하는 시간</b>이 더 큽니다.";
+}
+ids.forEach(function(id){ document.getElementById(id).addEventListener("input", calc); });
+document.getElementById("owned").addEventListener("change", calc);
+fetch("/config.json", {credentials:"same-origin"}).then(function(r){ return r.json(); }).then(function(c){
+  document.getElementById("pts").value = c.checkpoints.length; calc();
+}).catch(calc);
+calc();
+})();
+</script>
+</body>
+</html>

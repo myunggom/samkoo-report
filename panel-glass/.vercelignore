@@ -1,0 +1,3 @@
+build_data.py
+.env*
+node_modules

@@ -8,6 +8,7 @@ import { EVENT_TYPES, DEFAULT_EVENT_TYPE, REPEAT_OPTIONS, eventDot, eventStyle, 
 
 const WEEK = ["일", "월", "화", "수", "목", "금", "토"];
 const p2 = (n: number) => String(n).padStart(2, "0");
+const fmtKey = (k: string) => { const [y, m, d] = k.split("-").map(Number); return `${m}월 ${d}일 (${"일월화수목금토"[new Date(y, m - 1, d).getDay()]})`; };
 const keyOf = (d: Date) => `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
 type View = "month" | "week" | "day";
 
@@ -21,6 +22,8 @@ export default function DashCalendar({ media, notes }: { media: MediaItem[]; not
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
   const [dragTitle, setDragTitle] = useState<string>("");
   const [dragActive, setDragActive] = useState(false);
+  // 끌어 놓은 뒤 바로 옮기지 않고 확인을 받는다 (스크롤하다 실수로 옮겨지는 일 방지)
+  const [pendingMove, setPendingMove] = useState<{ id: string; title: string; from: string; to: string } | null>(null);
   const ghostRef = useRef<HTMLDivElement>(null);
   const justDragged = useRef(false);
 
@@ -86,7 +89,7 @@ export default function DashCalendar({ media, notes }: { media: MediaItem[]; not
       window.removeEventListener("pointercancel", up);
       if (active) {
         const key = cellKeyAt(ue.clientX, ue.clientY);
-        if (key) moveEvent(ev.id, key);
+        if (key && key !== ev.date) setPendingMove({ id: ev.id, title: ev.title || "일정", from: ev.date, to: key });
         justDragged.current = true;
         setTimeout(() => { justDragged.current = false; }, 60);
       }
@@ -232,6 +235,22 @@ export default function DashCalendar({ media, notes }: { media: MediaItem[]; not
       {dragActive && (
         <div ref={ghostRef} className="pointer-events-none fixed left-0 top-0 z-[70] rounded-lg bg-indigo-600 px-2 py-1 text-xs font-semibold text-white shadow-lg" style={{ transform: "translate(-999px,-999px)" }}>
           {dragTitle}
+        </div>
+      )}
+
+      {pendingMove && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4" onClick={() => setPendingMove(null)}>
+          <div className="w-full max-w-xs rounded-2xl bg-white p-5 shadow-xl" onClick={(ev) => ev.stopPropagation()}>
+            <div className="text-sm font-bold text-slate-900">일정을 옮길까요?</div>
+            <div className="mt-2 truncate text-sm text-slate-700">{pendingMove.title}</div>
+            <div className="mt-1 text-sm text-slate-500">
+              {fmtKey(pendingMove.from)} → <span className="font-semibold text-indigo-600">{fmtKey(pendingMove.to)}</span>
+            </div>
+            <div className="mt-4 flex gap-2">
+              <button onClick={() => setPendingMove(null)} className="flex-1 rounded-lg border border-slate-200 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">취소</button>
+              <button onClick={() => { const m = pendingMove; setPendingMove(null); moveEvent(m.id, m.to); }} className="flex-1 rounded-lg bg-indigo-600 py-2 text-sm font-semibold text-white hover:bg-indigo-700">이동</button>
+            </div>
+          </div>
         </div>
       )}
 

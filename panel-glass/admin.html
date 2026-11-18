@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>순찰·점검 현황</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#14171c;--sub:#5b6370;--line:#e3e6eb;--accent:#0a66d8;
+  --ok:#1a8a4a;--okbg:#e7f6ec;--bad:#c0392b;--badbg:#fdecea;--warn:#b4531a;--warnbg:#fff3e8;--chip:#eef1f5}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0e1013;--card:#171a1f;--ink:#e9ecf1;--sub:#9aa3af;--line:#2a2f37;--accent:#5aa2ff;
+  --ok:#5be08a;--okbg:#12291b;--bad:#ff7a6b;--badbg:#2e1513;--warn:#ffb072;--warnbg:#2b1d12;--chip:#232830}}
+:root[data-theme="dark"]{--bg:#0e1013;--card:#171a1f;--ink:#e9ecf1;--sub:#9aa3af;--line:#2a2f37;--accent:#5aa2ff;
+  --ok:#5be08a;--okbg:#12291b;--bad:#ff7a6b;--badbg:#2e1513;--warn:#ffb072;--warnbg:#2b1d12;--chip:#232830}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:"Pretendard","Malgun Gothic","Apple SD Gothic Neo",system-ui,sans-serif}
+.wrap{max-width:1080px;margin:0 auto;padding:20px 16px 48px}
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:14px}
+.top h1{font-size:22px;letter-spacing:-.02em;margin-right:auto}
+.top a{color:var(--accent);text-decoration:none;font-size:14px}
+.ctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}
+.ctl input[type=date]{font-size:15px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink)}
+.btn{font-size:14px;padding:9px 14px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);cursor:pointer}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+.live{font-size:14px;display:flex;align-items:center;gap:6px;color:var(--sub)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--ok);display:inline-block}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:14px;overflow-x:auto}
+.tab{padding:10px 14px;font-size:15px;border:0;background:none;color:var(--sub);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
+.tab.on{color:var(--ink);border-bottom-color:var(--accent);font-weight:700}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+.kpi b{display:block;font-size:28px;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.kpi span{font-size:13px;color:var(--sub)}
+.tw{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:12px}
+table{width:100%;border-collapse:collapse;min-width:560px}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);font-size:14px;vertical-align:top}
+tr:last-child td{border-bottom:0}
+th{font-size:12px;color:var(--sub);font-weight:600;white-space:nowrap}
+td.t{font-variant-numeric:tabular-nums;white-space:nowrap}
+.chip{display:inline-block;background:var(--chip);border-radius:6px;padding:2px 7px;margin:2px 4px 2px 0;font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tag{display:inline-block;border-radius:6px;padding:2px 8px;font-size:12px;font-weight:700;white-space:nowrap}
+.tag.ok{background:var(--okbg);color:var(--ok)}.tag.bad{background:var(--badbg);color:var(--bad)}.tag.warn{background:var(--warnbg);color:var(--warn)}
+.sec{font-size:15px;font-weight:700;margin:20px 2px 8px}
+.empty{color:var(--sub);padding:18px 12px}
+.new{animation:flash 2.4s ease-out}
+@keyframes flash{from{background:var(--warnbg)}to{background:transparent}}
+.ph{display:none}
+@media print{
+  @page{size:A4;margin:12mm}
+  body{background:#fff;color:#000}
+  .top,.ctl,.tabs,.kpis,.noprint{display:none!important}
+  .ph{display:block;font-size:18px;font-weight:700;margin-bottom:10px}
+  .tw{border:0}
+  th,td{border-bottom:1px solid #999;font-size:11pt;padding:5px 6px}
+  .chip{background:none;padding:0 4px 0 0}
+  .tag{padding:0;background:none!important}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <h1>순찰·점검 현황</h1>
+    <a href="/about">소개</a><a href="/qr">QR 인쇄</a><a href="/">분전반 회로표</a>
+  </div>
+  <div class="ctl">
+    <input type="date" id="d">
+    <button class="btn" id="today">오늘</button>
+    <label class="live"><input type="checkbox" id="live" checked> <span class="dot"></span> 실시간 (5초)</label>
+    <span style="margin-left:auto"></span>
+    <button class="btn" id="csv">엑셀(CSV) 받기</button>
+    <button class="btn pri" onclick="window.print()">일지 출력</button>
+  </div>
+  <div class="tabs">
+    <button class="tab on" data-t="patrol">보안 순찰</button>
+    <button class="tab" data-t="clean">화장실 점검</button>
+    <button class="tab" data-t="log">전체 기록</button>
+  </div>
+  <div id="out"><p class="empty">불러오는 중…</p></div>
+</div>
+<script>
+(function(){
+"use strict";
+var CFG = null, RECS = [], tab = "patrol", known = {}, first = true, timer = null;
+var dEl = document.getElementById("d"), out = document.getElementById("out");
+function kst(){ return new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10); }
+function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
+function hm(ts){ var d = new Date(ts); return ("0"+d.getHours()).slice(-2) + ":" + ("0"+d.getMinutes()).slice(-2); }
+function key(r){ return r.uid || (r.type + r.id + r.at); }
+function nameOf(type, id){
+  var list = type === "clean" ? CFG.restrooms : CFG.checkpoints;
+  var x = list.find(function(v){ return v.id === id; });
+  return x ? x.name : id;
+}
+dEl.value = kst();
+
+function load(){
+  return fetch("/api/records?date=" + dEl.value, {credentials:"same-origin", cache:"no-store"})
+    .then(function(r){ if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function(d){ RECS = d.records || []; render(); })
+    .catch(function(){ out.innerHTML = '<p class="empty">기록을 불러오지 못했습니다. 잠시 후 다시 시도합니다.</p>'; });
+}
+
+function render(){
+  if (!CFG) return;
+  var fresh = {};
+  RECS.forEach(function(r){ var k = key(r); if (!known[k] && !first) fresh[k] = 1; known[k] = 1; });
+  first = false;
+  var h = "";
+  var title = dEl.value + " ";
+  if (tab === "patrol") h = patrolView(fresh, title);
+  else if (tab === "clean") h = cleanView(fresh, title);
+  else h = logView(fresh, title);
+  out.innerHTML = h;
+}
+
+function patrolView(fresh, title){
+  var pats = RECS.filter(function(r){ return r.type === "patrol"; });
+  var iss = RECS.filter(function(r){ return r.type === "issue"; });
+  var by = {};
+  pats.forEach(function(r){ (by[r.id] = by[r.id] || []).push(r); });
+  var doneN = CFG.checkpoints.filter(function(c){ return by[c.id]; }).length;
+  var people = {}; pats.forEach(function(r){ people[r.who] = 1; });
+  var h = '<div class="ph">' + esc(title) + '보안 순찰 일지</div>';
+  h += '<div class="kpis"><div class="kpi"><b>' + doneN + ' / ' + CFG.checkpoints.length + '</b><span>순찰한 지점</span></div>' +
+       '<div class="kpi"><b>' + pats.length + '</b><span>총 스캔 횟수</span></div>' +
+       '<div class="kpi"><b style="color:' + (iss.length ? 'var(--bad)' : 'inherit') + '">' + iss.length + '</b><span>이상 보고</span></div>' +
+       '<div class="kpi"><b>' + Object.keys(people).length + '</b><span>순찰자</span></div></div>';
+  if (iss.length) {
+    h += '<div class="sec">⚠ 이상 보고</div><div class="tw"><table><thead><tr><th>시각</th><th>지점</th><th>내용</th><th>순찰자</th></tr></thead><tbody>';
+    iss.slice().reverse().forEach(function(r){
+      h += '<tr class="' + (fresh[key(r)] ? 'new' : '') + '"><td class="t">' + hm(r.at) + '</td><td>' + esc(nameOf("patrol", r.id)) +
+        '</td><td><span class="tag bad">' + esc(r.issue) + '</span> ' + esc(r.memo || "") + '</td><td>' + esc(r.who) + '</td></tr>';
+    });
+    h += '</tbody></table></div>';
+  }
+  h += '<div class="sec">지점별 순찰</div><div class="tw"><table><thead><tr><th>지점</th><th>상태</th><th>순찰 시각 · 순찰자</th></tr></thead><tbody>';
+  CFG.checkpoints.forEach(function(c){
+    var list = by[c.id] || [];
+    var bad = iss.some(function(r){ return r.id === c.id; });
+    var isNew = list.some(function(r){ return fresh[key(r)]; });
+    h += '<tr class="' + (isNew ? 'new' : '') + '"><td><b>' + esc(c.name) + '</b><br><span style="color:var(--sub);font-size:12px">' + esc(c.id) + '</span></td><td>' +
+      (!list.length ? '<span class="tag bad">미순찰</span>' : bad ? '<span class="tag warn">이상 있음</span>' : '<span class="tag ok">정상</span>') +
+      '</td><td>' + (list.map(function(r){ return '<span class="chip">' + hm(r.at) + ' ' + esc(r.who) + '</span>'; }).join("") || '<span style="color:var(--sub)">—</span>') + '</td></tr>';
+  });
+  return h + '</tbody></table></div>';
+}
+
+function cleanView(fresh, title){
+  var cl = RECS.filter(function(r){ return r.type === "clean"; });
+  var by = {};
+  cl.forEach(function(r){ (by[r.id] = by[r.id] || []).push(r); });
+  var doneN = CFG.restrooms.filter(function(c){ return by[c.id]; }).length;
+  var iss = cl.filter(function(r){ return r.issue; });
+  var h = '<div class="ph">' + esc(title) + '화장실 점검 일지</div>';
+  h += '<div class="kpis"><div class="kpi"><b>' + doneN + ' / ' + CFG.restrooms.length + '</b><span>점검한 화장실</span></div>' +
+       '<div class="kpi"><b>' + cl.length + '</b><span>총 점검 횟수</span></div>' +
+       '<div class="kpi"><b style="color:' + (iss.length ? 'var(--bad)' : 'inherit') + '">' + iss.length + '</b><span>이상 보고</span></div></div>';
+  h += '<div class="tw"><table><thead><tr><th>화장실</th><th>마지막 점검</th><th>항목</th><th>빠진 항목 · 이상</th><th>오늘 점검</th></tr></thead><tbody>';
+  CFG.restrooms.forEach(function(rm){
+    var list = by[rm.id] || [], last = list[list.length - 1];
+    var isNew = list.some(function(r){ return fresh[key(r)]; });
+    if (!last) {
+      h += '<tr><td><b>' + esc(rm.name) + '</b></td><td><span class="tag bad">미점검</span></td><td></td><td></td><td></td></tr>';
+      return;
+    }
+    var miss = CFG.cleanItems.filter(function(t){ return (last.done || []).indexOf(t) < 0; });
+    var full = !miss.length;
+    h += '<tr class="' + (isNew ? 'new' : '') + '"><td><b>' + esc(rm.name) + '</b></td><td class="t">' + hm(last.at) + ' · ' + esc(last.who) + '</td><td>' +
+      '<span class="tag ' + (full ? 'ok' : 'warn') + '">' + (last.done || []).length + '/' + (last.total || CFG.cleanItems.length) + '</span></td><td>' +
+      (last.issue ? '<span class="tag bad">' + esc(last.issue) + '</span> ' : '') + esc(miss.join(", ")) + '</td><td>' +
+      list.map(function(r){ return '<span class="chip">' + hm(r.at) + '</span>'; }).join("") + '</td></tr>';
+  });
+  return h + '</tbody></table></div>';
+}
+
+function logView(fresh, title){
+  var h = '<div class="ph">' + esc(title) + '전체 기록</div>';
+  if (!RECS.length) return h + '<p class="empty">이 날짜에는 기록이 없습니다.</p>';
+  h += '<div class="tw"><table><thead><tr><th>시각</th><th>종류</th><th>장소</th><th>내용</th><th>기록자</th></tr></thead><tbody>';
+  RECS.slice().reverse().forEach(function(r){
+    var kind = r.type === "patrol" ? "순찰" : r.type === "issue" ? "순찰 이상" : "화장실";
+    var what = r.type === "clean" ? ((r.done || []).length + "/" + (r.total || "") + " 항목" + (r.issue ? " · 이상: " + r.issue : "")) :
+               r.type === "issue" ? r.issue : "정상";
+    h += '<tr class="' + (fresh[key(r)] ? 'new' : '') + '"><td class="t">' + hm(r.at) + '</td><td>' + kind + '</td><td>' + esc(nameOf(r.type, r.id)) +
+      '</td><td>' + esc(what) + '</td><td>' + esc(r.who) + '</td></tr>';
+  });
+  return h + '</tbody></table></div>';
+}
+
+function csv(){
+  var rows = [["날짜","시각","종류","장소ID","장소","내용","기록자"]];
+  RECS.forEach(function(r){
+    var kind = r.type === "patrol" ? "순찰" : r.type === "issue" ? "순찰 이상" : "화장실";
+    var what = r.type === "clean" ? ("완료: " + (r.done || []).join("/") + (r.issue ? " | 이상: " + r.issue : "")) : (r.issue || "정상");
+    rows.push([dEl.value, hm(r.at), kind, r.id, nameOf(r.type, r.id), what, r.who]);
+  });
+  var text = "﻿" + rows.map(function(a){ return a.map(function(v){ return '"' + String(v).replace(/"/g, '""') + '"'; }).join(","); }).join("\r\n");
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([text], {type:"text/csv"}));
+  a.download = "순찰점검_" + dEl.value + ".csv";
+  a.click();
+}
+
+function schedule(){
+  clearInterval(timer);
+  if (document.getElementById("live").checked) timer = setInterval(load, 5000);
+}
+document.querySelectorAll(".tab").forEach(function(b){
+  b.addEventListener("click", function(){
+    document.querySelectorAll(".tab").forEach(function(x){ x.classList.remove("on"); });
+    b.classList.add("on"); tab = b.getAttribute("data-t"); render();
+  });
+});
+dEl.addEventListener("change", function(){ known = {}; first = true; load(); });
+document.getElementById("today").addEventListener("click", function(){ dEl.value = kst(); known = {}; first = true; load(); });
+document.getElementById("live").addEventListener("change", schedule);
+document.getElementById("csv").addEventListener("click", csv);
+var t0 = new URLSearchParams(location.search).get("tab");
+if (t0) { var tb = document.querySelector('.tab[data-t="' + t0 + '"]'); if (tb) tb.click(); }
+
+fetch("/config.json", {credentials:"same-origin", cache:"no-cache"}).then(function(r){ return r.json(); }).then(function(c){
+  CFG = c; load(); schedule();
+});
+})();
+</script>
+</body>
+</html>

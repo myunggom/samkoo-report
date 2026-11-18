@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#000000">
+<title>순찰·점검</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:#000;color:#fff;font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",system-ui,sans-serif;
+  user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
+.s{position:fixed;inset:0;display:flex;flex-direction:column}
+.head{display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid #1f1f1f;padding:14px 16px}
+.title{font-size:22px;font-weight:800;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.right{font-size:15px;color:#9a9a9a;white-space:nowrap}
+.ok{color:#5be08a}.warn{color:#ffb072}.blue{color:#7fb8ff}.dim{color:#8a8a8a}
+.body{flex:1;display:flex;flex-direction:column;padding:12px 16px;gap:10px;overflow:auto;min-height:0}
+.info{display:flex;flex-direction:column;gap:6px;padding:4px 0 6px}
+.big{font-size:26px;font-weight:800;letter-spacing:-.02em}
+.mid{font-size:17px;color:#cfcfcf}
+.row{display:flex;align-items:center;gap:12px;border:2px solid #222;border-radius:12px;padding:16px 14px;font-size:19px;font-weight:700;cursor:pointer;background:#0b0b0b}
+.row .ck{width:30px;flex:none;text-align:center;font-size:22px;color:#5c5c5c}
+.row.on .ck{color:#5be08a}
+.row .lb{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .sub{font-size:14px;color:#9a9a9a;font-weight:500;white-space:nowrap}
+.row.primary{border-color:#1f5fae;background:#0a1a2e}
+.row.danger .lb{color:#ffb072}
+.foot{border-top:1px solid #1f1f1f;padding:10px 16px;font-size:13px;color:#7a7a7a;display:flex;justify-content:space-between;gap:10px}
+.center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:0 20px}
+.mark{font-size:64px;line-height:1}
+
+/* ---- 스마트글래스 (Vuzix M400 640x360) : 한 화면 4줄, 초점 이동 ---- */
+body.glass .head{height:19vh;padding:0 3.5vw;border-bottom:.5vh solid #1c1c1c}
+body.glass .title{font-size:9vh}
+body.glass .right{font-size:6vh}
+body.glass .body{padding:1.5vh 3.5vw;gap:1.5vh;overflow:hidden}
+body.glass .info{gap:1vh;padding:0}
+body.glass .big{font-size:9vh}
+body.glass .mid{font-size:6.5vh}
+body.glass .row{height:15vh;flex:none;padding:0 2.5vw;font-size:7.5vh;border-width:.6vh;border-radius:2vh}
+body.glass .row .ck{width:7vw;font-size:7.5vh}
+body.glass .row .sub{font-size:5vh}
+body.glass .row.focus{border-color:#ffd24a;background:#1d1700}
+body.glass .foot{height:10vh;align-items:center;padding:0 3.5vw;font-size:5vh;border-top:.4vh solid #161616}
+body.glass .center{gap:2.5vh}
+body.glass .mark{font-size:20vh}
+body:not(.glass) .row.focus{border-color:#333}
+.demo{position:fixed;top:0;left:50%;transform:translateX(-50%);background:#ffd24a;color:#000;font-size:12px;font-weight:700;padding:2px 10px;border-radius:0 0 8px 8px;z-index:9}
+body.glass .demo{font-size:4vh;padding:.3vh 2vw}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+(function(){
+"use strict";
+var app = document.getElementById("app");
+var qs = new URLSearchParams(location.search);
+var DEMO = qs.get("demo") === "1";
+var CFG = null;
+var PER = 4;
+
+function isGlass(){
+  var m = qs.get("mode");
+  if (m === "glass") return true;
+  if (m === "list") return false;
+  var w = innerWidth, h = innerHeight;
+  return h <= 480 && w / h >= 1.45;
+}
+function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){
+  return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
+function hm(ts){ var d = new Date(ts); return ("0"+d.getHours()).slice(-2) + ":" + ("0"+d.getMinutes()).slice(-2); }
+function ls(k, v){ try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch(e){ return null; } }
+
+/* ---------- 순찰자 이름: 개인 카드 QR(/me?n=이름)로 한 번 등록 ---------- */
+function who(){ return DEMO ? "시연자" : (ls("pg_who") || ""); }
+
+/* ---------- 저장: 실패하면 기기에 쌓아 두고 인터넷 되면 다시 보냄 ---------- */
+function queue(){ try { return JSON.parse(ls("pg_queue") || "[]"); } catch(e){ return []; } }
+function setQueue(q){ ls("pg_queue", JSON.stringify(q)); }
+var sending = false, lastStatus = "";
+function send(rec){
+  if (DEMO) { lastStatus = "미리보기 — 기록하지 않음"; return; }
+  rec.uid = rec.uid || (Date.now().toString(36) + Math.random().toString(36).slice(2, 6));
+  var q = queue(); q.push(rec); setQueue(q);
+  flush();
+}
+function flush(){
+  if (sending) return;
+  var q = queue();
+  if (!q.length) return;
+  sending = true;
+  var rec = q[0];
+  fetch("/api/record", {method:"POST", credentials:"same-origin", headers:{"content-type":"application/json"}, body:JSON.stringify(rec)})
+    .then(function(r){ if (!r.ok) throw new Error(r.status); })
+    .then(function(){
+      var q2 = queue().filter(function(x){ return x.uid !== rec.uid; });
+      setQueue(q2); sending = false;
+      lastStatus = q2.length ? "전송 대기 " + q2.length + "건" : "저장됨";
+      paintStatus();
+      if (q2.length) flush();
+    })
+    .catch(function(){
+      sending = false;
+      lastStatus = "전송 대기 " + queue().length + "건 · 연결되면 자동 전송";
+      paintStatus();
+    });
+}
+addEventListener("online", flush);
+setInterval(flush, 15000);
+function paintStatus(){
+  var el = document.getElementById("st");
+  if (el) { el.textContent = lastStatus; el.className = /대기/.test(lastStatus) ? "warn" : "ok"; }
+}
+
+/* ---------- 화면 그리기 ---------- */
+var V = null;   // {title, right, info, rows:[{label,sub,on,cls,act}], focus, foot}
+
+function draw(){
+  var glass = isGlass();
+  document.body.className = glass ? "glass" : "";
+  var h = '<div class="s"><div class="head"><div class="title">' + esc(V.title) + '</div><div class="right">' + (V.right || "") + '</div></div>';
+  if (V.center) {
+    h += '<div class="center">' + V.center + '</div>';
+  } else {
+    h += '<div class="body">';
+    var rows = V.rows || [], start = 0, end = rows.length;
+    if (glass) {
+      var per = V.info ? PER - 1 : PER;     // 안내 문구가 있으면 한 줄 덜 보임
+      start = Math.floor(V.focus / per) * per;
+      end = Math.min(rows.length, start + per);
+    }
+    if (V.info && (!glass || start === 0)) h += '<div class="info">' + V.info + '</div>';
+    for (var i = start; i < end; i++) {
+      var r = rows[i];
+      h += '<div class="row' + (i === V.focus ? ' focus' : '') + (r.on ? ' on' : '') + (r.cls ? ' ' + r.cls : '') + '" data-i="' + i + '">' +
+        (r.ck ? '<span class="ck">' + (r.on ? '☑' : '☐') + '</span>' : '') +
+        '<span class="lb">' + esc(r.label) + '</span>' + (r.sub ? '<span class="sub">' + esc(r.sub) + '</span>' : '') + '</div>';
+    }
+    h += '</div>';
+  }
+  var hint = glass ? (V.center ? (V.footGlass || "") : "밀기: 이동 · 탭: 선택" + (rowsCount() > PER ? " · " + (V.focus + 1) + "/" + rowsCount() : ""))
+                   : (V.center ? "" : "");
+  h += '<div class="foot"><span id="st"></span><span>' + hint + '</span></div></div>';
+  if (DEMO) h += '<div class="demo">미리보기 · 기록 안 됨</div>';
+  app.innerHTML = h;
+  paintStatus();
+}
+function rowsCount(){ return V && V.rows ? V.rows.length : 0; }
+function moveFocus(d){
+  if (!V || !V.rows || !V.rows.length) return;
+  V.focus = (V.focus + d + V.rows.length) % V.rows.length;
+  draw();
+}
+function activate(i){
+  if (!V || !V.rows || !V.rows[i]) return;
+  V.focus = i;
+  V.rows[i].act();
+}
+
+document.addEventListener("keydown", function(e){
+  if (!V) return;
+  var k = e.key;
+  if (k === "ArrowRight" || k === "ArrowDown" || (k === "Tab" && !e.shiftKey)) { moveFocus(1); e.preventDefault(); }
+  else if (k === "ArrowLeft" || k === "ArrowUp" || (k === "Tab" && e.shiftKey)) { moveFocus(-1); e.preventDefault(); }
+  else if (k === "Enter" || k === " ") {
+    if (V.onEnter) V.onEnter(); else activate(V.focus);
+    e.preventDefault();
+  }
+  else if ((k === "Escape" || k === "Backspace" || k === "GoBack") && V.onBack) { V.onBack(); e.preventDefault(); }
+});
+document.addEventListener("click", function(e){
+  var row = e.target.closest && e.target.closest(".row");
+  if (row) return activate(+row.getAttribute("data-i"));
+  if (V && V.onEnter && V.center) V.onEnter();
+});
+
+/* ---------- 순찰 ---------- */
+function patrol(cp){
+  var me = who(), at = Date.now();
+  // 같은 지점을 1분 안에 다시 열면(새로고침 등) 두 번 기록하지 않는다
+  var lastKey = "pg_last_" + cp.id, last = +(ls(lastKey) || 0);
+  if (DEMO || at - last > 60000) {
+    send({type:"patrol", id:cp.id, who:me, at:at});
+    if (!DEMO) ls(lastKey, String(at));
+  } else {
+    at = last; lastStatus = "1분 안에 이미 기록됨";
+  }
+  function home(){
+    V = {
+      title: cp.name,
+      right: '<span class="ok">✓ 기록</span> ' + hm(at),
+      info: '<div class="mid">' + (me ? esc(me) : '<span class="warn">순찰자 미등록 · 개인 카드 QR을 먼저 스캔</span>') + '</div>',
+      focus: 0,
+      rows: [
+        {label:"이상 없음 · 완료", cls:"primary", act:function(){ done(null); }},
+        {label:"이상 있음 보고", cls:"danger", act:issue}
+      ]
+    };
+    draw();
+  }
+  function issue(){
+    var rows = CFG.patrolIssues.map(function(t){
+      return {label:t, cls:"danger", act:function(){
+        send({type:"issue", id:cp.id, who:me, at:Date.now(), issue:t});
+        done(t);
+      }};
+    });
+    rows.push({label:"← 취소", act:home});
+    V = {title:"이상 종류 선택", right:esc(cp.name), focus:0, rows:rows, onBack:home};
+    draw();
+  }
+  function done(iss){
+    V = {
+      title: cp.name, right: hm(at),
+      center: '<div class="mark ' + (iss ? 'warn' : 'ok') + '">' + (iss ? '⚠' : '✓') + '</div>' +
+        '<div class="big">' + (iss ? '이상 보고: ' + esc(iss) : '순찰 완료') + '</div>' +
+        '<div class="mid" id="prog">다음 지점으로 이동하세요</div>',
+      footGlass: "다음 QR을 스캔하세요"
+    };
+    draw();
+    progress();
+  }
+  home();
+}
+function progress(){
+  var total = CFG.checkpoints.length;
+  if (DEMO) { var p0 = document.getElementById("prog"); if (p0) p0.textContent = "오늘 순찰 5 / " + total + " 지점 (예시)"; return; }
+  fetch("/api/records", {credentials:"same-origin", cache:"no-store"}).then(function(r){ return r.json(); }).then(function(d){
+    var seen = {};
+    d.records.forEach(function(x){ if (x.type === "patrol") seen[x.id] = 1; });
+    var n = CFG.checkpoints.filter(function(c){ return seen[c.id]; }).length;
+    var el = document.getElementById("prog");
+    if (el) el.textContent = "오늘 순찰 " + n + " / " + total + " 지점";
+  }).catch(function(){});
+}
+
+/* ---------- 화장실 점검 ---------- */
+function clean(rm){
+  var me = who();
+  lastStatus = "";      // 저장 전에는 '저장됨' 을 띄우지 않는다
+  var on = CFG.cleanItems.map(function(){ return false; });
+  var iss = "";
+  function home(keepFocus){
+    var rows = CFG.cleanItems.map(function(t, i){
+      return {label:t, ck:true, on:on[i], act:function(){ on[i] = !on[i]; home(true); }};
+    });
+    rows.push({label:"전체 체크", sub:on.every(Boolean) ? "해제" : "", act:function(){
+      var all = on.every(Boolean); on = on.map(function(){ return !all; }); home(true); }});
+    rows.push({label:iss ? "이상: " + iss : "이상 있음 보고", cls:"danger", act:issue});
+    rows.push({label:"저장하고 완료", sub:on.filter(Boolean).length + "/" + on.length, cls:"primary", act:save});
+    var f = keepFocus && V && V.rows ? V.focus : 0;
+    V = {
+      title: rm.name,
+      right: me ? esc(me) : '<span class="warn">미등록</span>',
+      focus: f, rows: rows
+    };
+    draw();
+  }
+  function issue(){
+    var rows = CFG.cleanIssues.map(function(t){
+      return {label:t, cls:"danger", act:function(){ iss = t; home(); V.focus = V.rows.length - 1; draw(); }};
+    });
+    if (iss) rows.push({label:"이상 없음으로 되돌리기", act:function(){ iss = ""; home(); }});
+    rows.push({label:"← 취소", act:function(){ home(); }});
+    V = {title:"이상 종류 선택", right:esc(rm.name), focus:0, rows:rows, onBack:function(){ home(); }};
+    draw();
+  }
+  function save(){
+    var at = Date.now();
+    var done = CFG.cleanItems.filter(function(t, i){ return on[i]; });
+    send({type:"clean", id:rm.id, who:me, at:at, done:done, total:CFG.cleanItems.length, issue:iss});
+    V = {
+      title: rm.name, right: hm(at),
+      center: '<div class="mark ' + (iss ? 'warn' : 'ok') + '">' + (iss ? '⚠' : '✓') + '</div>' +
+        '<div class="big">점검 저장 · ' + done.length + '/' + CFG.cleanItems.length + ' 항목</div>' +
+        '<div class="mid">' + (iss ? '이상 보고: ' + esc(iss) : (done.length < CFG.cleanItems.length ? '빠진 항목: ' + esc(CFG.cleanItems.filter(function(t, i){ return !on[i]; }).join(", ")) : '모든 항목 완료')) + '</div>',
+      footGlass: "탭: 다시 점검", onEnter: function(){ on = on.map(function(){ return false; }); iss = ""; home(); }
+    };
+    draw();
+  }
+  home();
+}
+
+/* ---------- 개인 카드 등록 ---------- */
+function registerMe(){
+  var n = (qs.get("n") || "").trim().slice(0, 30);
+  if (n) ls("pg_who", n);
+  var cur = ls("pg_who");
+  V = {
+    title: "순찰자 등록", right: "",
+    center: cur ? '<div class="mark ok">✓</div><div class="big">' + esc(cur) + ' 님</div><div class="mid">이제 순찰·화장실 QR을 찍으면 이 이름으로 기록됩니다</div>'
+                : '<div class="mark warn">!</div><div class="big">이름이 없는 카드입니다</div>',
+    footGlass: "순찰 QR을 스캔하세요"
+  };
+  draw();
+}
+
+function notFound(id){
+  V = {title:"찾을 수 없음", right:"", center:'<div class="mark warn">?</div><div class="big">' + esc(id) + '</div><div class="mid">등록되지 않은 QR입니다</div>'};
+  draw();
+}
+
+/* ---------- 시작 ---------- */
+fetch("/config.json", {credentials:"same-origin", cache:"no-cache"}).then(function(r){ return r.json(); }).then(function(c){
+  CFG = c;
+  var m = location.pathname.match(/^\/(c|t)\/([^/]+)$/);
+  if (location.pathname === "/me") return registerMe();
+  if (!m) return notFound(location.pathname);
+  var id = decodeURIComponent(m[2]);
+  if (m[1] === "c") {
+    var cp = CFG.checkpoints.find(function(x){ return x.id === id; });
+    document.title = (cp ? cp.name : id) + " · 순찰";
+    return cp ? patrol(cp) : notFound(id);
+  }
+  var rm = CFG.restrooms.find(function(x){ return x.id === id; });
+  document.title = (rm ? rm.name : id) + " · 화장실 점검";
+  return rm ? clean(rm) : notFound(id);
+}).catch(function(){
+  app.innerHTML = '<div class="s"><div class="center"><div class="big">자료를 불러오지 못했습니다</div><div class="mid">QR을 다시 스캔해 주세요</div></div></div>';
+});
+var lastGlass = isGlass();
+addEventListener("resize", function(){ var g = isGlass(); if (g !== lastGlass && V) { lastGlass = g; draw(); } });
+flush();
+})();
+</script>
+</body>
+</html>
