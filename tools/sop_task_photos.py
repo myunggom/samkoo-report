@@ -1265,6 +1265,112 @@ def 키점검(client):
         print("(키 확인 요청이 실패했지만 계속합니다 : %s)" % s[:80])
 
 
+# ── 도면 번호 자리 찾기 (--locate-marks) ───────────────────────────
+# 도면 그림에는 글자를 넣지 않고, 사이트가 번호 동그라미를 좌표에 얹는다.
+# 좌표를 손으로 정해 두면 도면을 새로 그릴 때마다 어긋난다 (11-18 검수에서
+# '번호와 명칭 상이' 지적 수십 건). 그래서 새 도면이 나오면 Flash 에게
+# 부위마다 상자를 찾게 하고 그 한가운데를 번호 자리로 쓴다. 도면 한 장 1원 미만.
+# 결과는 sop-new/assets/fig_marks.json. 그림 파일의 md5 를 같이 적어 두어,
+# 도면이 또 바뀌면 sop_new_data_build.py 가 옛 좌표를 쓰지 않는다.
+번호파일 = os.path.join(SITE, "assets", "fig_marks.json")
+
+
+def 사이트자료():
+    import subprocess
+    src = os.path.join(SITE, "assets", "data.js").replace(os.sep, "/")
+    js = ("global.window={};require(%s);"
+          "process.stdout.write(JSON.stringify(window.TASKS))" % json.dumps(src))
+    d = subprocess.run(["node", "-e", js], capture_output=True, check=True)
+    return json.loads(d.stdout.decode("utf-8"))
+
+
+def 파일md5(path):
+    import hashlib
+    return hashlib.md5(open(path, "rb").read()).hexdigest()
+
+
+def 번호자리찾기(client, 대상):
+    from google import genai  # noqa: F401
+    from google.genai import types
+    from PIL import Image, ImageDraw
+    T = 사이트자료()
+    try:
+        표 = json.loads(io.open(번호파일, encoding="utf-8").read())
+    except Exception:                                        # noqa: BLE001
+        표 = {}
+    if 대상 == "all":
+        tids = sorted(t for t in T
+                      if os.path.exists(os.path.join(OUT_DIR, "%s_fig.jpg" % t)))
+    else:
+        tids = [x.strip() for x in 대상.split(",") if x.strip()]
+    확인폴더 = os.path.join(ROOT, ".tmp", "fig_marks_check")
+    os.makedirs(확인폴더, exist_ok=True)
+    틀 = {"type": "ARRAY", "items": {"type": "OBJECT", "properties": {
+        "n": {"type": "INTEGER"},
+        "found": {"type": "BOOLEAN"},
+        "point": {"type": "ARRAY", "items": {"type": "INTEGER"}}},
+        "required": ["n", "found", "point"]}}
+    for tid in tids:
+        그림 = os.path.join(OUT_DIR, "%s_fig.jpg" % tid)
+        t = T.get(tid) or {}
+        items = ((t.get("parts") or {}).get("items")) or []
+        if not os.path.exists(그림) or not items:
+            print("  %s : 도면 또는 부위 목록이 없어 건너뜀" % tid)
+            continue
+        im = Image.open(그림).convert("RGB")
+        목록 = NL.join("%d) %s — %s" % (it["n"], it.get("name", ""), it.get("desc", ""))
+                      for it in items)
+        질문 = NL.join([
+            "이 그림은 안전 교육자료의 '각부 명칭' 도면입니다 (%s)." % (t.get("name") or tid),
+            "아래 번호마다 그 부위가 그림의 어디에 있는지 찾아 주세요.",
+            "각 부위 **위에 정확히 놓이는 한 점**을 point = [y, x] 로, 그림 전체를 0~1000 으로 본 좌표로 주세요.",
+            "점은 반드시 그 물건의 몸체 위여야 합니다. 물건 사이 빈 공간 · 배경에 찍지 마세요.",
+            "같은 부위가 두 군데 있으면 더 크게 보이는 쪽 하나에 찍으세요.",
+            "부위가 그림에 없으면 found=false, point=[0,0].",
+            "같은 물건을 두 번호에 쓰지 말고, 이름에 가장 맞는 부분을 고르세요.",
+            "",
+            목록])
+        try:
+            res = client.models.generate_content(
+                model=점검모델, contents=[질문, im],
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json", response_schema=틀))
+            r = json.loads(res.text)
+        except Exception as e:                               # noqa: BLE001
+            if 돈때문인가(e):
+                raise 돈끊김(str(e)[:150])
+            print("  %s : 실패 %s" % (tid, str(e)[:80]))
+            continue
+        자리, 없음 = [], []
+        for x in r:
+            b = x.get("point") or []
+            if not x.get("found") or len(b) != 2 or not (0 < b[0] < 1000 and 0 < b[1] < 1000):
+                없음.append(x.get("n"))
+                continue
+            자리.append({"n": int(x["n"]),
+                       "x": round(b[1] / 10.0, 1),
+                       "y": round(b[0] / 10.0, 1)})
+        자리.sort(key=lambda m: m["n"])
+        표[tid] = {"file": os.path.basename(그림), "md5": 파일md5(그림),
+                  "marks": 자리, "missing": 없음,
+                  "at": time.strftime("%Y-%m-%d %H:%M")}
+        # 눈으로 볼 수 있게 번호를 얹은 그림도 남긴다
+        보기 = im.copy()
+        d = ImageDraw.Draw(보기)
+        rr = max(12, 보기.width // 60)
+        for m in 자리:
+            cx, cy = m["x"] * 보기.width / 100, m["y"] * 보기.height / 100
+            d.ellipse([cx - rr, cy - rr, cx + rr, cy + rr], fill=(217, 72, 15), outline="white", width=3)
+            d.text((cx - rr / 3, cy - rr / 2), str(m["n"]), fill="white")
+        보기.thumbnail((900, 900))
+        보기.save(os.path.join(확인폴더, "%s.jpg" % tid), quality=80)
+        print("  %s : 번호 %d개 자리 찾음%s" % (tid, len(자리),
+              (" · 못 찾음 %s" % 없음) if 없음 else ""))
+        io.open(번호파일, "w", encoding="utf-8", newline=NL).write(
+            json.dumps(표, ensure_ascii=False, indent=1))
+    print("번호 자리 : %s  (확인용 그림 %s)" % (번호파일, 확인폴더))
+
+
 def 사진점검(client, path, 기대인원, 혼자, 장면글=""):
     """만든 사진을 Flash 모델이 보고 판정한다.
 
@@ -1325,7 +1431,12 @@ def 사진점검(client, path, 기대인원, 혼자, 장면글=""):
     if r.get("split"):
         사유.append("화면이 여러 칸으로 나뉘었습니다")
     if r.get("fake_text"):
-        메모.append("가짜 글자 · 간판이 보임")
+        if 혼자:
+            # 도면은 번호 · 이름을 사이트가 얹는다. 그림에 글자가 들어가면
+            # '한문 · 일본어로 표기됨' 같은 지적이 나온다 (11-18 검수). 다시 그린다.
+            사유.append("도면 그림에 글자가 들어갔습니다. 번호 · 이름 · 설명 글자를 그림에 넣지 마세요")
+        else:
+            메모.append("가짜 글자 · 간판이 보임")
     if r.get("note"):
         메모.append(str(r["note"])[:80])
     # 같은 사유가 두 번 들어가지 않게
@@ -1823,6 +1934,8 @@ def main():
                     help="--redo-reviewed 와 함께 : 장비 모양 지적이 있는 작업(쉼표). 도면부터 참조 없이 새로 그린다")
     ap.add_argument("--include-redone", action="store_true",
                     help="--redo-reviewed 와 함께 : 다시 만들었지만 아직 안 본 사진도 지난 지적으로 또 만든다")
+    ap.add_argument("--locate-marks", default=None,
+                    help="도면 번호 자리를 Flash 로 찾아 sop-new/assets/fig_marks.json 에 적는다 (작업 쉼표, all = 도면 있는 전부)")
     ap.add_argument("--mark-redone", action="store_true",
                     help="배포한 뒤에 : 다시 만든 사진을 검수 화면에 '다시 만듦' 으로 표시")
     ap.add_argument("--redo-flagged", action="store_true",
@@ -1831,6 +1944,12 @@ def main():
 
     if a.mark_redone:
         검수표시보내기()
+        return
+    if a.locate_marks:
+        from google import genai
+        client = genai.Client(api_key=load_key())
+        키점검(client)
+        번호자리찾기(client, a.locate_marks)
         return
 
     tids = [x.strip() for x in (a.task or TASK).split(",") if x.strip()]

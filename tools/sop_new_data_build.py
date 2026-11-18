@@ -177,8 +177,34 @@ def 가리키는그림(t):
     return [(무엇, 이름) for 무엇, 이름 in out if 이름]
 
 
+def 자동표식():
+    """sop_task_photos.py --locate-marks 가 Flash 로 찾은 번호 자리."""
+    f = os.path.join(NEW, "fig_marks.json")
+    try:
+        return json.loads(io.open(f, encoding="utf-8").read())
+    except Exception:                                        # noqa: BLE001
+        return {}
+
+
+자동 = 자동표식()
+
+
 def 표식넣기(t, tid):
-    """도면 위 번호 위치를 자료에 넣는다. 정해 둔 작업만."""
+    """도면 위 번호 위치를 자료에 넣는다.
+
+    1) --locate-marks 가 찾은 자리 — **지금 도면 파일과 md5 가 같을 때만**
+       (도면을 또 새로 그렸으면 옛 좌표는 어긋나므로 쓰지 않는다)
+    2) 위 '표식' 에 손으로 정해 둔 자리
+    """
+    p = t.get("parts") or {}
+    e = 자동.get(tid)
+    그림 = os.path.join(NEW, "img", p.get("figure") or "-")
+    if e and os.path.exists(그림):
+        import hashlib
+        if hashlib.md5(open(그림, "rb").read()).hexdigest() == e.get("md5"):
+            p["marks"] = e.get("marks") or []
+            return
+        print("  주의 : %s 도면이 번호를 찾은 뒤 바뀌었습니다. --locate-marks %s 를 다시 돌리세요." % (tid, tid))
     쪽 = 표식.get(tid)
     if not 쪽:
         return
