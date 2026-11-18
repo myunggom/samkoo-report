@@ -103,6 +103,9 @@ textarea:focus,select:focus{outline:2px solid var(--accent);outline-offset:1px}
 .vw[hidden]{display:none}
 .vw .big{display:flex;align-items:center;justify-content:center;padding:16px;min-width:0;min-height:0;position:relative}
 .vw .big img{max-height:calc(100vh - 32px);object-fit:contain}
+.figw{position:relative;display:inline-block;max-width:100%;line-height:0}
+.figw .mk{position:absolute;transform:translate(-50%,-50%);width:26px;height:26px;border-radius:50%;background:#d9480f;color:#fff;display:grid;place-items:center;font-size:13px;font-weight:800;line-height:1;box-shadow:0 0 0 2.5px #fff,0 2px 6px rgb(0 0 0 / .3)}
+.fighint{font-size:12.5px;color:var(--ink-3);margin-top:4px}
 .vw .side{background:var(--card);overflow:auto;padding:18px;display:flex;flex-direction:column;gap:10px}
 .vw .nav{display:flex;gap:6px}
 .vw .nav button{flex:1;border:1px solid var(--line-2);background:var(--card);border-radius:8px;padding:7px;cursor:pointer}
@@ -170,7 +173,7 @@ textarea:focus,select:focus{outline:2px solid var(--accent);outline-offset:1px}
       });
     });
     var p = t.parts || {};
-    if (p.figure) ph.push({ n: "fig", name: "각부 명칭 도면", bullets: (p.items || []).map(function (x) { return x.n + ") " + x.name; }), img: p.figure, sec: "도면" });
+    if (p.figure) ph.push({ n: "fig", name: "각부 명칭 도면", bullets: (p.items || []).map(function (x) { return x.n + ") " + x.name; }), img: p.figure, sec: "도면", marks: p.marks || [] });
     if (t.guideFigure) ph.push({ n: "gfig", name: "안전작업 지침 대표 사진", bullets: [], img: t.guideFigure, sec: "대표" });
     if (ph.length) tasks.push({ tid: tid, name: t.name, photos: ph });
   });
@@ -253,7 +256,7 @@ textarea:focus,select:focus{outline:2px solid var(--accent);outline-offset:1px}
       ta.onblur = function () { if (tmr) { clearTimeout(tmr); tmr = null; save(p); } };
       ta.onkeydown = function (e) { e.stopPropagation(); };
       box.appendChild(ta);
-      if (r.s === "bad") box.appendChild(el("div", "hint", "적은 글이 그대로 사진 지시문에 들어갑니다."));
+      if (r.s === "bad") box.appendChild(el("div", "hint", "적은 글이 그대로 사진 지시문에 들어갑니다. 장비 모양이 틀렸으면 <b>설비가 다름</b>도 꼭 골라 주세요. 그래야 도면부터 고쳐 그립니다."));
     }
     return box;
   }
@@ -287,6 +290,9 @@ textarea:focus,select:focus{outline:2px solid var(--accent);outline-offset:1px}
     var b = el("div", "body");
     b.appendChild(el("div", "nm", esc(p.name)));
     if (p.bullets.length) b.appendChild(el("ul", "bl", p.bullets.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("")));
+    if (p.n === "fig") b.appendChild(el("div", "fighint", p.marks.length
+      ? "번호는 사이트가 사진 위에 얹습니다. 사진을 눌러 크게 보면 번호가 보입니다. 위치가 틀리면 메모에 적어 주세요."
+      : "이 도면은 아직 번호 위치가 정해지지 않았습니다. 번호 없음은 따로 처리하니 장비 모양만 봐 주세요."));
     var rn = redoNote(p); if (rn) b.appendChild(rn);
     b.appendChild(panel(p, function () { var nc = card(p, idx); c.replaceWith(nc); }));
     c.appendChild(b);
@@ -353,7 +359,13 @@ textarea:focus,select:focus{outline:2px solid var(--accent);outline-offset:1px}
   function closeView() { vw.hidden = true; document.body.style.overflow = ""; view = null; paint(); }
   function paintView() {
     var p = shown[view]; if (!p) return closeView();
-    vwBig.innerHTML = ""; var im = el("img"); im.src = src(p); im.alt = p.name; vwBig.appendChild(im);
+    vwBig.innerHTML = ""; var im = el("img"); im.src = src(p); im.alt = p.name;
+    if (p.n === "fig") {
+      // 본 SOP 화면처럼 번호를 사진 위에 얹어 보여 준다 (사진에는 번호를 그리지 않는다)
+      var w = el("span", "figw"); w.appendChild(im);
+      (p.marks || []).forEach(function (m) { var k = el("span", "mk", String(m.n)); k.style.left = m.x + "%"; k.style.top = m.y + "%"; w.appendChild(k); });
+      vwBig.appendChild(w);
+    } else vwBig.appendChild(im);
     vwSide.innerHTML = "";
     var nav = el("div", "nav");
     [["← 앞", -1], ["다음 →", 1], ["닫기 (Esc)", 0]].forEach(function (b) {

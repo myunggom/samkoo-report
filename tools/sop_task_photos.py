@@ -973,7 +973,17 @@ def refs(two, tid=None, 도면만들기=False):
                 got.append(n)
     남은칸 = max(0, min(3, 14 - len(out)))
     쓸것 = list(설비사진.get(tid) or [])
-    if 도면만들기:
+    if tid in 설비다시 and (tid in 강제다시그림 or not 쓸것):
+        # 검수에서 **장비 생김새가 틀렸다**는 지적이 있는 작업.
+        # 옛 그림(옛 도면 · 먼저 만든 도면)을 참조로 붙이면 지적 글보다
+        # 그림을 따라가서 틀린 곳이 그대로 나온다 (11-17 유도등 · 청소카트 ·
+        # 아웃트리거 수십 장이 그렇게 '안 바뀐' 사진이 됐다).
+        # 도면은 참조 없이 글로 새로 그리고, 사진은 **새로 그린 도면**만 붙인다.
+        # 우리 건물 **실물 사진**은 정답이라 남긴다. 실물과 다르게 그려 달라는
+        # 지적일 때만 --equip-redraw 로 지정해 실물도 뺀다.
+        도 = os.path.join(OUT_DIR, "%s_fig.jpg" % tid)
+        쓸것 = [] if 도면만들기 else ([도] if os.path.exists(도) else [])
+    elif 도면만들기:
         # **자기 자신을 참조로 붙이면 안 된다.** 먼저 만든 도면을 보고 그리면
         # 대본을 고쳐도 옛 그림을 그대로 베낀다 (c01 에서 실제로 당했다).
         # 대신 **지금 사이트의 그 장비 사진**이 있으면 그것을 쓴다.
@@ -1672,6 +1682,8 @@ def 점검만(a, client, tids):
 # 검수 화면은 samkoo-report-sop-new.vercel.app/review.html. 기록은 그 사이트의
 # /api/review 가 Blob 에 둔다. 읽기 · '다시 만들었음' 표시 모두 열쇠가 필요 없다.
 검수주소 = "https://samkoo-report-sop-new.vercel.app/api/review"
+설비다시 = set()       # 장비 생김새 지적이 있어 도면부터 새로 그릴 작업 (--redo-reviewed)
+강제다시그림 = set()   # --equip-redraw : 실물 사진도 빼고 지적대로 새로 그릴 작업
 검수지적 = {}          # (작업, 번호) → 지시문에 붙일 글. --redo-reviewed 때만 찬다.
 항목지시 = {
     "팔·손만": "팔이나 손만 나왔습니다. 사람 **전신**이 머리부터 발끝까지 나오게 카메라를 뒤로 물리세요.",
@@ -1739,6 +1751,10 @@ def main():
                     help="이미 만든 사진을 검사만 한다 (돈 거의 안 듦)")
     ap.add_argument("--redo-reviewed", action="store_true",
                     help="사장 검수에서 '문제' 로 표시한 사진만 다시 만든다")
+    ap.add_argument("--equip-redraw", default="",
+                    help="--redo-reviewed 와 함께 : 장비 모양 지적이 있는 작업(쉼표). 도면부터 참조 없이 새로 그린다")
+    ap.add_argument("--include-redone", action="store_true",
+                    help="--redo-reviewed 와 함께 : 다시 만들었지만 아직 안 본 사진도 지난 지적으로 또 만든다")
     ap.add_argument("--mark-redone", action="store_true",
                     help="배포한 뒤에 : 다시 만든 사진을 검수 화면에 '다시 만듦' 으로 표시")
     ap.add_argument("--redo-flagged", action="store_true",
@@ -1769,19 +1785,49 @@ def main():
     검수묶음 = {}
     if a.redo_reviewed:
         기록 = 검수기록읽기()
+        강제다시그림.update(x.strip() for x in (a.equip_redraw or "").split(",") if x.strip())
         for tid, 칸 in sorted(기록.items()):
             if a.task and tid not in tids:
                 continue
+            설비글 = []
             for n, r in 칸.items():
-                if r.get("s") == "bad":
-                    검수지적[(tid, str(n))] = 검수지적글(r)
-                    검수묶음.setdefault((tid, n == "fig"), []).append(str(n))
+                지난 = (r.get("history") or [{}])[-1]
+                if a.include_redone and not r.get("s") and r.get("redo") and 지난.get("s") == "bad":
+                    # 어제 다시 만들었지만 지적이 안 고쳐진 사진 — 지난 지적을 다시 쓴다
+                    r = r["history"][-1]
+                if r.get("s") != "bad":
+                    continue
+                검수지적[(tid, str(n))] = 검수지적글(r)
+                검수묶음.setdefault((tid, n == "fig"), []).append(str(n))
+                # 장비 생김새 지적 = '설비가 다름' 표시, 또는 --equip-redraw 로 지정한 작업.
+                # (도면에 '각부 명칭 표시' 같은 글자 지적만 있을 때 실물 참조를 빼면
+                #  오히려 장비가 달라진다 — 그래서 메모만으로는 정하지 않는다.)
+                장비 = "설비가 다름" in (r.get("tags") or []) or tid in 강제다시그림
+                메모 = (r.get("note") or "").strip()
+                if 장비 and 메모 and 메모 not in 설비글:
+                    설비글.append(메모)
+                if 장비:
+                    설비다시.add(tid)
+            if tid in 설비다시 and (도면장면.get(tid) or {}).get("fig"):
+                # 장비가 틀렸으면 **도면부터** 새로 그린다. 사진들이 도면을 보고 그리기 때문이다.
+                if (tid, "fig") not in 검수지적:
+                    검수지적[(tid, "fig")] = ""
+                    검수묶음.setdefault((tid, True), []).append("fig")
+                if 설비글:
+                    검수지적[(tid, "fig")] += (
+                        "\n## 이 작업의 사진들에서 **장비 생김새**에 대해 지적된 것 — 도면에서 반드시 고치세요\n"
+                        "(이 도면을 보고 사진 12장을 다시 그립니다. 도면이 틀리면 12장이 다 틀립니다.)\n"
+                        + "\n".join("- " + x.replace("\n", " ") for x in 설비글))
         if not 검수묶음:
             print("검수에서 '문제' 로 표시한 사진이 없습니다.")
             return
-        for (tid, 도면), ns in sorted(검수묶음.items()):
+        # 같은 작업 안에서는 **도면을 먼저** 만든다 (사진이 새 도면을 참조한다)
+        for (tid, 도면), ns in sorted(검수묶음.items(), key=lambda x: (x[0][0], not x[0][1])):
             할일.append((tid, 도면, ",".join(ns)))
-        a.run = True
+        if 설비다시:
+            print("장비 지적이 있어 도면부터 새로 그리고, 옛 장비 그림은 참조하지 않는 작업 : "
+                  + " ".join(sorted(설비다시)))
+        a.run = not a.plan          # --plan 이면 돈 안 쓰고 계획만
         a.skip_existing = False
         print("검수에서 '문제' 로 표시한 사진 %d장을 다시 만듭니다 (%d개 묶음)."
               % (len(검수지적), len(검수묶음)))
