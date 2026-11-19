@@ -1,0 +1,155 @@
+/* 자동 생성 — 위 css 들의 인쇄 규칙. 출력 틀에서는 화면에도 인쇄 모양을 적용한다 */
+
+  
+  body{background:#fff;font-size:10.5px}
+  .topbar,.btnbar,.savebar,.noprint,.toast{display:none !important}
+  .wrap{max-width:none;padding:0}
+  .card,.figbox,.gcard,.slot,.taskcard{box-shadow:none;break-inside:avoid}
+  .tablewrap{overflow:visible;border:0}
+  table.grid-t{min-width:0;font-size:8.4px}
+  table.grid-t th,table.grid-t td{padding:3px 4px}
+  table.grid-t thead th{position:static}
+  .gcards{grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
+  .gcard .ph{aspect-ratio:3/2}
+  .gcard .bd{padding:6px 7px}
+  .gcard ul{font-size:8.6px;padding-left:12px}
+  .gcard li{margin:1.5px 0}
+  .photos{grid-template-columns:1fr 1fr}
+  .drop{aspect-ratio:4/3}
+  .slot .sf,.drop input{display:none !important}
+  .num-in{border:0;background:transparent;font-size:11px}
+  .info-t input,.field input,.field textarea,.sign-t input{border:0;background:transparent}
+  .field textarea{min-height:0;height:auto}
+  .yn button{display:none}
+  .yn button.on{display:block;border:0;padding:2px 6px;background:transparent !important;
+    color:#000 !important}
+  .print-break{break-before:page}
+  a{text-decoration:none}
+
+  /* 여백 최소화 — A4 한 장에 최대한 담기 */
+  .wrap.narrow{max-width:none}
+  .card{margin-top:5px}
+  .card + .card{margin-top:5px}
+  .card-h{padding:5px 8px;font-size:11px}
+  .card-b{padding:7px}
+  .phead{margin:0 0 6px}
+  .phead .eyebrow{display:none}
+  .phead h2{font-size:15px;margin:2px 0 2px}
+  .phead p{font-size:9.5px}
+  .docline{margin-top:4px;padding-top:4px;font-size:9px}
+  .photos{gap:6px}
+  .drop{aspect-ratio:auto;height:33mm;padding:0}
+  .drop .ph-txt{font-size:9px}
+  .slot .sh{padding:4px 7px}
+  .slot .sh strong{font-size:10px}
+  .slot .sh em{font-size:8.5px}
+  .slot .cap-in{padding:3px 7px;font-size:9.5px}
+  .slot .cap-in:placeholder-shown{display:none}
+  .field label{font-size:9px;margin-bottom:1px}
+  .field input,.field textarea{padding:3px 5px;font-size:10px;border-color:#cbd5e1}
+  .field textarea{min-height:24px}
+  .fieldrow{gap:6px}
+  .sign-t th,.sign-t td{padding:3px 6px;font-size:10px}
+  .info-t th,.info-t td{padding:4px 6px;font-size:10px}
+  .info-t{min-width:0 !important}
+  .legend{font-size:8.5px;margin-top:6px}
+  input::placeholder,textarea::placeholder{color:transparent !important}
+  .partrow{padding:6px 9px}
+  .notebox{padding:7px 10px;margin-top:6px}
+  .figbox{padding:8px}
+  .figbox img{max-height:190px}
+  .partsflex{grid-template-columns:34% minmax(0,1fr);gap:10px}
+  .figgrid{gap:6px}
+  .figgrid img{max-height:88px}
+  .figbox .cap{margin-top:6px;font-size:10px}
+  .partlist{gap:5px}
+  .partrow strong{font-size:11px}
+  .partrow span{font-size:10px}
+  .bullet{width:19px;height:19px;font-size:10.5px}
+  .notebox h4{font-size:10.5px;margin-bottom:3px}
+  .notebox ul{font-size:10px;padding-left:14px}
+  .ppe .it img{height:38px}
+  .ppe .it span{font-size:10px}
+  .ppe .it{padding:6px 4px}
+  .gsection{margin-top:9px}
+  .gsection > h3{font-size:11px;margin-bottom:5px}
+  .gcard .nm{font-size:10.5px}
+  .gcard .num{width:17px;height:17px;font-size:10px}
+  .tag{font-size:8px;padding:1.5px 5px}
+  .gcard .hd{margin-bottom:4px;gap:4px}
+
+.printonly{display:block}
+details.tgrp>summary{background:#fff!important;color:#000}.tsearch,.gjump{display:none}
+.navbox{display:none}#tbody .tchap{border:0;padding:0}
+
+  
+  html,body{background:#fff!important;margin:0!important;padding:0!important}
+  .snav,.noprint,.savebar{display:none!important}
+  .stage{padding:0!important;background:#fff!important}
+  .slide{
+    font-size:11pt;--fs-sm:.727em;--fs-xs:.773em;
+    width:297mm;min-height:206mm;margin:0;border:0;border-radius:0;box-shadow:none;
+    padding:9mm 11mm 7mm;page-break-after:always;break-after:page;
+  }
+  .slide:last-child{page-break-after:auto;break-after:auto}
+  .s-logo{display:block}
+  .pt-main{grid-template-columns:52.86fr 37.68fr}
+  .gd-top{grid-template-columns:31fr 34fr 31fr}
+  .pt-notes{grid-template-columns:repeat(3,1fr)}
+  .gd-row4{grid-template-columns:repeat(4,1fr)}
+  .rp-main{grid-template-columns:67.6fr 25.6fr}
+  .rp-photos{grid-template-columns:1fr 1fr}
+  .gi{grid-template-columns:1fr 36%}
+  .rk-t{font-size:6.6pt;table-layout:fixed}
+  .tblscroll{overflow:visible!important}
+  .tblscroll .rk-t{min-width:0!important}
+  .rk-t input.n,.rk-info input,.rp-info input,.rp-sign input,.rp-cap input{border-color:transparent!important;background:transparent!important}
+  .yn button{border-color:#D5DCE5!important}
+  .rp-drop{cursor:default}
+  .rp-memo textarea{min-height:2.4em}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+
+
+  .rk-t input.n{display:none}
+  .rk-t .yn{display:none}
+  .rk-t .pv{display:block;font-weight:800;font-size:1.5em;color:#1F2937;line-height:1.2}
+  .slide.dense{font-size:9.3pt}
+  .slide.dense .s-body{margin-top:1em}
+  .slide.dense .gi .shot{aspect-ratio:3/2;object-fit:contain}
+  .slide.dense .gd-items{gap:.62em}
+  .slide.dense .gd-bot{margin-top:.9em}
+  .slide.dense .gd-fig img{max-height:14em}
+  .slide.dense .ppe .it img{height:2.9em}
+
+
+  .slide .rp-drop{aspect-ratio:16/9}
+  .slide .rp-photos{gap:.7em}
+  .slide .rp-main{margin-top:.7em}
+  .slide .rp-note{margin-top:.5em}
+
+
+  .slide .rp-drop{aspect-ratio:2/1}
+  .slide .rp-memo textarea{min-height:2em}
+  .slide.dense{font-size:9pt}
+  .slide.dense .gd-fig .pt-grid img{max-height:8.5em}
+  .slide.dense .gd-fig .pt-grid{gap:.6em}
+  .slide.dense .gi ul{line-height:1.5}
+
+
+  .rk-t td{padding:.95em .4em}
+
+.thint{display:none!important}
+
+  .rp-pledge{margin-top:.7em}
+  .rp-crew td{height:1.9em}
+  .rp-side{display:flex;flex-direction:column;gap:.7em}
+
+.shotzoom{display:none!important}
+.ebar,.ip-mask{display:none!important}
+  body.edit-on [data-e],body.edit-on [data-ei]{outline:0!important;background:none!important;box-shadow:none!important}
+  body.edit-on{padding-bottom:0}
+
+  .sg-mask,.rec-mask{display:none!important}
+  .sigbox{border:0!important;background:none!important;min-height:2.4em}
+  .sigbox .ph{display:none}
+

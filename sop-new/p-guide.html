@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta name="robots" content="noindex">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f2544">
+<title>안전 및 작업 교육자료</title>
+
+<link rel="stylesheet" href="assets/print/style.css">
+<link rel="stylesheet" href="assets/print/slide.css">
+<link rel="stylesheet" href="assets/print/inline.css">
+
+</head>
+<body>
+<div id="app"></div>
+
+<script src="assets/data.js"></script>
+
+<script src="assets/print/app.js"></script>
+<script>
+/* 출력 전용 : 편집 · 이동 기능은 끈다 */
+window.initInline = function () {};
+window.snav = function () { return ''; };
+/* 새 사이트 화면에서 적은 값 */
+window.PV = function (k) {
+  try {
+    var d = JSON.parse(sessionStorage.getItem('sop-print') || 'null');
+    if (d && d.id === qs('id') && d[k]) return d[k];
+  } catch (e) {}
+  return null;
+};
+</script>
+<link rel="stylesheet" href="assets/print/print-now.css">
+<style>
+.btnbar, .snav, .thint { display: none !important }
+</style>
+<script>
+/* 쪽마다 A4 가로 한 장에 맞춘다 (2026-11-19 사장 : "1페이지에 다 나오게").
+   넘치는 쪽은 비율을 줄이고, 줄인 만큼 폭을 넓혀 종이 폭을 그대로 채운다. */
+window.addEventListener('load', function () {
+  var imgs = [].slice.call(document.images), t0 = Date.now();
+  imgs.forEach(function (im) { im.loading = 'eager'; });
+  (function wait() {
+    if (imgs.some(function (im) { return !im.complete; }) && Date.now() - t0 < 10000)
+      return setTimeout(wait, 120);
+    var H = 210 / 25.4 * 96 - 4;            /* A4 가로 높이(px) - 여유 */
+    [].forEach.call(document.querySelectorAll('.slide'), function (sl) {
+      if (sl.offsetParent === null) return;
+      sl.style.minHeight = '0';
+      for (var k = 0; k < 4; k++) {
+        var z = parseFloat(sl.style.zoom || 1), h = sl.offsetHeight;
+        if (h <= H) break;
+        z = z * H / h * 0.995;
+        sl.style.zoom = z;
+        sl.style.width = (297 / z) + 'mm';
+      }
+      sl.style.minHeight = '';
+    });
+    window.맞춤끝 = true;
+  })();
+});
+</script>
+
+
+
+
+
+<script>
+(function () {
+  var t = currentTask(); if (!t) return;
+  var DAY = (window.dayCtx ? dayCtx() : null);
+  var B = 'TASKS.' + t.id, G = t.guide || [], p = t.parts;
+  document.title = t.name + ' 안전 교육자료 | 안전 표준운영절차';
+
+  function item(it, q) {
+    var body = '<div><div class="gi-h"><span class="sq"' + EA(q + '.n', 'num') + '>' + it.n + '</span>' +
+      '<span class="gi-nm"' + EA(q + '.name') + '>' + esc(it.name) + '</span></div>' +
+      '<div class="tags">' +
+      (it.must ? '<span class="tag must">필수</span>' : '') +
+      '<span class="tag warn"' + (it.warn ? '' : ' style="display:none"') + '>⚠ <span' + EA(q + '.warn') + '>' +
+      esc(it.warn || '') + '</span></span>' +
+      '</div><ul>' + (it.bullets || []).map(function (b, k) {
+        return '<li' + EA(q + '.bullets.' + k) + '>' + esc(b) + '</li>';
+      }).join('') + '</ul></div>';
+    var img = it.img
+      ? '<img class="shot" src="' + imgSrc(it.img) + '" alt="" loading="lazy"' + EI(q + '.img') + '>'
+      : '<div class="shot ph-none" style="display:none"' + EI(q + '.img') + '>＋ 사진</div>';
+    return '<div class="gi' + (it.img ? '' : ' noimg') + '">' + body + img + '</div>';
+  }
+  function section(g, gi, cls) {
+    return '<div class="pnl"><div class="pnl-h"' + EA(B + '.guide.' + gi + '.title') + '>' + esc(g.title) + '</div>' +
+      '<div class="pnl-b"><div class="' + cls + '">' +
+      g.items.map(function (it, i) { return item(it, B + '.guide.' + gi + '.items.' + i); }).join('') +
+      '</div></div></div>';
+  }
+
+  var h = snav(t.no + '. ' + t.name + ' — 안전 및 작업 교육자료', 'work.html?id=' + t.id);
+  h += '<div class="stage"><div class="slide dense">';
+  h += sHead('<span class="no"><span' + EA(B + '.no') + '>' + esc(t.no) + '</span>.</span>' +
+             '<span' + EA(B + '.name') + '>' + esc(t.name) + '</span> 안전 및 작업 교육자료', '');
+
+  h += '<div class="s-body"><div class="gd-top">';
+  h += G[0] ? section(G[0], 0, 'gd-items') : '<div></div>';
+
+  h += '<div class="pnl gd-mid"><div class="gd-fig">';
+  if (t.guideFigure) {
+    /* 교육자료 전용 상세설명도 (PPT 교육자료 슬라이드 중앙 그림) */
+    h += '<span class="pt-figwrap gd-figwrap"><img src="' + imgSrc(t.guideFigure) + '" alt=""' + EI(B + '.guideFigure') + '>' +
+      (t.guideMarks || []).map(function (m) {
+        return '<span class="mark" style="left:' + m.x + '%;top:' + m.y + '%">' + m.n + '</span>';
+      }).join('') + '</span>';
+  } else if (p.figures && p.figures.length) {
+    h += '<div class="pt-grid">' + p.figures.map(function (f, i) {
+      return '<figure><img src="' + imgSrc(f) + '" alt=""' + EI(B + '.parts.figures.' + i) + '>' +
+        '<figcaption>' + esc((p.items[i] && p.items[i].name) || '') + '</figcaption></figure>';
+    }).join('') + '</div>';
+  } else {
+    h += '<img src="' + imgSrc(p.figure) + '" alt=""' + EI(B + '.parts.figure') + '>';
+  }
+  h += '</div>';
+  h += '<div class="ppe-h"' + EA('SITE.labels.ppeHead') + '>' + esc(SITE.labels.ppeHead) + '</div>';
+  h += '<div class="ppe-note"' + (t.ppeNote ? '' : ' style="display:none"') + '>※ <span' + EA(B + '.ppeNote') + '>' +
+    esc(t.ppeNote || '') + '</span></div>';
+  h += '<div class="ppe">' + (t.ppe || []).map(function (x, i) {
+    return '<div class="it"><img src="' + imgSrc(x.img) + '" alt=""' + EI(B + '.ppe.' + i + '.img') + '>' +
+      '<span' + EA(B + '.ppe.' + i + '.name') + '>' + esc(x.name) + '</span></div>';
+  }).join('') + '</div>';
+  h += '<div class="gd-hint"' + EA('SITE.labels.guideHint') + '>' + esc(SITE.labels.guideHint) + '</div>';
+  h += '</div>';
+
+  h += G[1] ? section(G[1], 1, 'gd-items') : '<div></div>';
+  h += '</div>';
+
+  if (G[2]) h += '<div class="gd-bot">' + section(G[2], 2, 'gd-row4') + '</div>';
+
+  h += '</div>' + sFootE(t, B) + '</div></div>';
+
+  var DQ = DAY ? ('&day=' + encodeURIComponent(DAY.id)) : '';
+  h += '<div class="btnbar noprint" style="max-width:1180px;margin:0 auto 30px;padding:0 12px">' +
+    '<a class="btn" href="parts.html?id=' + t.id + '">‹ 각부 명칭</a>' +
+    (DAY ? '<a class="btn" href="day.html?d=' + encodeURIComponent(DAY.id) + '">일일 보고서</a>' : '') +
+    '<a class="btn primary" href="risk.html?id=' + t.id + DQ + '">다음 : 위험성평가표 ›</a></div>';
+
+  document.getElementById('app').innerHTML = h;
+  initInline();
+
+  /* 사진을 누르면 원본 크기로 크게 본다.
+     카드 안에서는 글과 나란히 놓느라 작게 보일 수밖에 없어,
+     자세히 볼 일이 있을 때 쓰도록 한다. 다시 누르거나 Esc 로 닫는다. */
+  (function zoom() {
+    var box = document.createElement('div');
+    box.className = 'shotzoom noprint';
+    box.innerHTML = '<img alt=""><span class="cap"></span>';
+    box.addEventListener('click', close);
+    document.body.appendChild(box);
+
+    function close() { box.classList.remove('on'); }
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') close();
+    });
+    document.addEventListener('click', function (e) {
+      var im = e.target.closest ? e.target.closest('img.shot') : null;
+      if (!im || document.body.classList.contains('edit-on')) return;
+      box.querySelector('img').src = im.src;
+      var card = im.closest('.gi');
+      var nm = card ? card.querySelector('.gi-nm') : null;
+      box.querySelector('.cap').textContent = nm ? nm.textContent : '';
+      box.classList.add('on');
+    });
+  })();
+})();
+</script>
+</body>
+</html>

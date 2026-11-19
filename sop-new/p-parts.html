@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta name="robots" content="noindex">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f2544">
+<title>각부 명칭 및 점검 포인트</title>
+
+<link rel="stylesheet" href="assets/print/style.css">
+<link rel="stylesheet" href="assets/print/slide.css">
+<link rel="stylesheet" href="assets/print/inline.css">
+
+</head>
+<body>
+<div id="app"></div>
+
+<script src="assets/data.js"></script>
+
+<script src="assets/print/app.js"></script>
+<script>
+/* 출력 전용 : 편집 · 이동 기능은 끈다 */
+window.initInline = function () {};
+window.snav = function () { return ''; };
+/* 새 사이트 화면에서 적은 값 */
+window.PV = function (k) {
+  try {
+    var d = JSON.parse(sessionStorage.getItem('sop-print') || 'null');
+    if (d && d.id === qs('id') && d[k]) return d[k];
+  } catch (e) {}
+  return null;
+};
+</script>
+<link rel="stylesheet" href="assets/print/print-now.css">
+<style>
+.btnbar, .snav, .thint { display: none !important }
+</style>
+<script>
+/* 쪽마다 A4 가로 한 장에 맞춘다 (2026-11-19 사장 : "1페이지에 다 나오게").
+   넘치는 쪽은 비율을 줄이고, 줄인 만큼 폭을 넓혀 종이 폭을 그대로 채운다. */
+window.addEventListener('load', function () {
+  var imgs = [].slice.call(document.images), t0 = Date.now();
+  imgs.forEach(function (im) { im.loading = 'eager'; });
+  (function wait() {
+    if (imgs.some(function (im) { return !im.complete; }) && Date.now() - t0 < 10000)
+      return setTimeout(wait, 120);
+    var H = 210 / 25.4 * 96 - 4;            /* A4 가로 높이(px) - 여유 */
+    [].forEach.call(document.querySelectorAll('.slide'), function (sl) {
+      if (sl.offsetParent === null) return;
+      sl.style.minHeight = '0';
+      for (var k = 0; k < 4; k++) {
+        var z = parseFloat(sl.style.zoom || 1), h = sl.offsetHeight;
+        if (h <= H) break;
+        z = z * H / h * 0.995;
+        sl.style.zoom = z;
+        sl.style.width = (297 / z) + 'mm';
+      }
+      sl.style.minHeight = '';
+    });
+    window.맞춤끝 = true;
+  })();
+});
+</script>
+
+
+
+
+<script>
+(function () {
+  var t = currentTask(); if (!t) return;
+  var p = t.parts, B = 'TASKS.' + t.id, P = B + '.parts';
+  document.title = t.name + ' 각부 명칭 | 안전 표준운영절차';
+
+  var h = snav(t.no + '. ' + t.name + ' — 각부 명칭 및 점검 포인트', 'work.html?id=' + t.id);
+  h += '<div class="stage"><div class="slide">';
+  h += sHead('<span class="no"><span' + EA(B + '.no') + '>' + esc(t.no) + '</span>.</span>' +
+             '<span' + EA(P + '.title') + '>' + esc(p.title) + '</span>',
+             '<span' + EA(P + '.subtitle') + '>' + esc(p.subtitle) + '</span>', true);
+
+  h += '<div class="s-body"><div class="pt-main">';
+
+  h += '<div class="pnl pt-fig">';
+  if (p.figures && p.figures.length) {
+    h += '<div class="pt-grid">' + p.figures.map(function (f, i) {
+      var mk = (p.marks || []).filter(function (m) { return m.i === i; });
+      var inner = '<img src="' + imgSrc(f) + '" alt=""' + EI(P + '.figures.' + i) + '>';
+      if (mk.length) {
+        inner = '<span class="pt-figwrap">' + inner + mk.map(function (m) {
+          return '<span class="mark" style="left:' + m.x + '%;top:' + m.y + '%">' + m.n + '</span>';
+        }).join('') + '</span>';
+      }
+      return '<figure>' + inner + '<figcaption><span' + EA(P + '.items.' + i + '.name') + '>' +
+        esc((p.items[i] && p.items[i].name) || '') + '</span></figcaption></figure>';
+    }).join('') + '</div>';
+  } else {
+    h += '<div class="pt-figwrap"><img src="' + imgSrc(p.figure) + '" alt=""' + EI(P + '.figure') + '>' +
+      (p.marks || []).map(function (m) {
+        return '<span class="mark" style="left:' + m.x + '%;top:' + m.y + '%">' + m.n + '</span>';
+      }).join('') + '</div>';
+  }
+  h += '<div class="pt-cap"' + EA(P + '.figureCaption') + '>' + esc(p.figureCaption) + '</div></div>';
+
+  h += '<div class="pnl"><div class="pnl-h"' + EA('SITE.labels.partsPanel') + '>' + esc(SITE.labels.partsPanel) +
+    '</div><div class="pnl-b">';
+  p.items.forEach(function (it, i) {
+    h += '<div class="pt-item"><span class="badge"' + EA(P + '.items.' + i + '.n', 'num') + '>' + it.n + '</span>' +
+      '<div><b' + EA(P + '.items.' + i + '.name') + '>' + esc(it.name) + '</b>' +
+      '<span' + EA(P + '.items.' + i + '.desc') + '>' + esc(it.desc) + '</span></div></div>';
+  });
+  h += '</div></div></div>';
+
+  function nb(cls, labKey, arrKey) {
+    return '<div class="nb ' + cls + '"><h4' + EA('SITE.labels.' + labKey) + '>' + esc(SITE.labels[labKey]) + '</h4>' +
+      (p[arrKey] || []).map(function (x, i) {
+        return '<p' + EA(P + '.' + arrKey + '.' + i) + '>' + esc(x) + '</p>';
+      }).join('') + '</div>';
+  }
+  h += '<div class="pt-notes">' + nb('b', 'notePre', 'pre') + nb('g', 'noteUse', 'use') + nb('r', 'noteBan', 'ban') + '</div>';
+
+  h += '</div>' + sFootE(t, B) + '</div></div>';
+
+  h += '<div class="btnbar noprint" style="max-width:1180px;margin:0 auto 30px;padding:0 12px">' +
+    '<a class="btn" href="work.html?id=' + t.id + '">‹ 작업 메뉴</a>' +
+    '<a class="btn primary" href="guide.html?id=' + t.id + '">다음 : 안전작업 지침 ›</a></div>';
+
+  document.getElementById('app').innerHTML = h;
+  initInline();
+})();
+</script>
+</body>
+</html>

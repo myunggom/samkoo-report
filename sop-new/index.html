@@ -730,7 +730,76 @@ table.grid.cs tr.sec td{
     }).join('') +
       '<button class="prt noprint" id="btnPrint">인쇄 · PDF</button>';
     document.getElementById('btnPrint')
-      .addEventListener('click', function () { window.print(); });
+      .addEventListener('click', 인쇄);
+  }
+
+  /* ── 인쇄 · PDF ──
+     화면은 보기 좋게, 출력은 기존 사이트(safety-sop) 양식 그대로.
+     2026-11-19 사장 : "PDF 가 기존 사이트보다 너무 떨어진다. 1페이지에 다 나오게,
+     입력창은 지금처럼 하되 출력은 기존처럼." → 기존 출력 쪽(p-*.html)을 숨은 틀에
+     열어 그 틀을 인쇄한다. 화면에서 적은 값은 sessionStorage 로 넘긴다. */
+  var 출력쪽 = { parts: 1, guide: 1, risk: 1, report: 1 };
+  function 화면값(k) {
+    var d = { id: cur };
+    if (k === 'risk') {
+      var hd = view.querySelectorAll('#sheetRisk table.head input');
+      var rows = [];
+      [].forEach.call(view.querySelectorAll('table.rk tbody tr'), function (tr) {
+        var r = {};
+        ['f', 's', 'f2', 's2'].forEach(function (x) {
+          var inp = tr.querySelector('input[data-k="' + x + '"]');
+          var n = parseInt(inp && inp.value, 10);
+          if (n) r[x] = n;
+        });
+        var on = tr.querySelector('.yn button.on');
+        r.done = on ? on.dataset.y : '';
+        rows.push(r);
+      });
+      d.risk = { date: hd[0] ? hd[0].value : '', assessor: hd[1] ? hd[1].value : '', rows: rows };
+    }
+    if (k === 'report') {
+      var f = {}, keys = ['date', 'leader', 'crew', 'sitename'];
+      [].forEach.call(view.querySelectorAll('table.head input'), function (inp, i) {
+        if (keys[i] && inp.value) f[keys[i]] = inp.value;
+      });
+      var chk = {};
+      [].forEach.call(view.querySelectorAll('ul.checks input[type=checkbox]'), function (c, i) {
+        if (c.checked) chk[i] = true;
+      });
+      d.report = { f: f, chk: chk };
+    }
+    return d;
+  }
+  function 인쇄() {
+    if (!출력쪽[tab] || !cur) { window.print(); return; }
+    try { sessionStorage.setItem('sop-print', JSON.stringify(화면값(tab))); } catch (e) {}
+    var 전 = document.getElementById('prFrame');
+    if (전) 전.parentNode.removeChild(전);
+    var fr = document.createElement('iframe');
+    fr.id = 'prFrame';
+    fr.title = '인쇄용';
+    fr.tabIndex = -1;
+    fr.setAttribute('aria-hidden', 'true');
+    /* A4 가로 폭으로 띄워야 기존 양식이 화면 폭에 맞춰 접히지 않는다 */
+    fr.style.cssText = 'position:fixed;left:-20000px;top:0;width:1123px;height:794px;border:0';
+    var btn = document.getElementById('btnPrint'), 글 = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = '준비 중…'; }
+    function 끝() { if (btn) { btn.disabled = false; btn.textContent = 글; } }
+    fr.onload = function () {
+      var doc = fr.contentDocument, imgs = [].slice.call(doc.images);
+      /* 숨은 틀에서는 '나중에 읽기' 사진이 영영 안 읽힌다 — 바로 읽게 한다 */
+      imgs.forEach(function (im) { im.loading = 'eager'; });
+      var 시작 = Date.now();
+      (function 기다림() {
+        var 남 = imgs.filter(function (im) { return !im.complete; }).length;
+        if (남 && Date.now() - 시작 < 10000) return setTimeout(기다림, 150);
+        끝();
+        fr.contentWindow.focus();
+        fr.contentWindow.print();
+      })();
+    };
+    fr.src = 'p-' + tab + '.html?id=' + encodeURIComponent(cur);
+    document.body.appendChild(fr);
   }
 
   /* ── 본문 ── */
@@ -1077,7 +1146,7 @@ table.grid.cs tr.sec td{
       }).join('') + '</tbody></table></div>';
 
     h += '<p class="fine">' + esc(R.legal) + '</p>' +
-      '<div class="act"><button class="btn">저장하고 PDF 만들기</button></div>' +
+      '<div class="act"><button class="btn" id="btnRepPdf">PDF 만들기</button></div>' +
       '</div>';
     return h;
   }
@@ -1214,7 +1283,17 @@ table.grid.cs tr.sec td{
     link();
     bindRisk();
     bindQr(t);
+    var rp = document.getElementById('btnRepPdf');
+    if (rp) rp.addEventListener('click', 인쇄);
   }
+
+  /* Ctrl+P 도 같은 출력 양식으로 */
+  document.addEventListener('keydown', function (e) {
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'p' || e.key === 'P') && 출력쪽[tab] && !CH[cur]) {
+      e.preventDefault();
+      인쇄();
+    }
+  });
 
   /* 도면의 번호와 아래 목록을 짚으면 짝이 같이 밝아진다 */
   function link() {
