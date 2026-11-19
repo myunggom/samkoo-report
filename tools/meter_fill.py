@@ -489,6 +489,38 @@ def fill_book(src, dst, feed_path, 항목, 보정=(), 대조=False):
     return 말
 
 
+검침미사용표시 = "검침값 미사용"
+
+
+def 검침값쓰나(path):
+    """'작성방법' 시트에 '검침값 미사용' 이라고 적혀 있으면 False.
+
+    사용량이 너무 적어 계량기 오차가 커지는 달은 검침값을 지우고, 양식이
+    미검침분(고지서 사용량)을 지분율로 배분하게 둔다. 그런 달에 원격검침을
+    다시 채우면 애써 지운 값이 되살아나 배분이 틀어진다.
+    """
+    from openpyxl import load_workbook
+
+    try:
+        wb = load_workbook(path, read_only=True, data_only=True)
+    except Exception:
+        return True
+    try:
+        if "작성방법" not in wb.sheetnames:
+            return True
+        ws = wb["작성방법"]
+        for row in ws.iter_rows(min_row=1, max_row=40, max_col=10,
+                                values_only=True):
+            for v in row:
+                if isinstance(v, str) and 검침미사용표시 in v:
+                    return False
+        return True
+    except Exception:
+        return True
+    finally:
+        wb.close()
+
+
 def check_gap(wb):
     """'작성방법' 시트의 미검침분을 읽어 알린다.
 
@@ -593,9 +625,20 @@ def main():
         print("   %-2s %-34s %s" % (c["종류"], c["이름"][:34], 기간글(c["기간"])))
     print()
 
-    books = [n for n in sorted(os.listdir(a.회입분))
-             if n.endswith(".xlsx") and not n.startswith("~$")
-             and FEED_OF.get(n[:2])]
+    books, 건너뜀 = [], []
+    for n in sorted(os.listdir(a.회입분)):
+        if not (n.endswith(".xlsx") and not n.startswith("~$")
+                and FEED_OF.get(n[:2])):
+            continue
+        if not 검침값쓰나(os.path.join(a.회입분, n)):
+            건너뜀.append(n)
+            continue
+        books.append(n)
+    for n in 건너뜀:
+        print("# %s" % n)
+        print("   '%s' 로 표시된 달입니다. 원격검침을 채우지 않고 그대로 둡니다."
+              % 검침미사용표시)
+        print()
     쓴것 = set()
 
     for n in books:
