@@ -152,18 +152,60 @@ def 중수달인가(검침폴더):
     return 가장긴날수 >= 45
 
 
-def 번호있는폴더(보고자료, 앞, 빼는폴더=None):
+금지표시 = "양식으로 쓰지 말 것"
+
+
+def 양식쓰면안되나(path):
+    """'작성방법' 시트에 양식 금지 표시가 있으면 True.
+
+    그 달만 예외로 수식을 상수로 바꾼 파일이 있다. (예: 사용량이 너무 적어
+    검침값을 버리고 지분율로만 부과한 달) 그런 파일을 다음 달 양식으로
+    쓰면 계산식이 죽은 채로 이어진다.
+    """
+    from openpyxl import load_workbook
+
+    try:
+        wb = load_workbook(path, read_only=True, data_only=True)
+    except Exception:
+        return False
+    try:
+        if "작성방법" not in wb.sheetnames:
+            return False
+        ws = wb["작성방법"]
+        for row in ws.iter_rows(min_row=1, max_row=40, max_col=10,
+                                values_only=True):
+            for v in row:
+                if isinstance(v, str) and 금지표시 in v:
+                    return True
+        return False
+    except Exception:
+        return False
+    finally:
+        wb.close()
+
+
+def 번호파일(폴더, 앞):
+    """그 폴더에서 해당 앞번호의 회입분 파일 경로 (없으면 None)."""
+    for n in sorted(os.listdir(폴더)):
+        if n.startswith(앞) and n.endswith(".xlsx") \
+                and not n.startswith("~$") and "원격검침DB" not in n:
+            return os.path.join(폴더, n)
+    return None
+
+
+def 번호있는폴더(보고자료, 앞, 빼는폴더=None, 쓸수있는것만=False):
     """그 앞번호 파일이 실제로 들어 있는 월 폴더를 오래된 것부터 늘어놓는다."""
     빼기 = os.path.abspath(빼는폴더) if 빼는폴더 else None
     out = []
     for q in 월폴더목록(보고자료):
         if 빼기 and os.path.abspath(q) == 빼기:
             continue
-        for n in os.listdir(q):
-            if n.startswith(앞) and n.endswith(".xlsx") \
-                    and not n.startswith("~$") and "원격검침DB" not in n:
-                out.append(q)
-                break
+        p = 번호파일(q, 앞)
+        if not p:
+            continue
+        if 쓸수있는것만 and 양식쓰면안되나(p):
+            continue
+        out.append(q)
     return out
 
 
@@ -202,11 +244,25 @@ def 폴더준비(양식폴더, 새폴더, y, m, 보고자료=None, 중수=None):
         if 앞 == "04" and 중수 is False:
             알림.append("  중수는 이번 달 고지 대상이 아니라 넣지 않았습니다.")
             continue
+        원본 = os.path.join(양식폴더, n)
+        if 앞 != "00" and 양식쓰면안되나(원본) and 보고자료:
+            # 그 달만 예외로 손본 파일이다. 계산식이 살아 있는 앞 달을 쓴다
+            성한곳 = 번호있는폴더(보고자료, 앞, 새폴더, 쓸수있는것만=True)
+            성한것 = 번호파일(성한곳[-1], 앞) if 성한곳 else None
+            if 성한것:
+                알림.append("  %s 는 %s 가 그 달만 손본 자료라, 계산식이 살아 있는"
+                            " %s 를 양식으로 썼습니다."
+                            % (앞, os.path.basename(양식폴더),
+                               os.path.basename(os.path.dirname(성한것))))
+                원본, n = 성한것, os.path.basename(성한것)
+            else:
+                알림.append("  ! %s 양식이 그 달만 손본 자료인데 대신 쓸 달을"
+                            " 못 찾았습니다. 계산식을 확인하세요." % 앞)
         쓴앞번호.add(앞)
         새이름 = 월바꾸기(n, y, m)
         dst = os.path.join(새폴더, 새이름)
         if not os.path.exists(dst):
-            shutil.copy2(os.path.join(양식폴더, n), dst)
+            shutil.copy2(원본, dst)
         만든것.append(새이름)
 
     # 중수 달인데 양식 폴더에 중수가 없으면 — 두 달 전 폴더에서 가져온다
