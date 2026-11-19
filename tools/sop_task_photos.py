@@ -1017,6 +1017,8 @@ def refs(two, tid=None, 도면만들기=False):
 
 - 첨부 사진이 작고 거칠어도 **모양은 그것이 정답**입니다.
 - 다른 종류의 장비로 바꾸지 마세요.
+- 첨부 사진 위에 덧그린 **번호 동그라미 · 화살표 · 이름표는 옮기지 마세요.**
+  번호는 사이트가 나중에 얹습니다. 장비만 깨끗하게 그리세요.
 - 첨부 사진이 접히거나 눕혀진 상태로 보이더라도, 위 '이번 사진의 장면'
   에 적힌 **조립 상태**를 따르세요.
 """
@@ -1198,6 +1200,7 @@ partial: 사진이 사람의 일부만 담았을 때만 — arm_only(팔·손만
 overlap: 한 사람이 다른 사람 뒤에 가려져 몸 일부만 보이거나, 두 사람 몸이 겹쳐 붙어 누구 팔인지 불분명하면 true. 서로 떨어져 각자 전신이 보이면 false.
 split: 화면이 둘 이상의 칸·장면으로 나뉘어 있으면 true.
 fake_text: 읽을 수 없는 가짜 글자·간판이 보이면 true.
+badges: 사진 위에 덧그린 번호 동그라미(①②, 원 안 숫자)·지시 화살표·설명 라벨이 있으면 true. 실제 장비에 붙은 명판·계기 눈금은 false.
 note: 한 줄 메모(한국어)."""
 
 점검틀 = {
@@ -1217,6 +1220,7 @@ note: 한 줄 메모(한국어)."""
         "overlap": {"type": "BOOLEAN"},
         "split": {"type": "BOOLEAN"},
         "fake_text": {"type": "BOOLEAN"},
+        "badges": {"type": "BOOLEAN"},
         "note": {"type": "STRING"},
     },
     "required": ["people", "persons", "partial", "overlap", "split",
@@ -1234,7 +1238,20 @@ note: 한 줄 메모(한국어)."""
 
 
 class 돈끊김(Exception):
-    """API 가 돈 · 할당량 때문에 계속 거절한다. 더 돌려도 소용없다."""
+    """API 가 돈 · 할당량 때문에 계속 거절한다. 더 돌려도 소용없다.
+    (--budget 상한에 닿았을 때도 이것으로 멈춘다 — 멈추는 길이 같아야 만든 것이 남는다.)"""
+
+
+# ── 돈 상한 (2026-11-19) ─────────────────────────────────────────
+# 사장 : "이제 10만원이 다에요. 돈 좀 적당히 쓰게." 그전에는 크레딧이 바닥날
+# 때까지 돌았다. --budget 원 을 주면 그림을 부르기 **전에** 지금까지 쓴 돈 +
+# 이번 장 값이 상한을 넘는지 보고, 넘으면 멈춘다. 검사(Flash)는 장당 1원도
+# 안 돼 세지 않는다.
+예산 = {"상한": 0, "씀": 0}
+
+
+def 장값(모델):
+    return 48 if 모델 == SAVER else 190
 
 
 def 돈때문인가(e):
@@ -1289,7 +1306,7 @@ def 파일md5(path):
     return hashlib.md5(open(path, "rb").read()).hexdigest()
 
 
-def 번호자리찾기(client, 대상):
+def 번호자리찾기(client, 대상, 검수알림=False):
     from google import genai  # noqa: F401
     from google.genai import types
     from PIL import Image, ImageDraw
@@ -1366,6 +1383,11 @@ def 번호자리찾기(client, 대상):
         보기.save(os.path.join(확인폴더, "%s.jpg" % tid), quality=80)
         print("  %s : 번호 %d개 자리 찾음%s" % (tid, len(자리),
               (" · 못 찾음 %s" % 없음) if 없음 else ""))
+        if 검수알림 and 자리:
+            d = 검수대기읽기()
+            if [tid, "fig"] not in d:
+                d.append([tid, "fig"])
+                io.open(검수대기파일, "w", encoding="utf-8").write(json.dumps(d, ensure_ascii=False))
         io.open(번호파일, "w", encoding="utf-8", newline=NL).write(
             json.dumps(표, ensure_ascii=False, indent=1))
     print("번호 자리 : %s  (확인용 그림 %s)" % (번호파일, 확인폴더))
@@ -1437,6 +1459,10 @@ def 사진점검(client, path, 기대인원, 혼자, 장면글=""):
             사유.append("도면 그림에 글자가 들어갔습니다. 번호 · 이름 · 설명 글자를 그림에 넣지 마세요")
         else:
             메모.append("가짜 글자 · 간판이 보임")
+    if r.get("badges") and 혼자:
+        # 2026-11-19 : 옛 도면(번호 동그라미가 그려진 것)을 참조로 그리니 m10 · m11 이
+        # 동그라미까지 베꼈다. 사이트가 번호를 따로 얹으므로 겹치고, 같은 번호가 두 번 나왔다.
+        사유.append("도면 그림에 번호 동그라미 · 화살표가 들어갔습니다. 번호 표시는 하나도 그리지 마세요")
     if r.get("note"):
         메모.append(str(r["note"])[:80])
     # 같은 사유가 두 번 들어가지 않게
@@ -1470,6 +1496,10 @@ def 그리기(client, 모델, 글, ref_imgs, 비율, 크기):
     import time
     from google.genai import types
     for 시도 in range(5):
+        값 = 장값(모델)
+        if 예산["상한"] and 예산["씀"] + 값 > 예산["상한"]:
+            raise 돈끊김("정해 둔 상한 %d원에 닿았습니다 (이번에 약 %d원 씀)"
+                       % (예산["상한"], 예산["씀"]))
         try:
             res = client.models.generate_content(
                 model=모델, contents=[글] + ref_imgs,
@@ -1488,6 +1518,7 @@ def 그리기(client, 모델, 글, ref_imgs, 비율, 크기):
                     continue
                 raise 돈끊김(str(e)[:150])
             raise
+        예산["씀"] += 값
         for cand in res.candidates or []:
             for part in (cand.content.parts or []):
                 blob = getattr(part, "inline_data", None)
@@ -1934,6 +1965,13 @@ def main():
                     help="--redo-reviewed 와 함께 : 장비 모양 지적이 있는 작업(쉼표). 도면부터 참조 없이 새로 그린다")
     ap.add_argument("--include-redone", action="store_true",
                     help="--redo-reviewed 와 함께 : 다시 만들었지만 아직 안 본 사진도 지난 지적으로 또 만든다")
+    ap.add_argument("--budget", type=int, default=0,
+                    help="이번에 쓸 돈 상한(원). 닿으면 멈춘다. 0 이면 상한 없음")
+    ap.add_argument("--except", dest="except_", default="",
+                    help="--redo-reviewed 에서 다시 그리지 않을 사진 (예: b05/fig,s04/fig). "
+                         "도면 지적이 '번호 없음' 뿐이면 다시 그리지 말고 --locate-marks 로 번호만 넣는다")
+    ap.add_argument("--mark-review", action="store_true",
+                    help="--locate-marks 와 함께 : 번호를 넣은 도면을 검수 화면 '다시 볼 것' 목록에 올린다")
     ap.add_argument("--locate-marks", default=None,
                     help="도면 번호 자리를 Flash 로 찾아 sop-new/assets/fig_marks.json 에 적는다 (작업 쉼표, all = 도면 있는 전부)")
     ap.add_argument("--mark-redone", action="store_true",
@@ -1941,6 +1979,8 @@ def main():
     ap.add_argument("--redo-flagged", action="store_true",
                     help="--check 에서 걸린 사진만 다시 만든다")
     a = ap.parse_args()
+    예산["상한"] = a.budget
+    제외 = {x.strip() for x in a.except_.split(",") if x.strip()}
 
     if a.mark_redone:
         검수표시보내기()
@@ -1949,7 +1989,7 @@ def main():
         from google import genai
         client = genai.Client(api_key=load_key())
         키점검(client)
-        번호자리찾기(client, a.locate_marks)
+        번호자리찾기(client, a.locate_marks, a.mark_review)
         return
 
     tids = [x.strip() for x in (a.task or TASK).split(",") if x.strip()]
@@ -1985,6 +2025,8 @@ def main():
                     r = r["history"][-1]
                 if r.get("s") != "bad":
                     continue
+                if "%s/%s" % (tid, n) in 제외:
+                    continue
                 검수지적[(tid, str(n))] = 검수지적글(r)
                 if r.get("refs"):
                     받은 = 예시받기(tid, n, r["refs"])
@@ -2008,10 +2050,10 @@ def main():
                                 도예.append(f)
             if tid in 설비다시 and (도면장면.get(tid) or {}).get("fig"):
                 # 장비가 틀렸으면 **도면부터** 새로 그린다. 사진들이 도면을 보고 그리기 때문이다.
-                if (tid, "fig") not in 검수지적:
+                if (tid, "fig") not in 검수지적 and tid + "/fig" not in 제외:
                     검수지적[(tid, "fig")] = ""
                     검수묶음.setdefault((tid, True), []).append("fig")
-                if 설비글:
+                if 설비글 and (tid, "fig") in 검수지적:
                     검수지적[(tid, "fig")] += (
                         "\n## 이 작업의 사진들에서 **장비 생김새**에 대해 지적된 것 — 도면에서 반드시 고치세요\n"
                         "(이 도면을 보고 사진 12장을 다시 그립니다. 도면이 틀리면 12장이 다 틀립니다.)\n"
@@ -2092,7 +2134,7 @@ def main():
         if a.redo_reviewed:          # 돈이 끊긴 작업도 그때까지 만든 것은 목록에 넣는다
             검수표시(tid, only, 시작)
         print()
-        print("※ 돈 · 할당량 때문에 API 가 계속 거절합니다 : %s" % e)
+        print("※ 멈췄습니다 : %s" % e)
         print("  여기까지 만든 사진은 폴더에 그대로 있습니다. 같은 명령에 "
               "--skip-existing 을 붙여 다시 돌리면 이어서 만듭니다.")
         요약(a, 통계)
