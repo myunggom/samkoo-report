@@ -2176,15 +2176,41 @@ def 검수표시보내기():
     if not d:
         print("검수 화면에 표시할 '다시 만든 사진' 이 없습니다.")
         return
-    남은 = []
+    남은, 이미봄 = [], 0
+    try:
+        기록 = 검수기록읽기()
+    except Exception:                                        # noqa: BLE001
+        기록 = {}
     for tid, n in d:
+        # 2026-11-19 : 다시 만든 사진이 배포된 뒤 검수자가 **벌써 새 사진을 보고 판정했으면**
+        # '다시 만듦' 표시를 보내지 않는다. 보내면 그 판정이 지난 기록으로 밀려 사라진다.
+        it = {"n": 번호로(n)}
+        if n in ("fig", "gfig"):
+            it["img"] = "%s_%s.jpg" % (tid, n)
+        f = os.path.join(OUT_DIR, 사진이름(tid, it))
+        r = (기록.get(tid) or {}).get(str(n)) or {}
+        if r.get("s") and r.get("at") and os.path.exists(f):
+            import datetime
+            판정 = datetime.datetime.fromisoformat(r["at"].replace("Z", "+00:00")).timestamp()
+            바뀐때 = os.path.getmtime(f)
+            if n == "fig":
+                # 도면은 그림이 그대로여도 번호만 새로 넣었을 수 있다 (--locate-marks)
+                try:
+                    m = json.loads(io.open(번호파일, encoding="utf-8").read()).get(tid) or {}
+                    바뀐때 = max(바뀐때, time.mktime(time.strptime(m.get("at", ""), "%Y-%m-%d %H:%M")))
+                except Exception:                                # noqa: BLE001
+                    pass
+            if 판정 > 바뀐때:
+                이미봄 += 1
+                continue
         try:
             검수다시만듦표시(tid, n)
         except Exception as e:                               # noqa: BLE001
             print("  ※ 검수 화면에 표시 못 함 (%s %s) : %s" % (tid, n, e))
             남은.append([tid, n])
     io.open(검수대기파일, "w", encoding="utf-8").write(json.dumps(남은, ensure_ascii=False))
-    print("검수 화면에 '다시 만듦' 표시 : %d장 (실패 %d장)" % (len(d) - len(남은), len(남은)))
+    print("검수 화면에 '다시 만듦' 표시 : %d장 (실패 %d장, 새 사진을 이미 판정해 건너뜀 %d장)"
+          % (len(d) - len(남은) - 이미봄, len(남은), 이미봄))
 
 
 def 요약(a, 통계):
