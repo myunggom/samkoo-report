@@ -10,6 +10,7 @@ const TABS: { href: string; label: string; match: (p: string) => boolean }[] = [
   { href: "/archive", label: "아카이브", match: (p) => p.startsWith("/archive") },
   { href: "/logs", label: "일일 기록", match: (p) => p.startsWith("/logs") },
   { href: "/issues", label: "문제 관리", match: (p) => p.startsWith("/issues") },
+  { href: "/hvac", label: "공조기", match: (p) => p.startsWith("/hvac") },
   { href: "/reports", label: "보고서", match: (p) => p.startsWith("/reports") || p.startsWith("/report/") || p.startsWith("/pungsuhae") },
   { href: "/daily-log", label: "업무일지", match: (p) => p.startsWith("/daily-log") },
   { href: "/weekly-log", label: "주간보고", match: (p) => p.startsWith("/weekly-log") },
