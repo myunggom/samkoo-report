@@ -33,11 +33,12 @@ export async function buildHvacPptx(opts: {
   s.addText(basis, { x: 6.4, y: 0.66, w: 6.5, h: 0.3, fontSize: 10, color: "4B5563", align: "right", fontFace: "맑은 고딕" });
   s.addShape(pptx.ShapeType.line, { x: 0.45, y: 1.0, w: 12.43, h: 0, line: { color: NAVY, width: 1.5 } });
 
-  const head = ["층", "호기", "입주사", "담당 구역", "모드", "설정온도\n(℃)", "급기팬\n(Hz)", "환기팬\n(Hz)", "엔탈피\n모드", "댐퍼\n개도(%)", "가동 요일", "가동 시간"];
-  const colW = [0.55, 0.65, 0.75, 2.75, 0.7, 0.85, 0.8, 0.8, 0.75, 0.8, 1.4, 1.63]; // 합 12.43
+  // 2026-11-25 사장 : "모든 글씨가 한 줄 안에" — 머리글도 두 줄로 접지 않는다
+  const head = ["층", "호기", "입주사", "담당 구역", "모드", "설정온도(℃)", "급기팬(Hz)", "환기팬(Hz)", "엔탈피", "댐퍼(%)", "가동 요일", "가동 시간"];
+  const colW = [0.5, 0.6, 0.7, 2.6, 0.65, 1.0, 0.95, 0.95, 0.7, 0.85, 1.3, 1.63]; // 합 12.43
   const hdr = head.map((t) => ({
     text: t,
-    options: { bold: true, color: "FFFFFF", fill: { color: NAVY }, align: "center" as const, valign: "middle" as const },
+    options: { bold: true, color: "FFFFFF", fill: { color: NAVY }, align: "center" as const, valign: "middle" as const, fontSize: 9 },
   }));
 
   const rows = units.map((u) => {
@@ -64,7 +65,7 @@ export async function buildHvacPptx(opts: {
 
   // 한 장에 들어가게 : 표는 1.1in ~ 7.12in. 34대 전부면 행 0.16in · 7.5pt
   // (PowerPoint 는 글자 크기보다 낮게 행을 못 줄인다 — 처음엔 0.02 여백으로 맨 아래 두 줄이 꼬리말과 겹쳤다)
-  const hdrH = 0.4;
+  const hdrH = 0.3;
   const avail = 7.12 - 1.1 - hdrH;
   const rowH = Math.min(0.42, avail / Math.max(1, rows.length));
   const font = rowH >= 0.3 ? 10.5 : rowH >= 0.21 ? 9 : 7.5;

@@ -40,7 +40,7 @@ function DayBar({ s }: { s: UnitSetting }) {
   const segs: [number, number][] = s.mode === "정지" || s.days.every((d) => !d) ? []
     : b > a ? [[a, b]] : b < a ? [[a, 1440], [0, b]] : [];
   return (
-    <div className="relative h-3 w-full min-w-[120px] rounded-full bg-slate-100" aria-hidden>
+    <div className="relative h-3 w-28 rounded-full bg-slate-100" aria-hidden>
       {[6, 12, 18].map((h) => (
         <span key={h} className="absolute top-0 h-3 w-px bg-slate-300" style={{ left: `${(h / 24) * 100}%` }} />
       ))}
@@ -255,8 +255,8 @@ export default function HvacPage() {
           <button type="button" onClick={() => setAskPw(false)} className="text-sm text-slate-500">닫기</button>
         </form>
       )}
-      {msg && <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">{msg}</p>}
-      {err && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{err}</p>}
+      {msg && <p className="rounded-lg bg-amber-50 px-2 py-2 text-sm text-amber-800">{msg}</p>}
+      {err && <p className="rounded-lg bg-red-50 px-2 py-2 text-sm text-red-700">{err}</p>}
 
       {!editing && (
         <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm">
@@ -325,21 +325,21 @@ export default function HvacPage() {
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-        <table className="w-full min-w-[1040px] text-sm">
+        <table className="w-full whitespace-nowrap text-sm">
           <thead className="bg-slate-50 text-left text-xs text-slate-500">
             <tr>
               {editing && <th className="w-8 px-2 py-2" />}
-              <th className="px-3 py-2">호기</th>
-              <th className="px-3 py-2">구역</th>
-              <th className="px-3 py-2">모드</th>
-              <th className="px-3 py-2">설정온도</th>
-              <th className="px-2 py-2">급기팬</th>
-              <th className="px-2 py-2">환기팬</th>
-              <th className="px-2 py-2">엔탈피</th>
-              <th className="px-2 py-2">댐퍼</th>
-              <th className="px-3 py-2">요일</th>
-              <th className="px-3 py-2">가동 시간</th>
-              <th className="w-1/4 px-3 py-2">0 · 6 · 12 · 18 · 24시</th>
+              <th className="whitespace-nowrap px-2 py-2">호기</th>
+              <th className="px-2 py-2">구역</th>
+              <th className="min-w-[76px] whitespace-nowrap px-2 py-2">모드</th>
+              <th className="whitespace-nowrap px-2 py-2">설정온도</th>
+              <th className="whitespace-nowrap px-2 py-2">급기팬</th>
+              <th className="whitespace-nowrap px-2 py-2">환기팬</th>
+              <th className="whitespace-nowrap px-2 py-2">엔탈피</th>
+              <th className="whitespace-nowrap px-2 py-2">댐퍼</th>
+              <th className="whitespace-nowrap px-2 py-2">요일</th>
+              <th className="whitespace-nowrap px-2 py-2">가동 시간</th>
+              <th className="px-2 py-2">0~24시</th>
             </tr>
           </thead>
           {floors.map((f) => (
@@ -355,24 +355,24 @@ export default function HvacPage() {
                           onChange={() => setSel((p) => { const n = new Set(p); if (n.has(u.id)) n.delete(u.id); else n.add(u.id); return n; })} />
                       </td>
                     )}
-                    <td className="px-3 py-2">
+                    <td className="px-2 py-2">
                       <button onClick={() => setOpen(u)} className="rounded-md border border-slate-300 px-2 py-0.5 font-mono text-sm font-bold text-slate-900 hover:border-slate-900 hover:bg-slate-900 hover:text-white" title="담당 구역 도면 보기">
                         {u.id}
                       </button>
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-2 py-2">
                       <span className={"mr-1.5 text-xs font-semibold " + TENANT_STYLE[u.tenant]}>{u.tenant}</span>
                       <span className="text-slate-700">{u.zone}</span>
                     </td>
                     {editing ? (
                       <>
-                        <td className="px-3 py-2">
+                        <td className="px-2 py-2">
                           <select value={s.mode} onChange={(e) => setOne(u.id, { mode: e.target.value as UnitSetting["mode"] })} className="rounded border border-slate-300 px-1 py-1" aria-label={`${u.id} 모드`}>
                             <option value="">—</option>
                             {HVAC_MODES.map((m) => <option key={m}>{m}</option>)}
                           </select>
                         </td>
-                        <td className="px-3 py-2">
+                        <td className="px-2 py-2">
                           <input type="number" step="0.5" value={s.temp ?? ""} onChange={(e) => setOne(u.id, { temp: e.target.value === "" ? null : Number(e.target.value) })}
                             className="w-16 rounded border border-slate-300 px-1 py-1" aria-label={`${u.id} 설정온도`} />
                         </td>
@@ -391,7 +391,7 @@ export default function HvacPage() {
                           <input type="number" step="1" min="0" max="100" value={s.damper ?? ""} onChange={(e) => setOne(u.id, { damper: numOrNull(e.target.value) })}
                             className="w-14 rounded border border-slate-300 px-1 py-1" aria-label={`${u.id} 댐퍼 개도`} />
                         </td>
-                        <td className="px-3 py-2">
+                        <td className="px-2 py-2">
                           <span className="inline-flex gap-0.5">
                             {DAY_LABELS.map((d, i) => (
                               <button key={d} type="button" onClick={() => setOne(u.id, { days: s.days.map((x, k) => (k === i ? !x : x)) })}
@@ -399,7 +399,7 @@ export default function HvacPage() {
                             ))}
                           </span>
                         </td>
-                        <td className="whitespace-nowrap px-3 py-2">
+                        <td className="whitespace-nowrap px-2 py-2">
                           <input type="time" value={s.start} onChange={(e) => setOne(u.id, { start: e.target.value })} className="rounded border border-slate-300 px-1 py-0.5" aria-label={`${u.id} 시작`} />
                           <span className="mx-1">~</span>
                           <input type="time" value={s.end} onChange={(e) => setOne(u.id, { end: e.target.value })} className="rounded border border-slate-300 px-1 py-0.5" aria-label={`${u.id} 종료`} />
@@ -407,17 +407,17 @@ export default function HvacPage() {
                       </>
                     ) : (
                       <>
-                        <td className="px-3 py-2"><span className={"rounded-full border px-2 py-0.5 text-xs font-semibold " + MODE_STYLE[s.mode]}>{s.mode || "미입력"}</span></td>
-                        <td className="px-3 py-2 tabular-nums text-slate-800">{s.temp != null ? `${s.temp}℃` : <span className="text-slate-300">—</span>}</td>
-                        <td className="px-2 py-2 tabular-nums text-slate-700">{s.supplyHz}<span className="text-[11px] text-slate-400">Hz</span></td>
-                        <td className="px-2 py-2 tabular-nums text-slate-700">{s.exhaustHz}<span className="text-[11px] text-slate-400">Hz</span></td>
-                        <td className="px-2 py-2 text-center">{s.enthalpy ? <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-800">사용</span> : <span className="text-slate-300">—</span>}</td>
-                        <td className="px-2 py-2 tabular-nums text-slate-700">{s.damper != null ? `${s.damper}%` : <span className="text-slate-300">—</span>}</td>
-                        <td className="px-3 py-2"><DaysText days={s.days} /></td>
-                        <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-800">{s.mode === "정지" ? <span className="text-slate-400">정지</span> : `${s.start} ~ ${s.end}`}</td>
+                        <td className="whitespace-nowrap px-2 py-2"><span className={"inline-block whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-semibold " + MODE_STYLE[s.mode]}>{s.mode || "미입력"}</span></td>
+                        <td className="whitespace-nowrap px-2 py-2 tabular-nums text-slate-800">{s.temp != null ? `${s.temp}℃` : <span className="text-slate-300">—</span>}</td>
+                        <td className="whitespace-nowrap px-2 py-2 tabular-nums text-slate-700">{s.supplyHz}<span className="text-[11px] text-slate-400">Hz</span></td>
+                        <td className="whitespace-nowrap px-2 py-2 tabular-nums text-slate-700">{s.exhaustHz}<span className="text-[11px] text-slate-400">Hz</span></td>
+                        <td className="whitespace-nowrap px-2 py-2 text-center">{s.enthalpy ? <span className="whitespace-nowrap rounded-full bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-800">사용</span> : <span className="text-slate-300">—</span>}</td>
+                        <td className="whitespace-nowrap px-2 py-2 tabular-nums text-slate-700">{s.damper != null ? `${s.damper}%` : <span className="text-slate-300">—</span>}</td>
+                        <td className="whitespace-nowrap px-2 py-2"><DaysText days={s.days} /></td>
+                        <td className="whitespace-nowrap px-2 py-2 tabular-nums text-slate-800">{s.mode === "정지" ? <span className="text-slate-400">정지</span> : `${s.start} ~ ${s.end}`}</td>
                       </>
                     )}
-                    <td className="px-3 py-2"><DayBar s={s} /></td>
+                    <td className="px-2 py-2"><DayBar s={s} /></td>
                   </tr>
                 );
               })}
