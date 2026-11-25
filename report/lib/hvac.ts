@@ -21,13 +21,20 @@ export type AhuUnit = {
 };
 
 // 한 호기의 운전 설정
+// 2026-11-25 사장 : 모드 · 설정온도는 필수. 급기팬 · 환기팬 Hz(기본 50), 엔탈피 모드(봄 · 가을),
+// 댐퍼 개도(0~100%)도 남긴다. 고객사에 보낼 설정값 표(PPT 한 장)에 그대로 나간다.
 export type UnitSetting = {
   mode: HvacMode;
   temp: number | null;  // 설정온도 ℃
+  supplyHz: number;     // 급기팬 Hz
+  exhaustHz: number;    // 환기팬 Hz
+  enthalpy: boolean;    // 엔탈피 제어 사용 (봄 · 가을)
+  damper: number | null; // 댐퍼 개도 %
   days: boolean[];      // 월~일 7칸
   start: string;        // "11:00"
   end: string;          // "14:00"
 };
+export const DEFAULT_HZ = 50;
 
 export type HvacVersion = {
   id: string;
@@ -87,7 +94,8 @@ export function sheetUrls(u: AhuUnit): string[] {
 // 처음 판이 없을 때 보여 줄 값 — 2026년 하절기 보고 때의 「매일 11:00~14:00」.
 // 모드 · 설정온도는 기록이 없어 비워 둔다(기계과장이 첫 저장 때 채운다).
 export function defaultSetting(): UnitSetting {
-  return { mode: "", temp: null, days: [true, true, true, true, true, true, true], start: "11:00", end: "14:00" };
+  return { mode: "", temp: null, supplyHz: DEFAULT_HZ, exhaustHz: DEFAULT_HZ, enthalpy: false, damper: null,
+           days: [true, true, true, true, true, true, true], start: "11:00", end: "14:00" };
 }
 export function defaultSettings(): Record<string, UnitSetting> {
   return Object.fromEntries(AHU_UNITS.map((u) => [u.id, defaultSetting()]));
@@ -103,10 +111,35 @@ export function cleanSetting(x: unknown): UnitSetting {
   const mode = HVAC_MODES.includes(o.mode as HvacMode) ? (o.mode as HvacMode) : "";
   const t = o.temp === null || o.temp === "" || o.temp === undefined ? null : Number(o.temp);
   const temp = t !== null && Number.isFinite(t) && t >= 5 && t <= 40 ? Math.round(t * 10) / 10 : null;
+  const num = (v: unknown, lo: number, hi: number, step: number): number | null => {
+    if (v === null || v === "" || v === undefined) return null;
+    const n = Number(v);
+    return Number.isFinite(n) && n >= lo && n <= hi ? Math.round(n / step) * step : null;
+  };
+  const supplyHz = num(o.supplyHz, 0, 60, 0.1) ?? d.supplyHz;
+  const exhaustHz = num(o.exhaustHz, 0, 60, 0.1) ?? d.exhaustHz;
+  const damper = num(o.damper, 0, 100, 1);
+  const enthalpy = o.enthalpy === true;
   const days = Array.isArray(o.days) && o.days.length === 7 ? o.days.map(Boolean) : d.days;
   const start = typeof o.start === "string" && TIME_RE.test(o.start) ? o.start : d.start;
   const end = typeof o.end === "string" && TIME_RE.test(o.end) ? o.end : d.end;
-  return { mode, temp, days, start, end };
+  return { mode, temp, supplyHz: Math.round(supplyHz * 10) / 10, exhaustHz: Math.round(exhaustHz * 10) / 10,
+           enthalpy, damper, days, start, end };
+}
+
+// 저장 전에 빠진 필수값 — 모드는 모두, 설정온도는 정지가 아닌 호기만
+export function missingRequired(settings: Record<string, UnitSetting>): string[] {
+  return AHU_UNITS.filter((u) => {
+    const s = settings[u.id];
+    return !s || !s.mode || (s.mode !== "정지" && s.temp == null);
+  }).map((u) => u.id);
+}
+
+export function daysText(days: boolean[]): string {
+  return days.every(Boolean) ? "매일"
+    : days.slice(0, 5).every(Boolean) && !days[5] && !days[6] ? "평일"
+    : days.every((x) => !x) ? "가동 없음"
+    : DAY_LABELS.filter((_, i) => days[i]).join("·");
 }
 export function isDate(s: unknown): s is string {
   return typeof s === "string" && DATE_RE.test(s);
@@ -129,11 +162,10 @@ export function toMin(t: string): number {
 }
 
 export function settingText(s: UnitSetting): string {
-  const days = s.days.every(Boolean) ? "매일"
-    : s.days.slice(0, 5).every(Boolean) && !s.days[5] && !s.days[6] ? "평일"
-    : s.days.every((x) => !x) ? "가동 없음"
-    : DAY_LABELS.filter((_, i) => s.days[i]).join("·");
-  return [s.mode || "모드 미입력", s.temp != null ? `${s.temp}℃` : "", s.mode === "정지" ? "" : `${days} ${s.start}~${s.end}`]
+  return [s.mode || "모드 미입력", s.temp != null ? `${s.temp}℃` : "",
+    `급기 ${s.supplyHz}Hz`, `환기 ${s.exhaustHz}Hz`, s.enthalpy ? "엔탈피" : "",
+    s.damper != null ? `댐퍼 ${s.damper}%` : "",
+    s.mode === "정지" ? "" : `${daysText(s.days)} ${s.start}~${s.end}`]
     .filter(Boolean).join(" · ");
 }
 

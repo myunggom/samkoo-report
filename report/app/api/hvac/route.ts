@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHash, timingSafeEqual } from "crypto";
 import { addHvacVersion, listHvacVersions } from "@/lib/hvacStore";
-import { AHU_UNITS, cleanSetting, isDate } from "@/lib/hvac";
+import { AHU_UNITS, cleanSetting, isDate, missingRequired } from "@/lib/hvac";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +16,12 @@ function pwOk(given: unknown): boolean {
 
 export async function GET() {
   try {
-    return NextResponse.json({ versions: await listHvacVersions() });
+    // 예전 판에 없던 칸(팬 Hz 등)은 기본값으로 채워 보낸다
+    const versions = (await listHvacVersions()).map((v) => ({
+      ...v,
+      settings: Object.fromEntries(AHU_UNITS.map((u) => [u.id, cleanSetting(v.settings?.[u.id])])),
+    }));
+    return NextResponse.json({ versions });
   } catch (e) {
     return NextResponse.json({ error: String((e as Error).message || e) }, { status: 500 });
   }
@@ -38,6 +43,10 @@ export async function POST(req: NextRequest) {
   if (!reason) return NextResponse.json({ error: "변경 사유를 적어 주세요." }, { status: 400 });
   const src = (b.settings && typeof b.settings === "object" ? b.settings : {}) as Record<string, unknown>;
   const settings = Object.fromEntries(AHU_UNITS.map((u) => [u.id, cleanSetting(src[u.id])]));
+  const miss = missingRequired(settings);
+  if (miss.length) {
+    return NextResponse.json({ error: `모드 · 설정온도는 꼭 넣어야 합니다 : ${miss.join(", ")}` }, { status: 400 });
+  }
   try {
     const v = await addHvacVersion({ effectiveFrom: b.effectiveFrom, by, reason, settings });
     return NextResponse.json(v, { status: 201 });

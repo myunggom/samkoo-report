@@ -2,9 +2,18 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  AHU_UNITS, DAY_LABELS, HVAC_MODES, TENANTS, defaultSettings, diffSettings, sheetUrls,
+  AHU_UNITS, DAY_LABELS, HVAC_MODES, TENANTS, defaultSettings, diffSettings, missingRequired, sheetUrls,
   settingText, toMin, versionAt, type AhuUnit, type HvacVersion, type UnitSetting,
 } from "@/lib/hvac";
+
+// 한꺼번에 바꾸기 — 비워 둔 칸은 그대로 둔다
+type Bulk = {
+  mode: string; temp: string; supplyHz: string; exhaustHz: string; enthalpy: "" | "on" | "off"; damper: string;
+  applyTime: boolean; days: boolean[]; start: string; end: string;
+};
+const EMPTY_BULK: Bulk = { mode: "", temp: "", supplyHz: "", exhaustHz: "", enthalpy: "", damper: "",
+  applyTime: false, days: [true, true, true, true, true, true, true], start: "08:00", end: "18:00" };
+const numOrNull = (v: string) => (v.trim() === "" ? null : Number(v));
 
 // 공조기 가동 스케줄 — 호기별 현재 운전값 · 날짜를 고르면 그때의 운전값 · 변경 이력 ·
 // 호기를 누르면 조닝도 팝업. 고치기는 기계과장(비밀번호).
@@ -105,7 +114,8 @@ export default function HvacPage() {
   const [askPw, setAskPw] = useState(false);
   const [draft, setDraft] = useState<Record<string, UnitSetting>>({});
   const [sel, setSel] = useState<Set<string>>(new Set());
-  const [bulk, setBulk] = useState<UnitSetting>({ mode: "", temp: null, days: [true, true, true, true, true, true, true], start: "08:00", end: "18:00" });
+  const [bulk, setBulk] = useState<Bulk>(EMPTY_BULK);
+  const [exporting, setExporting] = useState(false);
   const [meta, setMeta] = useState({ effectiveFrom: todayKST(), by: "기계과장", reason: "" });
   const [msg, setMsg] = useState("");
   const [saving, setSaving] = useState(false);
@@ -155,7 +165,17 @@ export default function HvacPage() {
     if (!sel.size) { setMsg("먼저 왼쪽 칸을 눌러 호기를 고르세요."); return; }
     setDraft((d) => {
       const n = { ...d };
-      sel.forEach((id) => { n[id] = { ...bulk, days: [...bulk.days] }; });
+      sel.forEach((id) => {
+        const x = { ...n[id] };
+        if (bulk.mode) x.mode = bulk.mode as UnitSetting["mode"];
+        if (bulk.temp.trim()) x.temp = Number(bulk.temp);
+        if (bulk.supplyHz.trim()) x.supplyHz = Number(bulk.supplyHz);
+        if (bulk.exhaustHz.trim()) x.exhaustHz = Number(bulk.exhaustHz);
+        if (bulk.enthalpy) x.enthalpy = bulk.enthalpy === "on";
+        if (bulk.damper.trim()) x.damper = Number(bulk.damper);
+        if (bulk.applyTime) { x.days = [...bulk.days]; x.start = bulk.start; x.end = bulk.end; }
+        n[id] = x;
+      });
       return n;
     });
     setMsg(`${sel.size}대에 적용했습니다. 아래에서 저장해야 기록됩니다.`);
@@ -163,6 +183,8 @@ export default function HvacPage() {
   async function save() {
     setMsg("");
     if (!meta.reason.trim()) { setMsg("변경 사유를 적어 주세요."); return; }
+    const miss = missingRequired(draft);
+    if (miss.length) { setMsg(`모드 · 설정온도는 꼭 넣어야 합니다 (정지는 온도 생략) : ${miss.join(", ")}`); return; }
     setSaving(true);
     const r = await fetch("/api/hvac", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -178,6 +200,22 @@ export default function HvacPage() {
     await load();
     setMsg("저장했습니다. 변경 이력에 남았습니다.");
   }
+  async function exportPptx() {
+    setExporting(true);
+    try {
+      const { buildHvacPptx } = await import("@/lib/hvacPptx");
+      const { blob, fileName } = await buildHvacPptx({ date, tenant, version: cur, settings });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = fileName;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    } catch (e) {
+      setMsg("PPT 를 만들지 못했습니다 : " + String((e as Error).message || e));
+    }
+    setExporting(false);
+  }
+
   const changed = editing ? diffSettings(versionAt(versions, todayKST())?.settings ?? defaultSettings(), draft) : [];
 
   return (
@@ -193,6 +231,12 @@ export default function HvacPage() {
             className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm disabled:bg-slate-100" />
           {date !== todayKST() && !editing && (
             <button onClick={() => setDate(todayKST())} className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50">오늘</button>
+          )}
+          {!editing && (
+            <button onClick={exportPptx} disabled={exporting} className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:text-slate-400"
+              title="지금 보이는 기준일 · 입주사 그대로 한 장">
+              {exporting ? "만드는 중…" : `설정값 PPT${tenant === "전체" ? "" : ` (${tenant})`}`}
+            </button>
           )}
           {!editing ? (
             <button onClick={() => { setAskPw(true); setMsg(""); }} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">스케줄 변경</button>
@@ -229,23 +273,39 @@ export default function HvacPage() {
 
       {editing && (
         <div className="space-y-3 rounded-xl border border-slate-300 bg-slate-50 p-3">
-          <p className="text-sm font-semibold text-slate-800">여러 대를 한꺼번에 바꾸기 — 표 왼쪽 칸으로 호기를 고른 뒤 적용</p>
+          <p className="text-sm font-semibold text-slate-800">여러 대를 한꺼번에 바꾸기 — 표 왼쪽 칸으로 호기를 고른 뒤 적용 (비워 둔 칸은 그대로 둡니다)</p>
           <div className="flex flex-wrap items-center gap-2 text-sm">
-            <select value={bulk.mode} onChange={(e) => setBulk({ ...bulk, mode: e.target.value as UnitSetting["mode"] })} className="rounded-lg border border-slate-300 px-2 py-1.5" aria-label="모드">
+            <select value={bulk.mode} onChange={(e) => setBulk({ ...bulk, mode: e.target.value })} className="rounded-lg border border-slate-300 px-2 py-1.5" aria-label="모드">
               <option value="">모드</option>
               {HVAC_MODES.map((m) => <option key={m}>{m}</option>)}
             </select>
-            <input type="number" step="0.5" placeholder="℃" value={bulk.temp ?? ""} onChange={(e) => setBulk({ ...bulk, temp: e.target.value === "" ? null : Number(e.target.value) })}
+            <input type="number" step="0.5" placeholder="설정 ℃" value={bulk.temp} onChange={(e) => setBulk({ ...bulk, temp: e.target.value })}
               className="w-20 rounded-lg border border-slate-300 px-2 py-1.5" aria-label="설정온도" />
-            <span className="inline-flex gap-1">
+            <input type="number" step="0.1" placeholder="급기 Hz" value={bulk.supplyHz} onChange={(e) => setBulk({ ...bulk, supplyHz: e.target.value })}
+              className="w-20 rounded-lg border border-slate-300 px-2 py-1.5" aria-label="급기팬 Hz" />
+            <input type="number" step="0.1" placeholder="환기 Hz" value={bulk.exhaustHz} onChange={(e) => setBulk({ ...bulk, exhaustHz: e.target.value })}
+              className="w-20 rounded-lg border border-slate-300 px-2 py-1.5" aria-label="환기팬 Hz" />
+            <select value={bulk.enthalpy} onChange={(e) => setBulk({ ...bulk, enthalpy: e.target.value as Bulk["enthalpy"] })} className="rounded-lg border border-slate-300 px-2 py-1.5" aria-label="엔탈피 모드">
+              <option value="">엔탈피</option>
+              <option value="on">엔탈피 사용</option>
+              <option value="off">엔탈피 안 씀</option>
+            </select>
+            <input type="number" step="1" min="0" max="100" placeholder="댐퍼 %" value={bulk.damper} onChange={(e) => setBulk({ ...bulk, damper: e.target.value })}
+              className="w-20 rounded-lg border border-slate-300 px-2 py-1.5" aria-label="댐퍼 개도" />
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <label className="inline-flex items-center gap-1 text-slate-700">
+              <input type="checkbox" checked={bulk.applyTime} onChange={(e) => setBulk({ ...bulk, applyTime: e.target.checked })} />요일 · 시간도 바꾸기
+            </label>
+            <span className={"inline-flex gap-1 " + (bulk.applyTime ? "" : "opacity-40")}>
               {DAY_LABELS.map((d, i) => (
-                <button key={d} type="button" onClick={() => setBulk({ ...bulk, days: bulk.days.map((x, k) => (k === i ? !x : x)) })}
+                <button key={d} type="button" disabled={!bulk.applyTime} onClick={() => setBulk({ ...bulk, days: bulk.days.map((x, k) => (k === i ? !x : x)) })}
                   className={"h-7 w-7 rounded-full border text-xs font-semibold " + (bulk.days[i] ? "border-slate-900 bg-slate-900 text-white" : "border-slate-300 text-slate-400")}>{d}</button>
               ))}
             </span>
-            <input type="time" value={bulk.start} onChange={(e) => setBulk({ ...bulk, start: e.target.value })} className="rounded-lg border border-slate-300 px-2 py-1" aria-label="시작" />
+            <input type="time" disabled={!bulk.applyTime} value={bulk.start} onChange={(e) => setBulk({ ...bulk, start: e.target.value })} className="rounded-lg border border-slate-300 px-2 py-1 disabled:opacity-40" aria-label="시작" />
             <span>~</span>
-            <input type="time" value={bulk.end} onChange={(e) => setBulk({ ...bulk, end: e.target.value })} className="rounded-lg border border-slate-300 px-2 py-1" aria-label="종료" />
+            <input type="time" disabled={!bulk.applyTime} value={bulk.end} onChange={(e) => setBulk({ ...bulk, end: e.target.value })} className="rounded-lg border border-slate-300 px-2 py-1 disabled:opacity-40" aria-label="종료" />
             <button type="button" onClick={applyBulk} className="rounded-lg bg-slate-800 px-3 py-1.5 font-semibold text-white">고른 {sel.size}대에 적용</button>
             <button type="button" onClick={() => setSel(new Set(units.map((u) => u.id)))} className="text-slate-600 underline">보이는 호기 모두 고르기</button>
             {sel.size > 0 && <button type="button" onClick={() => setSel(new Set())} className="text-slate-500 underline">고르기 해제</button>}
@@ -265,7 +325,7 @@ export default function HvacPage() {
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-        <table className="w-full min-w-[760px] text-sm">
+        <table className="w-full min-w-[1040px] text-sm">
           <thead className="bg-slate-50 text-left text-xs text-slate-500">
             <tr>
               {editing && <th className="w-8 px-2 py-2" />}
@@ -273,6 +333,10 @@ export default function HvacPage() {
               <th className="px-3 py-2">구역</th>
               <th className="px-3 py-2">모드</th>
               <th className="px-3 py-2">설정온도</th>
+              <th className="px-2 py-2">급기팬</th>
+              <th className="px-2 py-2">환기팬</th>
+              <th className="px-2 py-2">엔탈피</th>
+              <th className="px-2 py-2">댐퍼</th>
               <th className="px-3 py-2">요일</th>
               <th className="px-3 py-2">가동 시간</th>
               <th className="w-1/4 px-3 py-2">0 · 6 · 12 · 18 · 24시</th>
@@ -280,7 +344,7 @@ export default function HvacPage() {
           </thead>
           {floors.map((f) => (
             <tbody key={f} className="border-t border-slate-200">
-              <tr><td colSpan={editing ? 8 : 7} className="bg-slate-50/60 px-3 py-1 text-xs font-bold text-slate-500">{f}</td></tr>
+              <tr><td colSpan={editing ? 12 : 11} className="bg-slate-50/60 px-3 py-1 text-xs font-bold text-slate-500">{f}</td></tr>
               {units.filter((u) => u.floor === f).map((u) => {
                 const s = settings[u.id] ?? defaultSettings()[u.id];
                 return (
@@ -312,6 +376,21 @@ export default function HvacPage() {
                           <input type="number" step="0.5" value={s.temp ?? ""} onChange={(e) => setOne(u.id, { temp: e.target.value === "" ? null : Number(e.target.value) })}
                             className="w-16 rounded border border-slate-300 px-1 py-1" aria-label={`${u.id} 설정온도`} />
                         </td>
+                        <td className="px-2 py-2">
+                          <input type="number" step="0.1" value={s.supplyHz} onChange={(e) => setOne(u.id, { supplyHz: numOrNull(e.target.value) ?? 50 })}
+                            className="w-14 rounded border border-slate-300 px-1 py-1" aria-label={`${u.id} 급기팬 Hz`} />
+                        </td>
+                        <td className="px-2 py-2">
+                          <input type="number" step="0.1" value={s.exhaustHz} onChange={(e) => setOne(u.id, { exhaustHz: numOrNull(e.target.value) ?? 50 })}
+                            className="w-14 rounded border border-slate-300 px-1 py-1" aria-label={`${u.id} 환기팬 Hz`} />
+                        </td>
+                        <td className="px-2 py-2 text-center">
+                          <input type="checkbox" checked={s.enthalpy} onChange={(e) => setOne(u.id, { enthalpy: e.target.checked })} aria-label={`${u.id} 엔탈피 모드`} />
+                        </td>
+                        <td className="px-2 py-2">
+                          <input type="number" step="1" min="0" max="100" value={s.damper ?? ""} onChange={(e) => setOne(u.id, { damper: numOrNull(e.target.value) })}
+                            className="w-14 rounded border border-slate-300 px-1 py-1" aria-label={`${u.id} 댐퍼 개도`} />
+                        </td>
                         <td className="px-3 py-2">
                           <span className="inline-flex gap-0.5">
                             {DAY_LABELS.map((d, i) => (
@@ -330,6 +409,10 @@ export default function HvacPage() {
                       <>
                         <td className="px-3 py-2"><span className={"rounded-full border px-2 py-0.5 text-xs font-semibold " + MODE_STYLE[s.mode]}>{s.mode || "미입력"}</span></td>
                         <td className="px-3 py-2 tabular-nums text-slate-800">{s.temp != null ? `${s.temp}℃` : <span className="text-slate-300">—</span>}</td>
+                        <td className="px-2 py-2 tabular-nums text-slate-700">{s.supplyHz}<span className="text-[11px] text-slate-400">Hz</span></td>
+                        <td className="px-2 py-2 tabular-nums text-slate-700">{s.exhaustHz}<span className="text-[11px] text-slate-400">Hz</span></td>
+                        <td className="px-2 py-2 text-center">{s.enthalpy ? <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-800">사용</span> : <span className="text-slate-300">—</span>}</td>
+                        <td className="px-2 py-2 tabular-nums text-slate-700">{s.damper != null ? `${s.damper}%` : <span className="text-slate-300">—</span>}</td>
                         <td className="px-3 py-2"><DaysText days={s.days} /></td>
                         <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-800">{s.mode === "정지" ? <span className="text-slate-400">정지</span> : `${s.start} ~ ${s.end}`}</td>
                       </>
