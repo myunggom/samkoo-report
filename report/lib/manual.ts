@@ -1,10 +1,15 @@
-// 작동 매뉴얼 — 1·2사옥 보고서 PPT 양식(표지 + 네이비 머리 + 사진칸)을 그대로 쓴다.
+// 작동 매뉴얼 — 1사옥 보고 PPT 양식을 그대로 쓴다.
 //
-// 한 페이지에 사진을 3×2(6장) 또는 2×2(4장)로 깔고, 사진마다 번호와 한 줄 설명을 붙인다.
-// 번호는 페이지를 넘어가도 이어진다 — 1페이지가 1~6이면 2페이지는 7번부터.
+// 양식 원본 : 「[검토] 1사옥 9층 EHP 덕트 시공상태 검토_2026.11.25.pptx」 (사장 지정, 2026-11-27)
+//   · 표지   흰 바탕에 건물명·제목(네이비 58px)·대상/구분/확인일/작성, 아래 절반 야경 사진, 맨 아래 네이비 8px 띠
+//   · 내용쪽 네이비 제목 + 회색 부제 + 오른쪽 삼구 로고 / 대상·확인일·구분·작성 2행 표 / 네이비 배지 / 본문
+//   · 사진   둥근 회색 틀 안에 사진을 꽉 채우고, 사진 아래쪽에 검정 75% 띠 + 흰 글씨로 ① 설명
 //
-//  · "3x2" — 사진 6장을 가로로 펼치고, 아래에 「주의사항 · 비고」 칸 (촬영보고서 구역 페이지와 같은 틀)
-//  · "2x2" — 사진 4장을 왼쪽에 크게, 오른쪽에 「설명」 칸   (촬영보고서 특이사항 페이지와 같은 틀)
+// 한 쪽에 사진을 3×2(6장) 또는 2×2(4장)로 깔고, 사진마다 번호와 한 줄 설명을 붙인다.
+// 번호는 쪽을 넘어가도 이어진다 — 1쪽이 1~6이면 2쪽은 7번부터.
+//
+//  · "3x2" — 사진 6장 + 아래 「주의사항 · 비고」 칸
+//  · "2x2" — 사진 4장을 왼쪽에 크게 + 오른쪽 「설명」 칸
 //
 // 출력은 PPT(lib/manualPptx.ts)와 PDF(components/ManualDocument.tsx) 두 가지이고,
 // 두 출력이 똑같이 보이도록 좌표(px)를 이 파일의 LAYOUT 에서 함께 읽어 쓴다.
@@ -40,16 +45,16 @@ export type ManualPage = {
 export type Site = "1사옥" | "2사옥";
 export const SITES: Site[] = ["1사옥", "2사옥"];
 
-/** 사옥별 기본 건물명 — 표지 맨 윗줄 */
+/** 사옥별 기본 건물명 — 표지 맨 윗줄 (양식 원본: "바이오 이노베이션 허브 · 1사옥") */
 export const SITE_BUILDING: Record<Site, string> = {
-  "1사옥": "바이오 이노베이션 허브",
-  "2사옥": "한독 · 제넥신 · 프로젠 연구소",
+  "1사옥": "바이오 이노베이션 허브 · 1사옥",
+  "2사옥": "한독 · 제넥신 · 프로젠 연구소 · 2사옥",
 };
 
-/** 사옥별 표지 사진 (report/public) */
+/** 표지 사진 — 양식 원본에 들어 있는 야경 사진(두 사옥이 함께 찍힌 사진) */
 export const SITE_COVER: Record<Site, string> = {
-  "1사옥": "/cover-building.jpg",
-  "2사옥": "/cover-building2.jpg",
+  "1사옥": "/cover-building-night.jpg",
+  "2사옥": "/cover-building-night.jpg",
 };
 
 export type Manual = {
@@ -74,15 +79,16 @@ export type Manual = {
 export const DEFAULT_AUTHOR = "삼구INC 시설팀";
 
 // ── 쪽 양식 좌표 (px, A4 가로 1123×794 @96dpi) ─────────────────────
-// PDF(HTML)와 PPT(pptxgenjs)가 이 값을 함께 읽는다. 한 곳만 고치면 둘 다 바뀐다.
+// 전부 양식 원본 pptx 에서 그대로 재어 온 값이다. PDF(HTML)와 PPT(pptxgenjs)가
+// 이 값을 함께 읽는다 — 한 곳만 고치면 둘 다 바뀐다.
 export const LAYOUT = {
   PAGE_W: 1123,
   PAGE_H: 794,
   PAD: 28,
   NAVY: "0F2C5C",
-  BLUE: "4F86D6",
   INK: "111111",
-  MUTED: "64748B",
+  SLATE: "334155", // 표지 본문 글씨 · 표 머리글
+  MUTED: "64748B", // 부제
   FAINT: "94A3B8",
   LINE: "E2E8F0",
   TLINE: "CBD5E1",
@@ -93,7 +99,13 @@ export const LAYOUT = {
 
   // 표지
   COVER_Y: 379.2, // 사진이 시작하는 높이 (위는 흰 바탕)
+  BAR_Y: 785.3, // 맨 아래 네이비 띠
   BAR_H: 8,
+  COVER_LOGO: { x: 979.8, y: 36, w: 99.2, h: 46 },
+  COVER_X: 60,
+  COVER_BLD_Y: 60.7, // 건물명
+  COVER_TITLE_Y: 125.2, // 큰 제목
+  COVER_LINE_Y: [211.5, 248.7, 290.7, 332.7], // 대상 / 구분 / 작성일 / 작성
 
   // 내용 쪽 머리
   TITLE_Y: 28,
@@ -101,19 +113,28 @@ export const LAYOUT = {
   SUB_Y: 68.5,
   SUB_H: 18,
   LOGO: { x: 1013.1, y: 28, w: 81.9, h: 38 },
-  COVER_LOGO: { x: 979.8, y: 36, w: 99.2, h: 46 },
 
-  // 사진 쪽
-  BADGE_Y: 98.5,
+  // 대상·확인일·구분·작성 2행 표 (모든 내용 쪽 공통)
+  INFO_Y: 98.5,
+  INFO_TH_W: 92,
+  INFO_ROW_H: 34.5,
+  INFO_WIDE_H: 44, // 한 줄을 다 쓰는 행(용도·주의사항)
+
+  // 네이비 배지
+  BADGE_Y: 180.5,
   BADGE_H: 29,
-  GRID_Y: 139.5,
-  GAP: 10,
-  CAP_H: 40, // 사진 아래 설명줄 높이
-  NUM: 20, // 번호 배지 한 변
-  NOTE_H: 103.5, // 3x2 아래 비고칸 전체 높이
+  BADGE_GAP: 16.8, // 배지 오른쪽 설명 글씨까지
+
+  // 본문(사진 격자)
+  GRID_Y: 217.5,
+  GAP_X: 18.9,
+  GAP_Y: 14,
+  CAP_BAR_H: 29, // 사진 위에 얹는 검정 설명 띠
+  CAP_ALPHA: 0.75,
+  NUM: 17, // 번호 동그라미 지름
+  NOTE_H: 120, // 3x2 아래 비고칸 전체 높이
   NOTE_HEAD_H: 31.5,
   PANEL_W: 378, // 2x2 오른쪽 설명칸 너비
-  PANEL_GAP: 12,
 } as const;
 
 /** 쪽 바닥 (여백 안쪽) */
@@ -122,12 +143,10 @@ export const CONTENT_W = LAYOUT.PAGE_W - LAYOUT.PAD * 2; // 1067
 
 /** 사진 격자의 칸 크기 — PDF·PPT 가 같은 값을 쓴다 */
 export function gridBox(layout: ManualLayout) {
-  const { PAD, GAP, GRID_Y, NOTE_H, PANEL_W, PANEL_GAP, CAP_H } = LAYOUT;
+  const { PAD, GAP_X, GAP_Y, GRID_Y, NOTE_H, PANEL_W } = LAYOUT;
   if (layout === "2x2") {
-    const w = CONTENT_W - PANEL_W - PANEL_GAP;
+    const w = CONTENT_W - PANEL_W - GAP_X;
     const h = PAGE_BOTTOM - GRID_Y;
-    const cw = (w - GAP) / 2;
-    const ch = (h - GAP) / 2;
     return {
       cols: 2,
       rows: 2,
@@ -135,16 +154,13 @@ export function gridBox(layout: ManualLayout) {
       y: GRID_Y,
       w,
       h,
-      cw,
-      ch,
-      photoH: ch - CAP_H,
-      panel: { x: PAD + w + PANEL_GAP, y: GRID_Y, w: PANEL_W, h },
+      cw: (w - GAP_X) / 2,
+      ch: (h - GAP_Y) / 2,
+      panel: { x: PAD + w + GAP_X, y: GRID_Y, w: PANEL_W, h },
       note: null as null | { x: number; y: number; w: number; h: number },
     };
   }
-  const h = PAGE_BOTTOM - NOTE_H - GAP - GRID_Y;
-  const cw = (CONTENT_W - GAP * 2) / 3;
-  const ch = (h - GAP) / 2;
+  const h = PAGE_BOTTOM - NOTE_H - GAP_Y - GRID_Y;
   return {
     cols: 3,
     rows: 2,
@@ -152,9 +168,8 @@ export function gridBox(layout: ManualLayout) {
     y: GRID_Y,
     w: CONTENT_W,
     h,
-    cw,
-    ch,
-    photoH: ch - CAP_H,
+    cw: (CONTENT_W - GAP_X * 2) / 3,
+    ch: (h - GAP_Y) / 2,
     panel: null as null | { x: number; y: number; w: number; h: number },
     note: { x: PAD, y: PAGE_BOTTOM - NOTE_H, w: CONTENT_W, h: NOTE_H },
   };
@@ -164,11 +179,53 @@ export function gridBox(layout: ManualLayout) {
 export function cellXY(layout: ManualLayout, i: number) {
   const g = gridBox(layout);
   return {
-    x: g.x + (i % g.cols) * (g.cw + LAYOUT.GAP),
-    y: g.y + Math.floor(i / g.cols) * (g.ch + LAYOUT.GAP),
+    x: g.x + (i % g.cols) * (g.cw + LAYOUT.GAP_X),
+    y: g.y + Math.floor(i / g.cols) * (g.ch + LAYOUT.GAP_Y),
     w: g.cw,
     h: g.ch,
   };
+}
+
+/** 배지 너비 — 글자 수에 맞춰 늘어난다 (양식: "개 요" 78.7 / "현 장 사 진" 158.5) */
+export function badgeWidth(text: string): number {
+  return Math.max(88, text.trim().length * 20 + 48);
+}
+
+/** 글자 폭 어림 — 한글·전각은 글자 크기 그대로, 영숫자는 0.56배 */
+export function textWidth(text: string, size: number, spacing = 0): number {
+  let w = 0;
+  for (const ch of text) {
+    const code = ch.codePointAt(0) ?? 0;
+    w += (code < 0x1100 ? 0.56 : 1) * size + spacing;
+  }
+  return w;
+}
+
+/** 사진 설명 띠에 들어갈 폭 (칸 너비에서 테두리·여백·번호 동그라미를 뺀 값) */
+export function capBoxWidth(cellW: number): number {
+  return cellW - (LAYOUT.NUM + 7) - 31;
+}
+
+/**
+ * 사진 설명을 한 줄로 칸 안에 넣는다. 글자를 12→9px 로 줄여 보고,
+ * 그래도 넘치면 잘라서 … 를 붙인다. PPT·PDF 가 같은 결과를 쓰도록 여기서 한 번에 정한다.
+ */
+export function fitCaption(text: string, boxW: number): { text: string; size: number } {
+  const SPACING = 0.4;
+  for (const size of [12, 11, 10, 9]) {
+    if (textWidth(text, size, SPACING) <= boxW) return { text, size };
+  }
+  let out = text;
+  while (out.length > 1 && textWidth(out + "…", 9, SPACING) > boxW) out = out.slice(0, -1);
+  return { text: out + "…", size: 9 };
+}
+
+/** 모든 내용 쪽 위쪽 2행 표에 들어가는 네 칸 */
+export function infoPairs(m: Manual): [string, string, string, string][] {
+  return [
+    ["대  상", m.equipment || "-", "위  치", m.location || "-"],
+    ["구  분", m.category || "-", "작  성", [m.author, dotDate(m.date)].filter(Boolean).join("   ·   ")],
+  ];
 }
 
 // ── 날짜 ───────────────────────────────────────────────────────────
@@ -202,7 +259,7 @@ export function emptyManual(id: string, site: Site = "1사옥"): Manual {
     title: "",
     equipment: "",
     location: "",
-    category: "설비 운전",
+    category: "작동 매뉴얼",
     purpose: "",
     caution: "",
     author: DEFAULT_AUTHOR,

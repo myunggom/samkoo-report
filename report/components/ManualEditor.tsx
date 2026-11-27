@@ -256,7 +256,7 @@ export default function ManualEditor({ initial }: { initial: Manual }) {
 
         <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <label className="block">
-            <span className="mb-1 block text-xs font-medium text-slate-500">사옥 (표지 사진)</span>
+            <span className="mb-1 block text-xs font-medium text-slate-500">사옥</span>
             <select value={m.site} onChange={(e) => setSite(e.target.value as Site)} className={field}>
               {SITES.map((s) => (
                 <option key={s} value={s}>
