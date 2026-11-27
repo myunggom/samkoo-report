@@ -13,6 +13,7 @@ import { randomUUID } from "crypto";
 import type { PungReport } from "./pungsuhae";
 import type { MediaItem, DayNote } from "./archive";
 import { fillDefaults, type GenReport } from "./reports";
+import { fillManual, type Manual } from "./manual";
 import type { CalEvent } from "./events";
 import type { Issue } from "./issues";
 import type { WeeklyDraft } from "./weekly";
@@ -30,6 +31,7 @@ const PUNG_PREFIX = "db/pungsuhae/";
 const MEDIA_PREFIX = "db/media/";
 const DAYNOTE_PREFIX = "db/daynotes/";
 const GENREPORT_PREFIX = "db/genreports/";
+const MANUAL_PREFIX = "db/manuals/";
 const EVENT_PREFIX = "db/events/";
 const ISSUE_PREFIX = "db/issues/";
 const WEEKLY_PREFIX = "db/weekly/";
@@ -43,6 +45,7 @@ const PUNG_FILE = path.join(DATA_DIR, "pungsuhae.json");
 const MEDIA_FILE = path.join(DATA_DIR, "media.json");
 const DAYNOTE_FILE = path.join(DATA_DIR, "daynotes.json");
 const GENREPORT_FILE = path.join(DATA_DIR, "genreports.json");
+const MANUAL_FILE = path.join(DATA_DIR, "manuals.json");
 const EVENT_FILE = path.join(DATA_DIR, "events.json");
 const ISSUE_FILE = path.join(DATA_DIR, "issues.json");
 const WEEKLY_FILE = path.join(DATA_DIR, "weekly.json");
@@ -247,6 +250,44 @@ export async function saveGenReport(report: GenReport): Promise<GenReport> {
 export async function deleteGenReport(id: string): Promise<void> {
   const all = await allGenReports();
   await putGenReports(all.filter((r) => r.id !== id));
+}
+
+// ── 작동 매뉴얼 (사진 매뉴얼 · 단일 집계 JSON) ────────────────────
+async function allManuals(): Promise<Manual[]> {
+  const list = USE_BLOB
+    ? await readBlobJson<Manual[]>(MANUAL_PREFIX, [])
+    : await readLocal<Manual[]>(MANUAL_FILE, []);
+  // 양식 칸이 없던 옛 자료도 열리도록 기본값을 채워 넘긴다.
+  return list.map(fillManual);
+}
+async function putManuals(list: Manual[]): Promise<void> {
+  if (USE_BLOB) await writeBlobJson(MANUAL_PREFIX, list);
+  else await writeLocal(MANUAL_FILE, list);
+}
+
+export async function listManuals(): Promise<Manual[]> {
+  const all = await allManuals();
+  return all.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+}
+
+export async function getManual(id: string): Promise<Manual | null> {
+  const all = await allManuals();
+  return all.find((m) => m.id === id) ?? null;
+}
+
+export async function saveManual(manual: Manual): Promise<Manual> {
+  const all = await allManuals();
+  const next: Manual = { ...manual, updatedAt: new Date().toISOString() };
+  const idx = all.findIndex((m) => m.id === next.id);
+  if (idx >= 0) all[idx] = next;
+  else all.push(next);
+  await putManuals(all);
+  return next;
+}
+
+export async function deleteManual(id: string): Promise<void> {
+  const all = await allManuals();
+  await putManuals(all.filter((m) => m.id !== id));
 }
 
 // ── 일정(캘린더 이벤트 · 단일 집계 JSON) ──────────────────────────

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import ReportTabs from "@/components/ReportTabs";
 import type { GenReport, ReportKind } from "@/lib/reports";
 import { REPORT_KINDS, KIND_LABEL, KIND_EMOJI, dotDate, reportFileName } from "@/lib/reports";
 
@@ -52,7 +53,8 @@ export default function ReportsHub() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-slate-900">보고서</h1>
+        <ReportTabs />
+        <h1 className="mt-4 text-xl font-bold text-slate-900">보고서</h1>
         <p className="mt-1 text-sm text-slate-500">양식을 고르면 내용·사진을 채워 동일한 양식의 PDF로 출력됩니다.</p>
       </div>
 
